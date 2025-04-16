@@ -1,0 +1,86 @@
+﻿<Window x:Class="Gitster.MainWindow"
+       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+       mc:Ignorable="d"
+       Title="Gitster" Height="450" Width="800" SizeToContent="Height" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
+    <Grid>
+        <Grid.Resources>
+            <Style TargetType="TextBox">
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Padding" Value="5" />
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="Height" Value="30" />
+            </Style>
+            <Style TargetType="Button">
+                <Setter Property="Background" Value="White" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Padding" Value="5" />
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="Height" Value="30" />
+            </Style>
+            <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0,5,5,5" />
+                <Setter Property="FontSize" Value="18" />
+            </Style>
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="200" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="5" TextChanged="FolderTb_TextChanged" />
+        <Grid Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="PreviousCommitName" Margin="5,5,5,5" Height="30" Grid.Column="0" IsReadOnly="True" />
+            <TextBox x:Name="PreviousDate" Margin="0,5,5,5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" />
+            <StackPanel Orientation="Horizontal" Grid.Column="2">
+                <Button Width="30" Content="🕑" Click="ButtonRead_Click" Style="{StaticResource IconButtonStyle}" />
+            </StackPanel>
+        </Grid>
+
+        <Slider Grid.Row="2" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="31" ValueChanged="DateSlider_ValueChanged" />
+        <Slider Grid.Row="2" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="12" ValueChanged="DateSlider_ValueChanged" />
+        <Slider Grid.Row="2" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="23" ValueChanged="TimeSliderValueChanged" />
+        <Slider Grid.Row="2" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="59" ValueChanged="TimeSliderValueChanged" />
+
+        <DatePicker Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" VerticalAlignment="Top" Width="200" SelectedDateChanged="DatePicker_SelectedDateChanged" Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
+        <TextBox Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" Width="200" IsReadOnly="True" Margin="5" />
+
+        <Grid Grid.Row="5" Grid.ColumnSpan="6" Grid.Column="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="CommitName" Margin="5,5,5,5" Height="30" Grid.Column="0" IsReadOnly="True" />
+            <TextBox x:Name="CommitDate" Margin="0,5,5,5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" />
+            <StackPanel Orientation="Horizontal" Grid.Column="2">
+                <Button Width="30" Content="🕑" Click="ButtonTime_Click" Style="{StaticResource IconButtonStyle}" />
+            </StackPanel>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
+            <Button Width="70" Height="30" Content="Amend" Click="Button_Click" Margin="5" x:Name="GoButton" />
+        </StackPanel>
+    </Grid>
+</Window>
