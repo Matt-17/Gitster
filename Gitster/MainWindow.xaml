@@ -30,10 +30,9 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="200" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="200" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -59,15 +58,15 @@
             </StackPanel>
         </Grid>
 
-        <Slider Grid.Row="2" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="31" ValueChanged="DateSlider_ValueChanged" />
-        <Slider Grid.Row="2" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="12" ValueChanged="DateSlider_ValueChanged" />
-        <Slider Grid.Row="2" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="23" ValueChanged="TimeSliderValueChanged" />
-        <Slider Grid.Row="2" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="59" ValueChanged="TimeSliderValueChanged" />
+        <Slider Grid.Row="4" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="31" ValueChanged="DateSlider_ValueChanged" />
+        <Slider Grid.Row="4" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="12" ValueChanged="DateSlider_ValueChanged" />
+        <Slider Grid.Row="4" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="23" ValueChanged="TimeSliderValueChanged" />
+        <Slider Grid.Row="4" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="59" ValueChanged="TimeSliderValueChanged" />
 
-        <DatePicker Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" VerticalAlignment="Top" Width="200" SelectedDateChanged="DatePicker_SelectedDateChanged" Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
-        <TextBox Grid.Row="3" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" Width="200" IsReadOnly="True" Margin="5" />
+        <DatePicker Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" VerticalAlignment="Top" Width="200" SelectedDateChanged="DatePicker_SelectedDateChanged" Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
+        <TextBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" Width="200" IsReadOnly="True" Margin="5" />
 
-        <Grid Grid.Row="5" Grid.ColumnSpan="6" Grid.Column="0">
+        <Grid Grid.Row="2" Grid.ColumnSpan="6" Grid.Column="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition />
                 <ColumnDefinition Width="Auto" />
@@ -79,7 +78,7 @@
                 <Button Width="30" Content="🕑" Click="ButtonTime_Click" Style="{StaticResource IconButtonStyle}" />
             </StackPanel>
         </Grid>
-        <StackPanel Orientation="Horizontal" Grid.Row="2" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
+        <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
             <Button Width="70" Height="30" Content="Amend" Click="Button_Click" Margin="5" x:Name="GoButton" />
         </StackPanel>
     </Grid>
