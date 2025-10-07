@@ -53,7 +53,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public partial CommitItem? SelectedCommit { get; set; }
 
     [ObservableProperty]
-    public partial CommitDetailViewModel PreviousCommitDetail { get; set; }
+    public partial CommitDetailViewModel SelectedCommitDetail { get; set; }
 
     [ObservableProperty]
     public partial CommitDetailViewModel CurrentCommitDetail { get; set; }
@@ -62,7 +62,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public MainWindowViewModel()
     {
-        PreviousCommitDetail = new CommitDetailViewModel();
+        SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
         
         // Initialize with current date/time
@@ -122,7 +122,7 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         if (value != null)
         {
-            PreviousCommitDetail.UpdateCommit(value.Message, value.Date);
+            SelectedCommitDetail.UpdateCommit(value.Message, value.Date);
         }
     }
 
@@ -172,22 +172,22 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void ReadPreviousCommitTime()
+    private void ReadSelectedCommitTime()
     {
+        if (SelectedCommit == null)
+        {
+            return;
+        }
+
         try
         {
-            using var repo = new Repository(Path);
-
-            var commit = repo.Head.Tip.Parents.First();
-            var author = commit.Author;
-            
-            SelectedDate = new DateTime(author.When.Year, author.When.Month, author.When.Day);
-            HoursValue = author.When.Hour;
-            MinutesValue = author.When.Minute;
+            SelectedDate = new DateTime(SelectedCommit.Date.Year, SelectedCommit.Date.Month, SelectedCommit.Date.Day);
+            HoursValue = SelectedCommit.Date.Hour;
+            MinutesValue = SelectedCommit.Date.Minute;
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error reading previous commit: {ex.Message}");
+            MessageBox.Show($"Error reading selected commit: {ex.Message}");
         }
     }
 
@@ -265,7 +265,7 @@ public partial class MainWindowViewModel : BaseViewModel
             );
 
             var previousCommit = headTip.Parents.First();
-            PreviousCommitDetail.UpdateCommit(
+            SelectedCommitDetail.UpdateCommit(
                 previousCommit.MessageShort,
                 previousCommit.Author.When.DateTime
             );
@@ -282,12 +282,18 @@ public partial class MainWindowViewModel : BaseViewModel
                     c.Id.Sha.Substring(0, 7)
                 ));
             }
+
+            // Auto-select the second item if available
+            if (Commits.Count >= 2)
+            {
+                SelectedCommit = Commits[1];
+            }
         }
         catch (Exception)
         {
             // Empty all the fields
             CurrentCommitDetail.Clear();
-            PreviousCommitDetail.Clear();
+            SelectedCommitDetail.Clear();
             SelectedDate = null;
 
             MonthsValue = 1;

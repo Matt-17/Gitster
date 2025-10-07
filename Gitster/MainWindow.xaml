@@ -68,8 +68,8 @@
 
         <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="5" 
                  Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" />
-        <GroupBox Header="Previous Commit / Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
-                  DataContext="{Binding PreviousCommitDetail}">
+        <GroupBox Header="Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
+                  DataContext="{Binding SelectedCommitDetail}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition />
@@ -81,7 +81,7 @@
                 <TextBox Margin="5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" 
                          Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
                 <StackPanel Orientation="Horizontal" Grid.Column="2">
-                    <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadPreviousCommitTimeCommand, RelativeSource={RelativeSource AncestorType=GroupBox}}" 
+                    <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadSelectedCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                             Style="{StaticResource IconButtonStyle}" />
                 </StackPanel>
             </Grid>
@@ -121,7 +121,7 @@
                 <TextBox Margin="5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" 
                          Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
                 <StackPanel Orientation="Horizontal" Grid.Column="2">
-                    <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadCurrentCommitTimeCommand, RelativeSource={RelativeSource AncestorType=GroupBox}}" 
+                    <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadCurrentCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                             Style="{StaticResource IconButtonStyle}" />
                 </StackPanel>
             </Grid>
