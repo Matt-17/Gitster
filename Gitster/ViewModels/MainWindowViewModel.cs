@@ -261,13 +261,13 @@ public partial class MainWindowViewModel : BaseViewModel
             var headTip = repo.Head.Tip;
             CurrentCommitDetail.UpdateCommit(
                 headTip.MessageShort,
-                headTip.Author.When.ToString(@"dd.MM.yyyy \u\m HH:mm")
+                headTip.Author.When.DateTime
             );
 
             var previousCommit = headTip.Parents.First();
             PreviousCommitDetail.UpdateCommit(
                 previousCommit.MessageShort,
-                previousCommit.Author.When.ToString(@"dd.MM.yyyy \u\m HH:mm")
+                previousCommit.Author.When.DateTime
             );
 
             IsGoButtonEnabled = true;
@@ -278,7 +278,7 @@ public partial class MainWindowViewModel : BaseViewModel
             {
                 Commits.Add(new CommitItem(
                     c.MessageShort,
-                    c.Author.When.ToString(@"dd.MM.yyyy HH:mm"),
+                    c.Author.When.DateTime,
                     c.Id.Sha.Substring(0, 7)
                 ));
             }

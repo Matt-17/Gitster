@@ -1,3 +1,4 @@
+using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Gitster.ViewModels;
@@ -11,12 +12,12 @@ public partial class CommitDetailViewModel : BaseViewModel
     public partial string CommitMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string CommitDate { get; set; } = string.Empty;
+    public partial DateTime? CommitDate { get; set; }
 
     /// <summary>
     /// Updates the commit details.
     /// </summary>
-    public void UpdateCommit(string message, string date)
+    public void UpdateCommit(string message, DateTime date)
     {
         CommitMessage = message;
         CommitDate = date;
@@ -28,6 +29,6 @@ public partial class CommitDetailViewModel : BaseViewModel
     public void Clear()
     {
         CommitMessage = string.Empty;
-        CommitDate = string.Empty;
+        CommitDate = null;
     }
 }
