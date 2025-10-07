@@ -8,10 +8,10 @@ namespace Gitster.ViewModels;
 public partial class CommitDetailViewModel : BaseViewModel
 {
     [ObservableProperty]
-    private string _commitMessage = string.Empty;
+    public partial string CommitMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string _commitDate = string.Empty;
+    public partial string CommitDate { get; set; } = string.Empty;
 
     /// <summary>
     /// Updates the commit details.

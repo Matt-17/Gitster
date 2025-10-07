@@ -5,18 +5,18 @@ namespace Gitster;
 public partial class CommitItem : ObservableObject
 {
     [ObservableProperty]
-    private string _message;
+    public partial string Message { get; set; }
 
     [ObservableProperty]
-    private string _date;
+    public partial string Date { get; set; }
 
     [ObservableProperty]
-    private string _commitId;
+    public partial string CommitId { get; set; }
 
     public CommitItem(string message, string date, string commitId)
     {
-        _message = message;
-        _date = date;
-        _commitId = commitId;
+        Message = message;
+        Date = date;
+        CommitId = commitId;
     }
 }

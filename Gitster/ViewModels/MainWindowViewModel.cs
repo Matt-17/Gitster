@@ -14,56 +14,56 @@ namespace Gitster.ViewModels;
 public partial class MainWindowViewModel : BaseViewModel
 {
     [ObservableProperty]
-    private string _path = string.Empty;
+    public partial string Path { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string _folderPath = string.Empty;
+    public partial string FolderPath { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string _commitName = string.Empty;
+    public partial string CommitName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string _commitDate = string.Empty;
+    public partial string CommitDate { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string _timeText = "00:00";
+    public partial string TimeText { get; set; } = "00:00";
 
     [ObservableProperty]
-    private DateTime? _selectedDate;
+    public partial DateTime? SelectedDate { get; set; }
 
     [ObservableProperty]
-    private double _hoursValue;
+    public partial double HoursValue { get; set; }
 
     [ObservableProperty]
-    private double _minutesValue;
+    public partial double MinutesValue { get; set; }
 
     [ObservableProperty]
-    private double _daysValue;
+    public partial double DaysValue { get; set; }
 
     [ObservableProperty]
-    private double _monthsValue;
+    public partial double MonthsValue { get; set; }
 
     [ObservableProperty]
-    private double _daysMaximum = 31;
+    public partial double DaysMaximum { get; set; } = 31;
 
     [ObservableProperty]
-    private bool _isGoButtonEnabled;
+    public partial bool IsGoButtonEnabled { get; set; }
 
     [ObservableProperty]
-    private CommitItem? _selectedCommit;
+    public partial CommitItem? SelectedCommit { get; set; }
 
     [ObservableProperty]
-    private CommitDetailViewModel _previousCommitDetail;
+    public partial CommitDetailViewModel PreviousCommitDetail { get; set; }
 
     [ObservableProperty]
-    private CommitDetailViewModel _currentCommitDetail;
+    public partial CommitDetailViewModel CurrentCommitDetail { get; set; }
 
-    public ObservableCollection<CommitItem> Commits { get; } = new();
+    public ObservableCollection<CommitItem> Commits { get; } = [];
 
     public MainWindowViewModel()
     {
-        _previousCommitDetail = new CommitDetailViewModel();
-        _currentCommitDetail = new CommitDetailViewModel();
+        PreviousCommitDetail = new CommitDetailViewModel();
+        CurrentCommitDetail = new CommitDetailViewModel();
         
         // Initialize with current date/time
         SelectedDate = DateTime.Now;
