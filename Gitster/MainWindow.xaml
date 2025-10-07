@@ -4,7 +4,7 @@
        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
        mc:Ignorable="d"
-       Title="Gitster" Height="450" Width="800" SizeToContent="Height" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
+       Title="Gitster" Height="450" Width="1100" SizeToContent="Height" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
     <Grid>
         <Grid.Resources>
             <Style TargetType="TextBox">
@@ -27,22 +27,40 @@
                 <Setter Property="FontSize" Value="18" />
             </Style>
         </Grid.Resources>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="200" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition />
-            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="420" />
+            <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+        
+        <!-- Left side: Commit ListView -->
+        <ListView x:Name="CommitListView" Grid.Column="0" Margin="5">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
+                    <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date}" />
+                    <GridViewColumn Header="Commit ID" Width="80" DisplayMemberBinding="{Binding CommitId}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+        
+        <!-- Right side: Original content -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="200" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
         <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="5" TextChanged="FolderTb_TextChanged" />
         <Grid Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0">
@@ -81,5 +99,6 @@
         <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
             <Button Width="70" Height="30" Content="Amend" Click="Button_Click" Margin="5" x:Name="GoButton" />
         </StackPanel>
+        </Grid>
     </Grid>
 </Window>
