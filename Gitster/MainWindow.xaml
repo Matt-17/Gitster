@@ -3,6 +3,8 @@
        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+       xmlns:vm="clr-namespace:Gitster.ViewModels"
+       d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
        mc:Ignorable="d"
        Title="Gitster" Height="450" Width="1100" SizeToContent="Height" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
     <Grid>
@@ -33,7 +35,9 @@
         </Grid.ColumnDefinitions>
         
         <!-- Left side: Commit ListView -->
-        <ListView x:Name="CommitListView" Grid.Column="0" Margin="5">
+        <ListView x:Name="CommitListView" Grid.Column="0" Margin="5" 
+                  ItemsSource="{Binding Commits}" 
+                  SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
             <ListView.View>
                 <GridView>
                     <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
@@ -62,42 +66,67 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-        <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="5" TextChanged="FolderTb_TextChanged" />
-        <Grid Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBox x:Name="PreviousCommitName" Margin="5,5,5,5" Height="30" Grid.Column="0" IsReadOnly="True" />
-            <TextBox x:Name="PreviousDate" Margin="0,5,5,5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" />
-            <StackPanel Orientation="Horizontal" Grid.Column="2">
-                <Button Width="30" Content="🕑" Click="ButtonRead_Click" Style="{StaticResource IconButtonStyle}" />
-            </StackPanel>
-        </Grid>
+        <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="5" 
+                 Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" />
+        <GroupBox Header="Previous Commit / Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
+                         Text="{Binding PreviousCommitDetail.CommitMessage, Mode=OneWay}" />
+                <TextBox Margin="5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" 
+                         Text="{Binding PreviousCommitDetail.CommitDate, Mode=OneWay}" />
+                <StackPanel Orientation="Horizontal" Grid.Column="2">
+                    <Button Width="30" Content="🕑" Command="{Binding ReadPreviousCommitTimeCommand}" 
+                            Style="{StaticResource IconButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </GroupBox>
 
-        <Slider Grid.Row="4" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="31" ValueChanged="DateSlider_ValueChanged" />
-        <Slider Grid.Row="4" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="1" Maximum="12" ValueChanged="DateSlider_ValueChanged" />
-        <Slider Grid.Row="4" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="23" ValueChanged="TimeSliderValueChanged" />
-        <Slider Grid.Row="4" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" HorizontalAlignment="Center" Minimum="0" Maximum="59" ValueChanged="TimeSliderValueChanged" />
+        <Slider Grid.Row="4" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" 
+                HorizontalAlignment="Center" Minimum="1" Maximum="{Binding DaysMaximum}" 
+                Value="{Binding DaysValue}" />
+        <Slider Grid.Row="4" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" 
+                HorizontalAlignment="Center" Minimum="1" Maximum="12" 
+                Value="{Binding MonthsValue}" />
+        <Slider Grid.Row="4" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" 
+                HorizontalAlignment="Center" Minimum="0" Maximum="23" 
+                Value="{Binding HoursValue}" />
+        <Slider Grid.Row="4" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" 
+                HorizontalAlignment="Center" Minimum="0" Maximum="59" 
+                Value="{Binding MinutesValue}" />
 
-        <DatePicker Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" VerticalAlignment="Top" Width="200" SelectedDateChanged="DatePicker_SelectedDateChanged" Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
-        <TextBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" Width="200" IsReadOnly="True" Margin="5" />
+        <DatePicker Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" 
+                    VerticalAlignment="Top" Width="200" 
+                    SelectedDate="{Binding SelectedDate, Mode=TwoWay}" 
+                    Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
+        <TextBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" 
+                 Width="200" IsReadOnly="True" Margin="5" 
+                 Text="{Binding TimeText, Mode=OneWay}" />
 
-        <Grid Grid.Row="2" Grid.ColumnSpan="6" Grid.Column="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBox x:Name="CommitName" Margin="5,5,5,5" Height="30" Grid.Column="0" IsReadOnly="True" />
-            <TextBox x:Name="CommitDate" Margin="0,5,5,5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" />
-            <StackPanel Orientation="Horizontal" Grid.Column="2">
-                <Button Width="30" Content="🕑" Click="ButtonTime_Click" Style="{StaticResource IconButtonStyle}" />
-            </StackPanel>
-        </Grid>
+        <GroupBox Header="Current Commit" Grid.Row="2" Grid.ColumnSpan="6" Grid.Column="0" Margin="5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
+                         Text="{Binding CurrentCommitDetail.CommitMessage, Mode=OneWay}" />
+                <TextBox Margin="5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" 
+                         Text="{Binding CurrentCommitDetail.CommitDate, Mode=OneWay}" />
+                <StackPanel Orientation="Horizontal" Grid.Column="2">
+                    <Button Width="30" Content="🕑" Command="{Binding ReadCurrentCommitTimeCommand}" 
+                            Style="{StaticResource IconButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </GroupBox>
         <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
-            <Button Width="70" Height="30" Content="Amend" Click="Button_Click" Margin="5" x:Name="GoButton" />
+            <Button Width="70" Height="30" Content="Amend" Command="{Binding AmendCommitCommand}" 
+                    Margin="5" x:Name="GoButton" IsEnabled="{Binding IsGoButtonEnabled}" />
         </StackPanel>
         </Grid>
     </Grid>
