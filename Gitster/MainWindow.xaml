@@ -41,7 +41,7 @@
             <ListView.View>
                 <GridView>
                     <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
-                    <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date}" />
+                    <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
                     <GridViewColumn Header="Commit ID" Width="80" DisplayMemberBinding="{Binding CommitId}" />
                 </GridView>
             </ListView.View>
@@ -79,7 +79,7 @@
                 <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
                          Text="{Binding CommitMessage, Mode=OneWay}" />
                 <TextBox Margin="5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" 
-                         Text="{Binding CommitDate, Mode=OneWay}" />
+                         Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
                 <StackPanel Orientation="Horizontal" Grid.Column="2">
                     <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadPreviousCommitTimeCommand, RelativeSource={RelativeSource AncestorType=GroupBox}}" 
                             Style="{StaticResource IconButtonStyle}" />
@@ -119,7 +119,7 @@
                 <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
                          Text="{Binding CommitMessage, Mode=OneWay}" />
                 <TextBox Margin="5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" 
-                         Text="{Binding CommitDate, Mode=OneWay}" />
+                         Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
                 <StackPanel Orientation="Horizontal" Grid.Column="2">
                     <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadCurrentCommitTimeCommand, RelativeSource={RelativeSource AncestorType=GroupBox}}" 
                             Style="{StaticResource IconButtonStyle}" />
