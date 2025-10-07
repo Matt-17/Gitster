@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 
 using LibGit2Sharp;
+using System.Collections.ObjectModel;
 
 namespace Gitster;
 
@@ -10,10 +11,13 @@ namespace Gitster;
 public partial class MainWindow : Window
 {
     private string _path;
+    private ObservableCollection<CommitItem> _commits = new ObservableCollection<CommitItem>();
 
     public MainWindow()
     {
         InitializeComponent();
+
+        CommitListView.ItemsSource = _commits;
 
         DatePicker.SelectedDate = DateTime.Now;
         HoursSlider.Value = DateTime.Now.Hour;
@@ -177,6 +181,17 @@ public partial class MainWindow : Window
             PreviousDate.Text = commit.Author.When.ToString(@"dd.MM.yyyy \u\m HH:mm");
 
             GoButton.IsEnabled = true;
+
+            // Update commit list
+            _commits.Clear();
+            foreach (var c in repo.Commits)
+            {
+                _commits.Add(new CommitItem(
+                    c.MessageShort,
+                    c.Author.When.ToString(@"dd.MM.yyyy HH:mm"),
+                    c.Id.Sha.Substring(0, 7)
+                ));
+            }
         }
         catch (Exception exception)
         {
@@ -193,6 +208,8 @@ public partial class MainWindow : Window
             MinutesSlider.Value = 0;
 
             GoButton.IsEnabled = false;
+
+            _commits.Clear();
         }
     }
 }
