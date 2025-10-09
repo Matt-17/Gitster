@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
+using Gitster.Controls;
 using Gitster.Helpers;
 using Gitster.Models;
 
@@ -18,6 +19,9 @@ public partial class DateControlViewModel : BaseViewModel
     private bool _isOpen;
     private string _text = string.Empty;
     private DateTime? _selectedDate;
+    private EditMode _editMode = Controls.EditMode.DateOnly;
+    private int _hour;
+    private int _minute;
 
     public DateControlViewModel()
     {
@@ -53,6 +57,36 @@ public partial class DateControlViewModel : BaseViewModel
         set => SetProperty(ref _date, value);
     }
 
+    public EditMode EditMode
+    {
+        get => _editMode;
+        set => SetProperty(ref _editMode, value);
+    }
+
+    public int Hour
+    {
+        get => _hour;
+        set
+        {
+            if (SetProperty(ref _hour, value))
+            {
+                UpdateSelectedDateWithTime();
+            }
+        }
+    }
+
+    public int Minute
+    {
+        get => _minute;
+        set
+        {
+            if (SetProperty(ref _minute, value))
+            {
+                UpdateSelectedDateWithTime();
+            }
+        }
+    }
+
     public string Text
     {
         get => _text;
@@ -62,7 +96,14 @@ public partial class DateControlViewModel : BaseViewModel
                 return;
             try
             {
-                SelectedDate = string.IsNullOrWhiteSpace(value) ? null : GetDate(value);
+                if (EditMode == Controls.EditMode.DateOnly)
+                {
+                    SelectedDate = string.IsNullOrWhiteSpace(value) ? null : GetDate(value);
+                }
+                else
+                {
+                    SelectedDate = string.IsNullOrWhiteSpace(value) ? null : GetDateTime(value);
+                }
             }
             finally
             {
@@ -79,9 +120,33 @@ public partial class DateControlViewModel : BaseViewModel
             if (value.Equals(_selectedDate))
                 return;
             _selectedDate = value;
+            
+            // Update hour and minute from the selected date
+            if (_selectedDate.HasValue)
+            {
+                _hour = _selectedDate.Value.Hour;
+                _minute = _selectedDate.Value.Minute;
+                OnPropertyChanged(nameof(Hour));
+                OnPropertyChanged(nameof(Minute));
+            }
+            
             OnPropertyChanged();
             OnSelectedDateChanged(SelectedDate);
-            _text = SelectedDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+            
+            // Update text based on edit mode
+            if (EditMode == Controls.EditMode.DateOnly)
+            {
+                _text = SelectedDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+            }
+            else if (EditMode == Controls.EditMode.TimeOnly)
+            {
+                _text = SelectedDate?.ToString("HH:mm") ?? string.Empty;
+            }
+            else // DateTime
+            {
+                _text = SelectedDate?.ToString("dd.MM.yyyy HH:mm") ?? string.Empty;
+            }
+            
             OnPropertyChanged(nameof(Text));
             SetDate(SelectedDate);
 
@@ -138,6 +203,49 @@ public partial class DateControlViewModel : BaseViewModel
     public void Reset()
     {
         OnPropertyChanged(nameof(Text));
+    }
+
+    public void ChangeHour(int hours)
+    {
+        if (SelectedDate.HasValue)
+        {
+            var newHour = (Hour + hours + 24) % 24;
+            Hour = newHour;
+        }
+    }
+
+    public void ChangeMinute(int minutes)
+    {
+        if (SelectedDate.HasValue)
+        {
+            var newMinute = (Minute + minutes + 60) % 60;
+            Minute = newMinute;
+        }
+    }
+
+    private void UpdateSelectedDateWithTime()
+    {
+        if (_selectedDate.HasValue)
+        {
+            var date = _selectedDate.Value.Date;
+            var newDateTime = new DateTime(date.Year, date.Month, date.Day, _hour, _minute, 0);
+            
+            // Update without triggering the setter loop
+            _selectedDate = newDateTime;
+            OnPropertyChanged(nameof(SelectedDate));
+            OnSelectedDateChanged(newDateTime);
+            
+            // Update text
+            if (EditMode == Controls.EditMode.TimeOnly)
+            {
+                _text = newDateTime.ToString("HH:mm");
+            }
+            else // DateTime
+            {
+                _text = newDateTime.ToString("dd.MM.yyyy HH:mm");
+            }
+            OnPropertyChanged(nameof(Text));
+        }
     }
 
     protected virtual void OnSelectedDateChanged(DateTime? e)
@@ -220,6 +328,51 @@ public partial class DateControlViewModel : BaseViewModel
 
         if (success)
             return dateTime;
+
+        throw new ArgumentOutOfRangeException();
+    }
+
+    private DateTime? GetDateTime(string text)
+    {
+        // Try parsing as full datetime first
+        var dateTimeFormats = new[] {
+            "dd.MM.yyyy HH:mm",
+            "dd.MM.yyyy HH:mm:ss",
+            "dd-MM-yyyy HH:mm",
+            "dd-MM-yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm",
+            "dd/MM/yyyy HH:mm:ss",
+            "d.M.yyyy HH:mm",
+            "d.M.yyyy HH:mm:ss",
+            "dd.MM.yy HH:mm",
+            "dd.MM.yy HH:mm:ss",
+            "HH:mm",
+            "HH:mm:ss"
+        };
+
+        foreach (var format in dateTimeFormats)
+        {
+            if (DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture, 
+                DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out DateTime result))
+            {
+                return result;
+            }
+        }
+
+        // If that fails, try parsing as date only and add current time
+        try
+        {
+            var dateOnly = GetDate(text);
+            if (dateOnly.HasValue)
+            {
+                return new DateTime(dateOnly.Value.Year, dateOnly.Value.Month, dateOnly.Value.Day, 
+                    _hour, _minute, 0);
+            }
+        }
+        catch
+        {
+            // Continue to exception below
+        }
 
         throw new ArgumentOutOfRangeException();
     }
