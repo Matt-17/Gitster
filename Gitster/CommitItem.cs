@@ -1,12 +1,20 @@
+using System;
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Gitster;
 
-public class CommitItem
+public partial class CommitItem : ObservableObject
 {
-    public string Message { get; set; }
-    public string Date { get; set; }
-    public string CommitId { get; set; }
+    [ObservableProperty]
+    public partial string Message { get; set; }
 
-    public CommitItem(string message, string date, string commitId)
+    [ObservableProperty]
+    public partial DateTime Date { get; set; }
+
+    [ObservableProperty]
+    public partial string CommitId { get; set; }
+
+    public CommitItem(string message, DateTime date, string commitId)
     {
         Message = message;
         Date = date;
