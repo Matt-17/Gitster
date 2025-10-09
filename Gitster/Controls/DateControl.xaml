@@ -8,7 +8,9 @@
              xmlns:models="clr-namespace:Gitster.Models"
              xmlns:converters="clr-namespace:Gitster.Converters"
              xmlns:controls="clr-namespace:Gitster.Controls"
+             xmlns:viewModels="clr-namespace:Gitster.ViewModels"
              mc:Ignorable="d" 
+             d:DataContext="{d:DesignInstance Type=viewModels:DateControlViewModel}"
              d:DesignWidth="200" HorizontalAlignment="Left">
     <UserControl.Resources>
         <converters:BoolConverter x:Key="BoolConverterVisible" Type="Visible"/>
@@ -19,6 +21,7 @@
     <Grid x:Name="LayoutRoot">
         <Grid.ColumnDefinitions>
             <ColumnDefinition MinWidth="90"/>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
@@ -37,12 +40,13 @@
                 <behaviors:FocusBehavior SelectOnFocus="True" />
             </b:Interaction.Behaviors>
         </TextBox>
-        <Button Grid.Column="1" Focusable="False" Click="Button_Click" HorizontalAlignment="Right" Height="20" Padding="2" Margin="0,0,4,4" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
+        <Button Grid.Column="1" Focusable="False" Click="Button_Click" HorizontalAlignment="Right" Height="20" Padding="1" Margin="2" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
             <Path Data="M19.100003,21.900019L23.400006,21.900019 23.400006,26.100003 19.100003,26.100003z M13.900004,21.900019L18.200009,21.900019 18.200009,26.100003 13.900004,26.100003z M8.6000004,21.900019L12.900004,21.900019 12.900004,26.100003 8.6000004,26.100003z M3.4000025,21.900019L7.7000065,21.900019 7.7000065,26.100003 3.4000025,26.100003z M24.400008,16.599999L28.700011,16.599999 28.700011,20.800013 24.400008,20.800013z M19.100003,16.599999L23.400006,16.599999 23.400006,20.800013 19.100003,20.800013z M13.900004,16.599999L18.200009,16.599999 18.200009,20.800013 13.900004,20.800013z M8.6000004,16.599999L12.900004,16.599999 12.900004,20.800013 8.6000004,20.800013z M3.4000025,16.599999L7.7000065,16.599999 7.7000065,20.800013 3.4000025,20.800013z M24.400008,11.500005L28.700011,11.500005 28.700011,15.700004 24.400008,15.700004z M19.100003,11.500005L23.400006,11.500005 23.400006,15.700004 19.100003,15.700004z M13.900004,11.500005L18.200009,11.500005 18.200009,15.700004 13.900004,15.700004z M8.6000004,11.500005L12.900004,11.500005 12.900004,15.700004 8.6000004,15.700004z M3.4000025,11.500005L7.7000065,11.500005 7.7000065,15.700004 3.4000025,15.700004z M24.400008,6.2999905L28.700011,6.2999905 28.700011,10.500005 24.400008,10.500005z M19.100003,6.2999905L23.400006,6.2999905 23.400006,10.500005 19.100003,10.500005z M13.900004,6.2999905L18.200009,6.2999905 18.200009,10.500005 13.900004,10.500005z M8.6000004,6.2999905L12.900004,6.2999905 12.900004,10.500005 8.6000004,10.500005z M2.3000035,5.1999992L2.3000035,27.100003 29.600005,27.100003 29.600005,5.1999992z M0,0L31.999999,0 31.999999,29.499998 0,29.499998z" Stretch="Uniform" Fill="{DynamicResource AccentMainBrush}" />
         </Button>
-        <Button Grid.Column="2" Focusable="False" Click="Date_Click" Margin="4,0,4,4" Height="20" Width="20" Padding="0" VerticalAlignment="Center" SnapsToDevicePixels="True" Content="H" ToolTip="Heute"/>
-        
-        <Popup IsOpen="{Binding IsOpen, Mode=TwoWay}" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=TbDate}" VerticalOffset="2">
+        <Button Grid.Column="2" Focusable="False" Click="Date_Click" Margin="2" Height="20" Width="20" Padding="0" VerticalAlignment="Center" SnapsToDevicePixels="True" Content="H" ToolTip="Heute"/>
+        <Button Grid.Column="3" Focusable="False" Click="Date_Click" Margin="2" Height="20" Width="20" Padding="0" VerticalAlignment="Center" SnapsToDevicePixels="True" Content="J" ToolTip="Heute"/>
+
+        <Popup Grid.Column="0" IsOpen="{Binding IsOpen, Mode=TwoWay, FallbackValue=True, TargetNullValue=True}" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=TbDate}" VerticalOffset="2">
             <Border Background="White" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="2" SnapsToDevicePixels="True" MouseWheel="MonthOnMouseWheel">
                 <StackPanel>
                     <Grid Height="28">
@@ -101,7 +105,7 @@
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
-                    
+
                     <!-- Time Editor Section (visible when EditMode != DateOnly) -->
                     <Grid Margin="10,10,10,5">
                         <Grid.Style>
@@ -122,7 +126,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
+
                         <!-- Hour Section -->
                         <Border Grid.Column="0" MinWidth="50" Height="28" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="1" 
                                 MouseDown="HourOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
@@ -130,10 +134,10 @@
                                 ToolTipService.InitialShowDelay="0" Background="Transparent">
                             <TextBlock Text="{Binding Hour, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="16"/>
                         </Border>
-                        
+
                         <!-- Separator -->
                         <TextBlock Grid.Column="1" Text=":" VerticalAlignment="Center" Margin="5,0" FontSize="16" FontWeight="Bold"/>
-                        
+
                         <!-- Minute Section -->
                         <Border Grid.Column="2" MinWidth="50" Height="28" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="1" 
                                 MouseDown="MinuteOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
@@ -142,14 +146,14 @@
                             <TextBlock Text="{Binding Minute, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="16"/>
                         </Border>
                     </Grid>
-                    
+
                     <!-- Buttons Section -->
                     <Grid Margin="10,0,10,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
+
                         <!-- Jetzt Button (visible when EditMode != DateOnly) -->
                         <Button Grid.Column="0" Content="Jetzt" Click="Now_Click" Height="24" Padding="5,2" 
                                 ToolTip="Aktuelles Datum und Uhrzeit">
