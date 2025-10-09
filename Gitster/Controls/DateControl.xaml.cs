@@ -260,7 +260,22 @@ public partial class DateControl : UserControl
 
     private void Date_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.SelectedDate = SystemTime.Today;
+        // Only set the date part, preserve time
+        if (ViewModel.SelectedDate.HasValue)
+        {
+            var currentTime = ViewModel.SelectedDate.Value;
+            ViewModel.SelectedDate = new DateTime(SystemTime.Today.Year, SystemTime.Today.Month, SystemTime.Today.Day, 
+                currentTime.Hour, currentTime.Minute, currentTime.Second);
+        }
+        else
+        {
+            ViewModel.SelectedDate = SystemTime.Today;
+        }
+    }
+
+    private void Now_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectedDate = SystemTime.Now;
     }
 
     private void HourOnMouseDown(object sender, MouseButtonEventArgs e)
