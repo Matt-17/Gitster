@@ -13,12 +13,25 @@ using Gitster.ViewModels;
 namespace Gitster.Controls;
 
 /// <summary>
+/// Edit mode for the DateControl.
+/// </summary>
+public enum EditMode
+{
+    DateOnly,
+    TimeOnly,
+    DateTime
+}
+
+/// <summary>
 /// Interaction logic for DateControl.xaml.
 /// </summary>
 public partial class DateControl : UserControl
 {
     public static readonly DependencyProperty SelectedDateProperty =
         DependencyProperty.Register(nameof(SelectedDate), typeof(DateTime?), typeof(DateControl), new FrameworkPropertyMetadata(default(DateTime?), FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, SelectedDateCallback));
+
+    public static readonly DependencyProperty EditModeProperty =
+        DependencyProperty.Register(nameof(EditMode), typeof(EditMode), typeof(DateControl), new PropertyMetadata(EditMode.DateOnly, EditModeChanged));
 
     private static readonly Brush HoverBrush;
     private static readonly Brush MainBrush;
@@ -44,7 +57,19 @@ public partial class DateControl : UserControl
         set { SetValue(SelectedDateProperty, value); }
     }
 
+    public EditMode EditMode
+    {
+        get { return (EditMode)GetValue(EditModeProperty); }
+        set { SetValue(EditModeProperty, value); }
+    }
+
     private DateControlViewModel ViewModel => (DateControlViewModel)LayoutRoot.DataContext;
+
+    private static void EditModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var control = (DateControl)d;
+        control.ViewModel.EditMode = (EditMode)e.NewValue;
+    }
 
     private static void SelectedDateCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -236,5 +261,66 @@ public partial class DateControl : UserControl
     private void Date_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.SelectedDate = SystemTime.Today;
+    }
+
+    private void HourOnMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        StartTimeChange(sender, e, 1, true);
+    }
+
+    private void MinuteOnMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        StartTimeChange(sender, e, 1, false);
+    }
+
+    private void HourOnMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        ViewModel.ChangeHour(-Math.Sign(e.Delta));
+        e.Handled = true;
+    }
+
+    private void MinuteOnMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        ViewModel.ChangeMinute(-Math.Sign(e.Delta));
+        e.Handled = true;
+    }
+
+    private async void StartTimeChange(object sender, MouseButtonEventArgs e, int value, bool isHour)
+    {
+        Abort();
+        SetBorderLayout(sender, 2);
+        var change = 0;
+        if (e.LeftButton == MouseButtonState.Pressed)
+            change -= value;
+        if (e.RightButton == MouseButtonState.Pressed)
+            change += value;
+        _source = new CancellationTokenSource();
+
+        await SetTimeTimeout(() =>
+        {
+            if (isHour)
+                ViewModel.ChangeHour(change);
+            else
+                ViewModel.ChangeMinute(change);
+        }, _source.Token);
+    }
+
+    private async Task SetTimeTimeout(Action action, CancellationToken token)
+    {
+        try
+        {
+            action();
+            await Task.Delay(800, token);
+            while (true)
+            {
+                token.ThrowIfCancellationRequested();
+                action();
+                await Task.Delay(50, token);
+            }
+        }
+        catch (Exception)
+        {
+            _source = null;
+        }
     }
 }
