@@ -128,17 +128,17 @@
         </GroupBox>
         <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
             <Button Width="70" Height="30" Content="Fetch" Command="{Binding FetchCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" />
+                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Download changes from remote without merging" />
             <Button Width="70" Height="30" Content="Pull" Command="{Binding PullCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" />
+                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Fetch and merge changes from remote" />
             <Button Width="70" Height="30" Content="Push" Command="{Binding PushCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" />
+                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Upload local changes to remote" />
             <Button Width="70" Height="30" Content="Sync" Command="{Binding SyncCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" />
+                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Synchronize with remote (fetch + pull + push)" />
             <ComboBox Width="120" Height="30" ItemsSource="{Binding Remotes}" SelectedItem="{Binding SelectedRemote, Mode=TwoWay}"
-                      Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" />
+                      Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Select remote repository" />
             <Button Width="70" Height="30" Content="Amend" Command="{Binding AmendCommitCommand}" 
-                    Margin="5" x:Name="GoButton" IsEnabled="{Binding IsGoButtonEnabled}" />
+                    Margin="5" x:Name="GoButton" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Amend the commit timestamp" />
         </StackPanel>
         </Grid>
     </Grid>
