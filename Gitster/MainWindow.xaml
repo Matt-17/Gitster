@@ -4,6 +4,7 @@
        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
        xmlns:vm="clr-namespace:Gitster.ViewModels"
+       xmlns:controls="clr-namespace:Gitster.Controls"
        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
        mc:Ignorable="d"
        Title="Gitster" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
@@ -139,10 +140,10 @@
                 HorizontalAlignment="Center" Minimum="0" Maximum="59" 
                 Value="{Binding MinutesValue}" />
 
-        <DatePicker Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" 
+        <controls:DateControl Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DateControl" 
                     VerticalAlignment="Top" Width="200" 
                     SelectedDate="{Binding SelectedDate, Mode=TwoWay}" 
-                    Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
+                    Margin="5" Height="30" />
         <TextBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" 
                  Width="200" IsReadOnly="True" Margin="5" 
                  Text="{Binding TimeText, Mode=OneWay}" />

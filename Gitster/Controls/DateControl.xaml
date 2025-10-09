@@ -1,0 +1,106 @@
+<UserControl x:Class="Gitster.Controls.DateControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behaviors="clr-namespace:Gitster.Behaviors"
+             xmlns:models="clr-namespace:Gitster.Models"
+             xmlns:converters="clr-namespace:Gitster.Converters"
+             mc:Ignorable="d" 
+             d:DesignWidth="200" HorizontalAlignment="Left">
+    <UserControl.Resources>
+        <converters:BoolConverter x:Key="BoolConverterVisible" Type="Visible"/>
+        <converters:BoolConverter x:Key="BoolConverterCollapsed" Type="Collapsed"/>
+        <converters:BoolConverter x:Key="BoolConverterFontWeightBold" Type="FontWeightBold"/>
+        <converters:BoolConverter x:Key="BoolConverterOpaque" Type="Opaque"/>
+    </UserControl.Resources>
+    <Grid x:Name="LayoutRoot">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition MinWidth="90"/>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.Resources>
+            <Style x:Key="HoverStyle" TargetType="Border">
+                <Setter Property="Background" Value="Transparent"/>
+                <Style.Triggers>
+                    <Trigger Property="Border.IsMouseOver" Value="True">
+                        <Setter Property="Border.Background" Value="{DynamicResource HoverBrush}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Resources>
+        <TextBox x:Name="TbDate" Grid.ColumnSpan="2" Text="{Binding Text, ValidatesOnDataErrors=True}" PreviewMouseDoubleClick="TbDate_MouseDoubleClick" PreviewKeyDown="TbDate_PreviewKeyDown" GotKeyboardFocus="TbDate_GotFocus"  LostKeyboardFocus="TbDate_LostFocus">
+            <b:Interaction.Behaviors>
+                <behaviors:FocusBehavior SelectOnFocus="True" />
+            </b:Interaction.Behaviors>
+        </TextBox>
+        <Button Grid.Column="1" Focusable="False" Click="Button_Click" HorizontalAlignment="Right" Height="20" Padding="2" Margin="0,0,4,4" VerticalAlignment="Center" Background="Transparent" BorderThickness="0">
+            <Path Data="M19.100003,21.900019L23.400006,21.900019 23.400006,26.100003 19.100003,26.100003z M13.900004,21.900019L18.200009,21.900019 18.200009,26.100003 13.900004,26.100003z M8.6000004,21.900019L12.900004,21.900019 12.900004,26.100003 8.6000004,26.100003z M3.4000025,21.900019L7.7000065,21.900019 7.7000065,26.100003 3.4000025,26.100003z M24.400008,16.599999L28.700011,16.599999 28.700011,20.800013 24.400008,20.800013z M19.100003,16.599999L23.400006,16.599999 23.400006,20.800013 19.100003,20.800013z M13.900004,16.599999L18.200009,16.599999 18.200009,20.800013 13.900004,20.800013z M8.6000004,16.599999L12.900004,16.599999 12.900004,20.800013 8.6000004,20.800013z M3.4000025,16.599999L7.7000065,16.599999 7.7000065,20.800013 3.4000025,20.800013z M24.400008,11.500005L28.700011,11.500005 28.700011,15.700004 24.400008,15.700004z M19.100003,11.500005L23.400006,11.500005 23.400006,15.700004 19.100003,15.700004z M13.900004,11.500005L18.200009,11.500005 18.200009,15.700004 13.900004,15.700004z M8.6000004,11.500005L12.900004,11.500005 12.900004,15.700004 8.6000004,15.700004z M3.4000025,11.500005L7.7000065,11.500005 7.7000065,15.700004 3.4000025,15.700004z M24.400008,6.2999905L28.700011,6.2999905 28.700011,10.500005 24.400008,10.500005z M19.100003,6.2999905L23.400006,6.2999905 23.400006,10.500005 19.100003,10.500005z M13.900004,6.2999905L18.200009,6.2999905 18.200009,10.500005 13.900004,10.500005z M8.6000004,6.2999905L12.900004,6.2999905 12.900004,10.500005 8.6000004,10.500005z M2.3000035,5.1999992L2.3000035,27.100003 29.600005,27.100003 29.600005,5.1999992z M0,0L31.999999,0 31.999999,29.499998 0,29.499998z" Stretch="Uniform" Fill="{DynamicResource AccentMainBrush}" />
+        </Button>
+        <Button Grid.Column="2" Focusable="False" Click="Date_Click" Margin="4,0,4,4" Height="20" Width="20" Padding="0" VerticalAlignment="Center" SnapsToDevicePixels="True" Content="H" ToolTip="Heute"/>
+        <Popup IsOpen="{Binding IsOpen, Mode=TwoWay}" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=TbDate}" VerticalOffset="2">
+            <Border Background="White" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="2" SnapsToDevicePixels="True" MouseWheel="MonthOnMouseWheel">
+                <StackPanel>
+                    <Grid Height="28">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
+                            <TextBlock Text="{Binding Date, StringFormat='MMMM'}" FontSize="18" TextAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
+                            <TextBlock Text="{Binding Date, StringFormat='yyyy'}" TextAlignment="Center" FontSize="18" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <Border Background="{DynamicResource AccentMainBrush}" Padding="10, 2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Mo" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                            <TextBlock Grid.Column="1" Text="Di" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                            <TextBlock Grid.Column="2" Text="Mi" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                            <TextBlock Grid.Column="3" Text="Do" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                            <TextBlock Grid.Column="4" Text="Fr" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                            <TextBlock Grid.Column="5" Text="Sa" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
+                            <TextBlock Grid.Column="6" Text="So" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
+                        </Grid>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Days}" MaxWidth="210" Margin="10, 0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type models:DateTimeHolder}">
+                                <Border Width="30" Height="28" Style="{DynamicResource HoverStyle}" MouseDown="DayOnMouseDown">
+                                    <Grid>
+                                        <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentMainBrush}" >
+                                            <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center" Foreground="White"
+                                                   FontWeight="{Binding IsToday, Converter={StaticResource BoolConverterFontWeightBold}}"
+                                                   Opacity="{Binding IsSelectedMonth, Converter={StaticResource BoolConverterOpaque}}"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center"  Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}"
+                                                       FontWeight="{Binding IsToday, Converter={StaticResource BoolConverterFontWeightBold}}"
+                                                       Opacity="{Binding IsSelectedMonth, Converter={StaticResource BoolConverterOpaque}}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </Popup>
+    </Grid>
+</UserControl>

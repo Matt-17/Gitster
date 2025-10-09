@@ -4,6 +4,8 @@
              xmlns:local="clr-namespace:Gitster"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <SolidColorBrush x:Key="HoverBrush" Color="#E0E0E0" />
+        <SolidColorBrush x:Key="AccentMainBrush" Color="#007ACC" />
+        <SolidColorBrush x:Key="AccentMainLightestBrush" Color="#CCE4F7" />
     </Application.Resources>
 </Application>
