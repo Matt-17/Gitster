@@ -141,7 +141,7 @@
                 Value="{Binding MinutesValue}" />
 
         <controls:DateControl Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DateControl" 
-                    VerticalAlignment="Top" Width="400" 
+                    VerticalAlignment="Top" Width="200" 
                     SelectedDate="{Binding SelectedDate, Mode=TwoWay}"
                     EditMode="DateTime"
                     Margin="5" Height="30" />
