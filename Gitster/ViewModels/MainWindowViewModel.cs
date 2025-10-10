@@ -58,7 +58,11 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial CommitDetailViewModel CurrentCommitDetail { get; set; }
 
+    [ObservableProperty]
+    public partial string SelectedRemote { get; set; } = string.Empty;
+
     public ObservableCollection<CommitItem> Commits { get; } = [];
+    public ObservableCollection<string> Remotes { get; } = [];
 
     public MainWindowViewModel()
     {
@@ -210,6 +214,121 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
+    [RelayCommand]
+    private void Fetch(string? remoteName)
+    {
+        try
+        {
+            using var repo = new Repository(Path);
+            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
+            
+            if (remote == null)
+            {
+                MessageBox.Show("No remote found");
+                return;
+            }
+
+            var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
+            Commands.Fetch(repo, remote.Name, refSpecs, null, $"Fetch from {remote.Name}");
+            
+            MessageBox.Show($"Fetched from {remote.Name} successfully");
+            UpdateElements();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error fetching: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void Pull(string? remoteName)
+    {
+        try
+        {
+            using var repo = new Repository(Path);
+            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
+            
+            if (remote == null)
+            {
+                MessageBox.Show("No remote found");
+                return;
+            }
+
+            var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+            var pullOptions = new PullOptions();
+
+            Commands.Pull(repo, signature, pullOptions);
+            
+            MessageBox.Show($"Pulled from {remote.Name} successfully");
+            UpdateElements();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error pulling: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void Push(string? remoteName)
+    {
+        try
+        {
+            using var repo = new Repository(Path);
+            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
+            
+            if (remote == null)
+            {
+                MessageBox.Show("No remote found");
+                return;
+            }
+
+            var pushOptions = new PushOptions();
+            repo.Network.Push(repo.Head, pushOptions);
+            
+            MessageBox.Show($"Pushed to {remote.Name} successfully");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error pushing: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void Sync(string? remoteName)
+    {
+        try
+        {
+            using var repo = new Repository(Path);
+            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
+            
+            if (remote == null)
+            {
+                MessageBox.Show("No remote found");
+                return;
+            }
+
+            // First fetch
+            var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
+            Commands.Fetch(repo, remote.Name, refSpecs, null, $"Fetch from {remote.Name}");
+
+            // Then pull
+            var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+            var pullOptions = new PullOptions();
+            Commands.Pull(repo, signature, pullOptions);
+
+            // Finally push
+            var pushOptions = new PushOptions();
+            repo.Network.Push(repo.Head, pushOptions);
+            
+            MessageBox.Show($"Synced with {remote.Name} successfully");
+            UpdateElements();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error syncing: {ex.Message}");
+        }
+    }
+
     public void OnWindowActivated()
     {
         UpdateElements();
@@ -288,6 +407,19 @@ public partial class MainWindowViewModel : BaseViewModel
             {
                 SelectedCommit = Commits[1];
             }
+
+            // Update remotes list
+            Remotes.Clear();
+            foreach (var remote in repo.Network.Remotes)
+            {
+                Remotes.Add(remote.Name);
+            }
+
+            // Auto-select the first remote if available
+            if (Remotes.Count > 0 && string.IsNullOrEmpty(SelectedRemote))
+            {
+                SelectedRemote = Remotes[0];
+            }
         }
         catch (Exception)
         {
@@ -304,6 +436,7 @@ public partial class MainWindowViewModel : BaseViewModel
             IsGoButtonEnabled = false;
 
             Commits.Clear();
+            Remotes.Clear();
         }
     }
 }
