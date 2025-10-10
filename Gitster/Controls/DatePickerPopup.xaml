@@ -9,7 +9,7 @@
              xmlns:viewModels="clr-namespace:Gitster.ViewModels"
              mc:Ignorable="d" 
              d:DataContext="{d:DesignInstance Type=viewModels:DateControlViewModel}"
-             d:DesignHeight="300" d:DesignWidth="230">
+             d:DesignHeight="300" d:DesignWidth="330">
     <UserControl.Resources>
         <converters:BoolConverter x:Key="BoolConverterVisible" Type="Visible"/>
         <converters:BoolConverter x:Key="BoolConverterCollapsed" Type="Collapsed"/>
@@ -24,68 +24,85 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    
-    <Border Background="White" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="2" SnapsToDevicePixels="True" MouseWheel="MonthOnMouseWheel">
-        <StackPanel>
-            <Grid Height="28">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition />
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
-                    <TextBlock Text="{Binding Date, StringFormat='MMMM'}" FontSize="18" TextAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
-                    <TextBlock Text="{Binding Date, StringFormat='yyyy'}" TextAlignment="Center" FontSize="18" VerticalAlignment="Center"/>
-                </Border>
-            </Grid>
 
-            <Border Background="{DynamicResource AccentMainBrush}" Padding="10, 2">
-                <Grid>
+    <Border Background="White" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="2" SnapsToDevicePixels="True">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <Grid Height="28">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition />
-                        <ColumnDefinition />
-                        <ColumnDefinition />
-                        <ColumnDefinition />
-                        <ColumnDefinition />
-                        <ColumnDefinition />
+                        <ColumnDefinition Width="2*" />
                         <ColumnDefinition />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Mo" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                    <TextBlock Grid.Column="1" Text="Di" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                    <TextBlock Grid.Column="2" Text="Mi" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                    <TextBlock Grid.Column="3" Text="Do" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                    <TextBlock Grid.Column="4" Text="Fr" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                    <TextBlock Grid.Column="5" Text="Sa" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
-                    <TextBlock Grid.Column="6" Text="So" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
+                    <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
+                        <TextBlock Text="{Binding Date, StringFormat='MMMM'}" FontSize="18" TextAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
+                        <TextBlock Text="{Binding Date, StringFormat='yyyy'}" TextAlignment="Center" FontSize="18" VerticalAlignment="Center"/>
+                    </Border>
                 </Grid>
-            </Border>
-            <ItemsControl ItemsSource="{Binding Days}" MaxWidth="210" Margin="10, 0">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type models:DateTimeHolder}">
-                        <Border Width="30" Height="28" Style="{DynamicResource HoverStyle}" MouseDown="DayOnMouseDown">
-                            <Grid>
-                                <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentMainBrush}" >
-                                    <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center" Foreground="White"
+
+                <Border Background="{DynamicResource AccentMainBrush}" Padding="10, 2">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Mo" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="1" Text="Di" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="2" Text="Mi" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="3" Text="Do" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="4" Text="Fr" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="5" Text="Sa" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
+                        <TextBlock Grid.Column="6" Text="So" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
+                    </Grid>
+                </Border>
+                <ItemsControl ItemsSource="{Binding Days}" MaxWidth="210" Margin="10, 0" MouseWheel="MonthOnMouseWheel">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:DateTimeHolder}">
+                            <Border Width="30" Height="28" Style="{DynamicResource HoverStyle}" MouseDown="DayOnMouseDown">
+                                <Grid>
+                                    <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentMainBrush}" >
+                                        <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center" Foreground="White"
                                            FontWeight="{Binding IsToday, Converter={StaticResource BoolConverterFontWeightBold}}"
                                            Opacity="{Binding IsSelectedMonth, Converter={StaticResource BoolConverterOpaque}}"/>
-                                </Border>
-                                <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center"  Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}"
+                                    </Border>
+                                    <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center"  Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}"
                                                FontWeight="{Binding IsToday, Converter={StaticResource BoolConverterFontWeightBold}}"
                                                Opacity="{Binding IsSelectedMonth, Converter={StaticResource BoolConverterOpaque}}"/>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
 
-            <!-- Time Editor Section (visible when EditMode != DateOnly) -->
-            <Grid Margin="10,10,10,5">
+                <!-- Time Editor Section (visible when EditMode != DateOnly) -->
+
+            </StackPanel>
+
+            <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
+
+            <Grid Grid.Column="2" Width="200">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
                 <Grid.Style>
                     <Style TargetType="Grid">
                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -99,57 +116,132 @@
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
 
-                <!-- Hour Section -->
-                <Border Grid.Column="0" MinWidth="50" Height="28" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="1" 
-                        MouseDown="HourOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
-                        MouseWheel="HourOnMouseWheel" ToolTip="Stunden ändern&#x0a;Zurück - links&#x0a;Vorwärts - rechts" 
-                        ToolTipService.InitialShowDelay="0" Background="Transparent">
-                    <TextBlock Text="{Binding Hour, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="16"/>
+                <Grid Grid.Row="0" Height="28">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Hour Section -->
+                    <Border Grid.Column="0"
+         MouseDown="HourOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
+         MouseWheel="HourOnMouseWheel" ToolTip="Stunden ändern&#x0a;Zurück - links&#x0a;Vorwärts - rechts" 
+         ToolTipService.InitialShowDelay="0" Background="Transparent">
+                        <TextBlock Text="{Binding Hour, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
+                    </Border>
+
+                    <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
+                    <!-- Minute Section -->
+                    <Border Grid.Column="2"
+         MouseDown="MinuteOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
+         MouseWheel="MinuteOnMouseWheel" ToolTip="Minuten ändern&#x0a;Zurück - links&#x0a;Vorwärts - rechts" 
+         ToolTipService.InitialShowDelay="0" Background="Transparent">
+                        <TextBlock Text="{Binding Minute, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
+                    </Border>
+                </Grid>
+
+                <Border Grid.Row="1" Background="{DynamicResource AccentMainBrush}" Padding="10, 2">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Stunde" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="1" Text="Minute" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                    </Grid>
                 </Border>
 
-                <!-- Separator -->
-                <TextBlock Grid.Column="1" Text=":" VerticalAlignment="Center" Margin="5,0" FontSize="16" FontWeight="Bold"/>
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Minute Section -->
-                <Border Grid.Column="2" MinWidth="50" Height="28" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="1" 
-                        MouseDown="MinuteOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
-                        MouseWheel="MinuteOnMouseWheel" ToolTip="Minuten ändern&#x0a;Zurück - links&#x0a;Vorwärts - rechts" 
-                        ToolTipService.InitialShowDelay="0" Background="Transparent">
-                    <TextBlock Text="{Binding Minute, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="16"/>
-                </Border>
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="0" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="1" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="2" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="3" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="4" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="5" MouseDown="HourTextMouseDown" />
+
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="6" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="7" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="8" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="9" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="10" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="11" MouseDown="HourTextMouseDown" />
+
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="2" Text="12" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="2" Text="13" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="2" Text="14" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="2" Text="15" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="2" Text="16" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="2" Text="17" MouseDown="HourTextMouseDown" />
+
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="3" Text="18" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="3" Text="19" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="3" Text="20" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="3" Text="21" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="3" Text="22" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="3" Text="23" MouseDown="HourTextMouseDown" />
+
+                    </Grid>
+                    <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
+                    
+                    <Grid Grid.Column="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="00" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="10" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="20" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="30" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="40" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="50" MouseDown="MinuteTextMouseDown" />
+                                                                                                                           
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="05" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="15" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="25" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="35" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="45" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="55" MouseDown="MinuteTextMouseDown" />
+
+                    </Grid>
+                </Grid>
+
             </Grid>
-
-            <!-- Buttons Section -->
-            <Grid Margin="10,0,10,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Jetzt Button (visible when EditMode != DateOnly) -->
-                <Button Grid.Column="0" Content="Jetzt" Click="Now_Click" Height="24" Padding="5,2" 
-                        ToolTip="Aktuelles Datum und Uhrzeit">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.DateTime}">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-            </Grid>
-        </StackPanel>
+        </Grid>
     </Border>
 </UserControl>

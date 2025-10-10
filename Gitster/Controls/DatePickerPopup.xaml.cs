@@ -140,11 +140,6 @@ public partial class DatePickerPopup : UserControl
         }
     }
 
-    private void Now_Click(object sender, RoutedEventArgs e)
-    {
-        ViewModel.SelectedDate = SystemTime.Now;
-    }
-
     private void HourOnMouseDown(object sender, MouseButtonEventArgs e)
     {
         StartTimeChange(sender, e, 1, true);
@@ -203,6 +198,32 @@ public partial class DatePickerPopup : UserControl
         catch (Exception)
         {
             _source = null;
+        }
+    }
+
+    private void HourTextMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is SelectableTextBlock {Text: string text } tb)
+        {
+            if (int.TryParse(text, out var hour))
+            {
+                ViewModel.SetHour(hour);
+                if (e.ClickCount == 2)
+                    ViewModel.IsOpen = false;
+            }
+        }
+    }
+
+    private void MinuteTextMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is SelectableTextBlock { Text: string text } tb)
+        {
+            if (int.TryParse(text, out var minute))
+            {
+                ViewModel.SetMinute(minute);
+                if (e.ClickCount == 2)
+                    ViewModel.IsOpen = false;
+            }
         }
     }
 }
