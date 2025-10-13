@@ -1,0 +1,32 @@
+<UserControl x:Class="Gitster.Controls.SelectableTextBlock"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Gitster.Controls"
+             xmlns:converters="clr-namespace:Gitster.Converters"
+             mc:Ignorable="d" 
+             d:DataContext="{d:DesignInstance Type=local:SelectableTextBlock}"
+             d:DesignHeight="28" d:DesignWidth="30">
+    <UserControl.Resources>
+        <converters:BoolConverter x:Key="BoolConverterVisible" Type="Visible"/>
+        <converters:BoolConverter x:Key="BoolConverterCollapsed" Type="Collapsed"/>
+        <Style x:Key="HoverStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="Border.IsMouseOver" Value="True">
+                    <Setter Property="Border.Background" Value="{DynamicResource HoverBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Border x:Name="LayoutRoot" x:FieldModifier="private"  Height="28" Style="{DynamicResource HoverStyle}" MouseDown="BorderOnMouseDown">
+        <Grid>
+            <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentMainBrush}" >
+                <TextBlock Text="{Binding Text}" TextAlignment="Center" VerticalAlignment="Center" Foreground="White" FontWeight="{Binding FontWeight}" Opacity="{Binding Opacity}"/>
+            </Border>
+            <TextBlock Text="{Binding Text}" TextAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}" FontWeight="{Binding FontWeight}" Opacity="{Binding Opacity}"/>
+        </Grid>
+    </Border>
+</UserControl>

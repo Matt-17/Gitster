@@ -376,4 +376,14 @@ public partial class DateControlViewModel : BaseViewModel
 
         throw new ArgumentOutOfRangeException();
     }
+
+    public void SetMinute(int result)
+    {
+        Minute = result;
+    }
+
+    public void SetHour(int result)
+    {
+        Hour  = result;
+    }
 }
