@@ -48,7 +48,7 @@ public partial class MainWindow : Window
 
         var commit = repo.Head.Tip;
         var author = commit.Author;
-        var committer = commit.Committer;
+        var committer = commit.Author;
 
         var currentTimezoneOffset = DateTimeOffset.Now.Offset;
 
