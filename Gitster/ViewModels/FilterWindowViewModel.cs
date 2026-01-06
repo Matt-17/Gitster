@@ -1,6 +1,5 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -24,27 +23,6 @@ public partial class FilterWindowViewModel : BaseViewModel
 
     public FilterWindowViewModel()
     {
-    }
-
-    /// <summary>
-    /// Populates the author names list from commits.
-    /// </summary>
-    public void PopulateAuthorNames(ObservableCollection<CommitItem> commits)
-    {
-        AuthorNames.Clear();
-        
-        // Add "All" option at the beginning
-        AuthorNames.Add("All");
-        
-        // Get distinct author names from commits
-        var distinctAuthors = commits
-            .Select(c => c.Message.Split('\n').FirstOrDefault() ?? string.Empty)
-            .Distinct()
-            .OrderBy(name => name)
-            .ToList();
-
-        // For now, we'll need to get actual author names from the repository
-        // This is a placeholder that will be updated when connected to the repository
     }
 
     [RelayCommand]

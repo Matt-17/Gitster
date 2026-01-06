@@ -185,30 +185,21 @@ public partial class MainWindowViewModel : BaseViewModel
                 _filterViewModel.AuthorNames.Add(author);
             }
 
+            // Set default selection to "All" if no author is selected
+            if (string.IsNullOrEmpty(_filterViewModel.SelectedAuthorName))
+            {
+                _filterViewModel.SelectedAuthorName = "All";
+            }
+
             var filterWindow = new FilterWindow(_filterViewModel)
             {
                 Owner = Application.Current.MainWindow
             };
 
-            // Subscribe to Apply button clicks
-            void OnApplyClicked(object? sender, EventArgs e)
-            {
-                if (filterWindow.ApplyClicked)
-                {
-                    ApplyFilters();
-                    filterWindow.ApplyClicked = false;
-                }
-            }
+            // Subscribe to FiltersApplied event
+            filterWindow.FiltersApplied += (sender, e) => ApplyFilters();
 
-            filterWindow.Closed += OnApplyClicked;
             filterWindow.ShowDialog();
-            filterWindow.Closed -= OnApplyClicked;
-
-            // If OK was clicked, apply filters one more time and close
-            if (filterWindow.DialogResultOk)
-            {
-                ApplyFilters();
-            }
         }
         catch (Exception ex)
         {

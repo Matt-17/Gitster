@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using Gitster.ViewModels;
 
@@ -10,7 +11,8 @@ public partial class FilterWindow : Window
 {
     public FilterWindowViewModel ViewModel { get; }
     public bool DialogResultOk { get; private set; }
-    public bool ApplyClicked { get; private set; }
+    
+    public event EventHandler? FiltersApplied;
 
     public FilterWindow(FilterWindowViewModel viewModel)
     {
@@ -22,20 +24,19 @@ public partial class FilterWindow : Window
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
         DialogResultOk = true;
-        ApplyClicked = true;
+        FiltersApplied?.Invoke(this, EventArgs.Empty);
         Close();
     }
 
     private void ApplyButton_Click(object sender, RoutedEventArgs e)
     {
-        ApplyClicked = true;
+        FiltersApplied?.Invoke(this, EventArgs.Empty);
         // Window stays open when Apply is clicked
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
         DialogResultOk = false;
-        ApplyClicked = false;
         Close();
     }
 }
