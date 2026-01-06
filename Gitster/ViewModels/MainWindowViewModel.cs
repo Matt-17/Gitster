@@ -136,10 +136,14 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         try
         {
+            var initialDirectory = string.IsNullOrEmpty(FolderPath) 
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) 
+                : FolderPath;
+            
             var dialog = new OpenFolderDialog
             {
                 Title = "Select Git Repository Folder",
-                InitialDirectory = string.IsNullOrEmpty(FolderPath) ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) : FolderPath
+                InitialDirectory = initialDirectory
             };
 
             if (dialog.ShowDialog() == true)
