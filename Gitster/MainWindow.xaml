@@ -66,8 +66,9 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-        <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="5" 
-                 Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="4" 
+                 Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" />
+        <Button Grid.Column="4" Content="Browse..." Width="80" Command="{Binding BrowseFolderCommand}" />
         <GroupBox Header="Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
                   DataContext="{Binding SelectedCommitDetail}">
             <Grid>
