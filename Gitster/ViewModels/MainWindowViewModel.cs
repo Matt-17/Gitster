@@ -64,6 +64,9 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
+    
+    private ObservableCollection<CommitItem> _allCommits = [];
+    private FilterWindowViewModel? _filterViewModel;
 
     public MainWindowViewModel()
     {
@@ -154,6 +157,62 @@ public partial class MainWindowViewModel : BaseViewModel
         catch (Exception ex)
         {
             MessageBox.Show($"Error opening folder dialog: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void OpenFilter()
+    {
+        try
+        {
+            if (_filterViewModel == null)
+            {
+                _filterViewModel = new FilterWindowViewModel();
+            }
+
+            // Populate author names from all commits
+            _filterViewModel.AuthorNames.Clear();
+            _filterViewModel.AuthorNames.Add("All");
+            
+            var distinctAuthors = _allCommits
+                .Select(c => c.AuthorName)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .Distinct()
+                .OrderBy(name => name);
+            
+            foreach (var author in distinctAuthors)
+            {
+                _filterViewModel.AuthorNames.Add(author);
+            }
+
+            var filterWindow = new FilterWindow(_filterViewModel)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            // Subscribe to Apply button clicks
+            void OnApplyClicked(object? sender, EventArgs e)
+            {
+                if (filterWindow.ApplyClicked)
+                {
+                    ApplyFilters();
+                    filterWindow.ApplyClicked = false;
+                }
+            }
+
+            filterWindow.Closed += OnApplyClicked;
+            filterWindow.ShowDialog();
+            filterWindow.Closed -= OnApplyClicked;
+
+            // If OK was clicked, apply filters one more time and close
+            if (filterWindow.DialogResultOk)
+            {
+                ApplyFilters();
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error opening filter window: {ex.Message}");
         }
     }
 
@@ -398,6 +457,59 @@ public partial class MainWindowViewModel : BaseViewModel
         settings.Save();
     }
 
+    private void ApplyFilters()
+    {
+        if (_filterViewModel == null)
+        {
+            return;
+        }
+
+        Commits.Clear();
+
+        var filteredCommits = _allCommits.AsEnumerable();
+
+        // Apply author filter
+        if (!string.IsNullOrEmpty(_filterViewModel.SelectedAuthorName) 
+            && _filterViewModel.SelectedAuthorName != "All")
+        {
+            filteredCommits = filteredCommits.Where(c => 
+                c.AuthorName == _filterViewModel.SelectedAuthorName);
+        }
+
+        // Apply from date filter
+        if (_filterViewModel.FromDate.HasValue)
+        {
+            var fromDate = _filterViewModel.FromDate.Value.Date;
+            filteredCommits = filteredCommits.Where(c => c.Date.Date >= fromDate);
+        }
+
+        // Apply to date filter
+        if (_filterViewModel.ToDate.HasValue)
+        {
+            var toDate = _filterViewModel.ToDate.Value.Date.AddDays(1).AddTicks(-1);
+            filteredCommits = filteredCommits.Where(c => c.Date <= toDate);
+        }
+
+        foreach (var commit in filteredCommits)
+        {
+            Commits.Add(commit);
+        }
+
+        // Auto-select the second item if available
+        if (Commits.Count >= 2)
+        {
+            SelectedCommit = Commits[1];
+        }
+        else if (Commits.Count == 1)
+        {
+            SelectedCommit = Commits[0];
+        }
+        else
+        {
+            SelectedCommit = null;
+        }
+    }
+
     public void UpdateElements()
     {
         try
@@ -420,13 +532,17 @@ public partial class MainWindowViewModel : BaseViewModel
 
             // Update commit list
             Commits.Clear();
+            _allCommits.Clear();
             foreach (var c in repo.Commits)
             {
-                Commits.Add(new CommitItem(
+                var commitItem = new CommitItem(
                     c.MessageShort,
                     c.Author.When.DateTime,
-                    c.Id.Sha.Substring(0, 7)
-                ));
+                    c.Id.Sha.Substring(0, 7),
+                    c.Author.Name
+                );
+                _allCommits.Add(commitItem);
+                Commits.Add(commitItem);
             }
 
             // Auto-select the second item if available

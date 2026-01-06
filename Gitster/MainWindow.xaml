@@ -34,18 +34,34 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         
-        <!-- Left side: Commit ListView -->
-        <ListView x:Name="CommitListView" Grid.Column="0" Margin="5" 
-                  ItemsSource="{Binding Commits}" 
-                  SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
-                    <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
-                    <GridViewColumn Header="Commit ID" Width="80" DisplayMemberBinding="{Binding CommitId}" />
-                </GridView>
-            </ListView.View>
-        </ListView>
+        <!-- Left side: Commit ListView with Filter button -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Filter button -->
+            <Button Grid.Row="0" 
+                    Content="🔍 Filter" 
+                    HorizontalAlignment="Right" 
+                    Width="100" 
+                    Command="{Binding OpenFilterCommand}"
+                    ToolTip="Open filter window" />
+            
+            <!-- Commit ListView -->
+            <ListView x:Name="CommitListView" Grid.Row="1" Margin="5" 
+                      ItemsSource="{Binding Commits}" 
+                      SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
+                        <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
+                        <GridViewColumn Header="Commit ID" Width="80" DisplayMemberBinding="{Binding CommitId}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
         
         <!-- Right side: Original content -->
         <Grid Grid.Column="1">

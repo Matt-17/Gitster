@@ -1,0 +1,140 @@
+<Window x:Class="Gitster.FilterWindow"
+       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+       xmlns:vm="clr-namespace:Gitster.ViewModels"
+       d:DataContext="{d:DesignInstance Type=vm:FilterWindowViewModel}"
+       mc:Ignorable="d"
+       Title="Filter Commits" Height="300" Width="450" 
+       WindowStyle="SingleBorderWindow" 
+       ResizeMode="NoResize"
+       ShowInTaskbar="False"
+       Icon="pack://application:,,,/Assets/Icon.ico">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="Height" Value="30" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="Height" Value="30" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="Height" Value="30" />
+        </Style>
+        <Style TargetType="DatePicker">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="Height" Value="30" />
+        </Style>
+        <Style x:Key="ClearButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,5,5,5" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+    </Window.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Author Name Filter -->
+        <GroupBox Header="Author Name" Grid.Row="0" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0" 
+                          ItemsSource="{Binding AuthorNames}" 
+                          SelectedItem="{Binding SelectedAuthorName, Mode=TwoWay}"
+                          IsEditable="False" />
+                <Button Grid.Column="1" 
+                        Content="✕" 
+                        Command="{Binding ClearAuthorNameCommand}"
+                        Style="{StaticResource ClearButtonStyle}"
+                        ToolTip="Clear author filter" />
+            </Grid>
+        </GroupBox>
+
+        <!-- Time Filter -->
+        <GroupBox Header="Commit Time" Grid.Row="1" Margin="0,0,0,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- From Date -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="From:" 
+                               VerticalAlignment="Center" 
+                               Margin="5" />
+                    <DatePicker Grid.Column="1" 
+                                SelectedDate="{Binding FromDate, Mode=TwoWay}" />
+                    <Button Grid.Column="2" 
+                            Content="✕" 
+                            Command="{Binding ClearFromDateCommand}"
+                            Style="{StaticResource ClearButtonStyle}"
+                            ToolTip="Clear from date" />
+                </Grid>
+                
+                <!-- To Date -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="To:" 
+                               VerticalAlignment="Center" 
+                               Margin="5" />
+                    <DatePicker Grid.Column="1" 
+                                SelectedDate="{Binding ToDate, Mode=TwoWay}" />
+                    <Button Grid.Column="2" 
+                            Content="✕" 
+                            Command="{Binding ClearToDateCommand}"
+                            Style="{StaticResource ClearButtonStyle}"
+                            ToolTip="Clear to date" />
+                </Grid>
+            </Grid>
+        </GroupBox>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+            <Button Content="OK" 
+                    Width="80" 
+                    Click="OkButton_Click" 
+                    IsDefault="True" />
+            <Button Content="Apply" 
+                    Width="80" 
+                    Click="ApplyButton_Click" />
+            <Button Content="Cancel" 
+                    Width="80" 
+                    Click="CancelButton_Click" 
+                    IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>
