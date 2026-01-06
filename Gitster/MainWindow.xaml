@@ -9,6 +9,7 @@
        Title="Gitster" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
     <Grid>
         <Grid.Resources>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <Style TargetType="TextBox">
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Padding" Value="5" />
@@ -34,18 +35,49 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         
-        <!-- Left side: Commit ListView -->
-        <ListView x:Name="CommitListView" Grid.Column="0" Margin="5" 
-                  ItemsSource="{Binding Commits}" 
-                  SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
-                    <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
-                    <GridViewColumn Header="Commit ID" Width="80" DisplayMemberBinding="{Binding CommitId}" />
-                </GridView>
-            </ListView.View>
-        </ListView>
+        <!-- Left side: Commit ListView with Filter button -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Filter controls -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="{Binding FilterStatusText}" 
+                           VerticalAlignment="Center"
+                           Margin="5"
+                           FontStyle="Italic"
+                           Foreground="Gray" />
+                <Button Content="🗑️" 
+                        Width="30" 
+                        Height="30"
+                        Margin="0,5,5,5"
+                        Padding="0"
+                        Command="{Binding ClearAllFiltersCommand}"
+                        ToolTip="Clear all filters"
+                        Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Style="{StaticResource IconButtonStyle}" />
+                <Button Content="🔍 Filter" 
+                        HorizontalAlignment="Right" 
+                        Width="100" 
+                        Command="{Binding OpenFilterCommand}"
+                        ToolTip="Open filter window" />
+            </StackPanel>
+            
+            <!-- Commit ListView -->
+            <ListView x:Name="CommitListView" Grid.Row="1" Margin="5" 
+                      ItemsSource="{Binding Commits}" 
+                      SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Message" Width="200" DisplayMemberBinding="{Binding Message}" />
+                        <GridViewColumn Header="Date" Width="120" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
+                        <GridViewColumn Header="Commit ID" Width="80" DisplayMemberBinding="{Binding CommitId}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Grid>
         
         <!-- Right side: Original content -->
         <Grid Grid.Column="1">
