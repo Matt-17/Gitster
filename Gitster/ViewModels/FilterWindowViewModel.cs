@@ -19,10 +19,47 @@ public partial class FilterWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial DateTime? ToDate { get; set; }
 
+    [ObservableProperty]
+    public partial bool HasPendingChanges { get; set; }
+
     public ObservableCollection<string> AuthorNames { get; } = [];
+
+    private string? _appliedAuthorName;
+    private DateTime? _appliedFromDate;
+    private DateTime? _appliedToDate;
 
     public FilterWindowViewModel()
     {
+    }
+
+    partial void OnSelectedAuthorNameChanged(string? value)
+    {
+        UpdatePendingChanges();
+    }
+
+    partial void OnFromDateChanged(DateTime? value)
+    {
+        UpdatePendingChanges();
+    }
+
+    partial void OnToDateChanged(DateTime? value)
+    {
+        UpdatePendingChanges();
+    }
+
+    private void UpdatePendingChanges()
+    {
+        HasPendingChanges = _appliedAuthorName != SelectedAuthorName
+                         || _appliedFromDate != FromDate
+                         || _appliedToDate != ToDate;
+    }
+
+    public void SaveAppliedState()
+    {
+        _appliedAuthorName = SelectedAuthorName;
+        _appliedFromDate = FromDate;
+        _appliedToDate = ToDate;
+        HasPendingChanges = false;
     }
 
     [RelayCommand]

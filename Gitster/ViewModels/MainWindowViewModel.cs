@@ -62,6 +62,12 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial string SelectedRemote { get; set; } = string.Empty;
 
+    [ObservableProperty]
+    public partial string FilterStatusText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasActiveFilters { get; set; }
+
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
     
@@ -205,7 +211,11 @@ public partial class MainWindowViewModel : BaseViewModel
             };
 
             // Subscribe to FiltersApplied event
-            _filterWindow.FiltersApplied += (sender, e) => ApplyFilters();
+            _filterWindow.FiltersApplied += (sender, e) => 
+            {
+                ApplyFilters();
+                _filterViewModel.SaveAppliedState();
+            };
             
             // Clean up when window is closed
             _filterWindow.Closed += (sender, e) => _filterWindow = null;
@@ -215,6 +225,16 @@ public partial class MainWindowViewModel : BaseViewModel
         catch (Exception ex)
         {
             MessageBox.Show($"Error opening filter window: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void ClearAllFilters()
+    {
+        if (_filterViewModel != null)
+        {
+            _filterViewModel.ClearAllFilters();
+            ApplyFilters();
         }
     }
 
@@ -510,6 +530,48 @@ public partial class MainWindowViewModel : BaseViewModel
         else
         {
             SelectedCommit = null;
+        }
+
+        // Update filter status
+        UpdateFilterStatus();
+    }
+
+    private void UpdateFilterStatus()
+    {
+        if (_filterViewModel == null)
+        {
+            FilterStatusText = string.Empty;
+            HasActiveFilters = false;
+            return;
+        }
+
+        int filterCount = 0;
+
+        if (!string.IsNullOrEmpty(_filterViewModel.SelectedAuthorName) 
+            && _filterViewModel.SelectedAuthorName != "All")
+        {
+            filterCount++;
+        }
+
+        if (_filterViewModel.FromDate.HasValue)
+        {
+            filterCount++;
+        }
+
+        if (_filterViewModel.ToDate.HasValue)
+        {
+            filterCount++;
+        }
+
+        if (filterCount > 0)
+        {
+            FilterStatusText = $"{filterCount} Filter{(filterCount > 1 ? "s" : "")} applied";
+            HasActiveFilters = true;
+        }
+        else
+        {
+            FilterStatusText = string.Empty;
+            HasActiveFilters = false;
         }
     }
 

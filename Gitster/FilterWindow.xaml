@@ -130,7 +130,8 @@
                     IsDefault="True" />
             <Button Content="Apply" 
                     Width="80" 
-                    Click="ApplyButton_Click" />
+                    Click="ApplyButton_Click"
+                    IsEnabled="{Binding HasPendingChanges}" />
             <Button Content="Cancel" 
                     Width="80" 
                     Click="CancelButton_Click" 
