@@ -5,6 +5,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LibGit2Sharp;
+using Microsoft.Win32;
 
 namespace Gitster.ViewModels;
 
@@ -127,6 +128,32 @@ public partial class MainWindowViewModel : BaseViewModel
         if (value != null)
         {
             SelectedCommitDetail.UpdateCommit(value.Message, value.Date);
+        }
+    }
+
+    [RelayCommand]
+    private void BrowseFolder()
+    {
+        try
+        {
+            var initialDirectory = string.IsNullOrEmpty(FolderPath) 
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) 
+                : FolderPath;
+            
+            var dialog = new OpenFolderDialog
+            {
+                Title = "Select Git Repository Folder",
+                InitialDirectory = initialDirectory
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                FolderPath = dialog.FolderName;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error opening folder dialog: {ex.Message}");
         }
     }
 
