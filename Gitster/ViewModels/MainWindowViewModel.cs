@@ -538,10 +538,16 @@ public partial class MainWindowViewModel : BaseViewModel
             _allCommits.Clear();
             foreach (var c in repo.Commits)
             {
+                if (c.Author == null)
+                {
+                    continue;
+                }
+
+                var commitId = c.Id.Sha.Length >= 7 ? c.Id.Sha.Substring(0, 7) : c.Id.Sha;
                 var commitItem = new CommitItem(
                     c.MessageShort,
                     c.Author.When.DateTime,
-                    c.Id.Sha.Substring(0, 7),
+                    commitId,
                     c.Author.Name ?? string.Empty
                 );
                 _allCommits.Add(commitItem);

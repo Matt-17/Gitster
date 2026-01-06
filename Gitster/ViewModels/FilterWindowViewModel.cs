@@ -48,7 +48,7 @@ public partial class FilterWindowViewModel : BaseViewModel
     /// </summary>
     public bool HasActiveFilters()
     {
-        return !string.IsNullOrEmpty(SelectedAuthorName) && SelectedAuthorName != "All" 
+        return (!string.IsNullOrEmpty(SelectedAuthorName) && SelectedAuthorName != "All") 
                || FromDate.HasValue 
                || ToDate.HasValue;
     }
