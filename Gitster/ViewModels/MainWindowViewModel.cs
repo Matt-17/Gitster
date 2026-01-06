@@ -68,6 +68,9 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool HasActiveFilters { get; set; }
 
+    [ObservableProperty]
+    public partial StatusBarViewModel StatusBar { get; set; }
+
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
     
@@ -80,6 +83,7 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
+        StatusBar = new StatusBarViewModel();
         
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) => 
@@ -635,6 +639,9 @@ public partial class MainWindowViewModel : BaseViewModel
             {
                 SelectedRemote = Remotes[0];
             }
+
+            // Update status bar information
+            UpdateStatusBar(repo);
         }
         catch (Exception)
         {
@@ -652,6 +659,55 @@ public partial class MainWindowViewModel : BaseViewModel
 
             Commits.Clear();
             Remotes.Clear();
+
+            // Clear status bar
+            StatusBar.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Updates the status bar with current repository information including branch name,
+    /// repository name, and incoming/outgoing commit counts.
+    /// </summary>
+    /// <param name="repo">The Git repository to get status information from.</param>
+    private void UpdateStatusBar(Repository repo)
+    {
+        try
+        {
+            // Get current branch
+            var branch = repo.Head.FriendlyName;
+
+            // Get repository name from path
+            var repoPath = repo.Info.WorkingDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar);
+            var repoName = System.IO.Path.GetFileName(repoPath);
+
+            // Calculate incoming and outgoing commits
+            int incoming = 0;
+            int outgoing = 0;
+            
+            var trackedBranch = repo.Head.TrackedBranch;
+            if (trackedBranch != null)
+            {
+                var localCommit = repo.Head.Tip;
+                var remoteCommit = trackedBranch.Tip;
+
+                if (localCommit != null && remoteCommit != null)
+                {
+                    // Use HistoryDivergence for better performance
+                    var divergence = repo.ObjectDatabase.CalculateHistoryDivergence(localCommit, remoteCommit);
+                    
+                    outgoing = divergence.AheadBy ?? 0;
+                    incoming = divergence.BehindBy ?? 0;
+                }
+            }
+
+            // Update status bar with all values at once
+            StatusBar.UpdateStatus(branch, repoName, incoming, outgoing);
+        }
+        catch (Exception)
+        {
+            // If there's an error, just clear the status bar
+            StatusBar.Clear();
         }
     }
 }
