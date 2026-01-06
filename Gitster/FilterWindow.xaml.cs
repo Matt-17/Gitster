@@ -10,7 +10,6 @@ namespace Gitster;
 public partial class FilterWindow : Window
 {
     public FilterWindowViewModel ViewModel { get; }
-    public bool DialogResultOk { get; private set; }
     
     public event EventHandler? FiltersApplied;
 
@@ -23,7 +22,6 @@ public partial class FilterWindow : Window
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
-        DialogResultOk = true;
         FiltersApplied?.Invoke(this, EventArgs.Empty);
         Close();
     }
@@ -36,7 +34,6 @@ public partial class FilterWindow : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        DialogResultOk = false;
         Close();
     }
 }

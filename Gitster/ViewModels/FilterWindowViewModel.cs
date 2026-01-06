@@ -28,7 +28,7 @@ public partial class FilterWindowViewModel : BaseViewModel
     [RelayCommand]
     private void ClearAuthorName()
     {
-        SelectedAuthorName = null;
+        SelectedAuthorName = "All";
     }
 
     [RelayCommand]
@@ -58,7 +58,7 @@ public partial class FilterWindowViewModel : BaseViewModel
     /// </summary>
     public void ClearAllFilters()
     {
-        SelectedAuthorName = null;
+        SelectedAuthorName = "All";
         FromDate = null;
         ToDate = null;
     }

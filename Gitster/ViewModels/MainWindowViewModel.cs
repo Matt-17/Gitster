@@ -67,6 +67,7 @@ public partial class MainWindowViewModel : BaseViewModel
     
     private ObservableCollection<CommitItem> _allCommits = [];
     private FilterWindowViewModel? _filterViewModel;
+    private FilterWindow? _filterWindow;
 
     public MainWindowViewModel()
     {
@@ -165,6 +166,13 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         try
         {
+            // If filter window is already open, just activate it
+            if (_filterWindow != null)
+            {
+                _filterWindow.Activate();
+                return;
+            }
+
             if (_filterViewModel == null)
             {
                 _filterViewModel = new FilterWindowViewModel();
@@ -191,15 +199,18 @@ public partial class MainWindowViewModel : BaseViewModel
                 _filterViewModel.SelectedAuthorName = "All";
             }
 
-            var filterWindow = new FilterWindow(_filterViewModel)
+            _filterWindow = new FilterWindow(_filterViewModel)
             {
                 Owner = Application.Current.MainWindow
             };
 
             // Subscribe to FiltersApplied event
-            filterWindow.FiltersApplied += (sender, e) => ApplyFilters();
+            _filterWindow.FiltersApplied += (sender, e) => ApplyFilters();
+            
+            // Clean up when window is closed
+            _filterWindow.Closed += (sender, e) => _filterWindow = null;
 
-            filterWindow.ShowDialog();
+            _filterWindow.Show();
         }
         catch (Exception ex)
         {
