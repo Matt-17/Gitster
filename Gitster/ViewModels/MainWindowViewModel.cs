@@ -684,6 +684,11 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
+    /// <summary>
+    /// Updates the status bar with current repository information including branch name,
+    /// repository name, and incoming/outgoing commit counts.
+    /// </summary>
+    /// <param name="repo">The Git repository to get status information from.</param>
     private void UpdateStatusBar(Repository repo)
     {
         try
@@ -704,26 +709,13 @@ public partial class MainWindowViewModel : BaseViewModel
 
                 if (localCommit != null && remoteCommit != null)
                 {
-                    // Count commits ahead (outgoing)
-                    var commitsAhead = repo.Commits
-                        .QueryBy(new CommitFilter { 
-                            IncludeReachableFrom = localCommit,
-                            ExcludeReachableFrom = remoteCommit 
-                        })
-                        .Count();
-
-                    // Count commits behind (incoming)
-                    var commitsBehind = repo.Commits
-                        .QueryBy(new CommitFilter { 
-                            IncludeReachableFrom = remoteCommit,
-                            ExcludeReachableFrom = localCommit 
-                        })
-                        .Count();
-
-                    OutgoingCount = commitsAhead;
-                    IncomingCount = commitsBehind;
-                    HasOutgoingChanges = commitsAhead > 0;
-                    HasIncomingChanges = commitsBehind > 0;
+                    // Use HistoryDivergence for better performance
+                    var divergence = repo.ObjectDatabase.CalculateHistoryDivergence(localCommit, remoteCommit);
+                    
+                    OutgoingCount = divergence.AheadBy ?? 0;
+                    IncomingCount = divergence.BehindBy ?? 0;
+                    HasOutgoingChanges = OutgoingCount > 0;
+                    HasIncomingChanges = IncomingCount > 0;
                 }
                 else
                 {
