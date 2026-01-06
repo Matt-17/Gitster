@@ -71,14 +71,21 @@ public partial class MainWindowViewModel : BaseViewModel
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
     
+    public CommitFilter Filter { get; } = new();
+    
     private ObservableCollection<CommitItem> _allCommits = [];
-    private FilterWindowViewModel? _filterViewModel;
     private FilterWindow? _filterWindow;
 
     public MainWindowViewModel()
     {
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
+        
+        // Subscribe to filter changes
+        Filter.PropertyChanged += (s, e) => 
+        {
+            ApplyFilters();
+        };
         
         // Initialize with current date/time
         SelectedDate = DateTime.Now;
@@ -179,14 +186,12 @@ public partial class MainWindowViewModel : BaseViewModel
                 return;
             }
 
-            if (_filterViewModel == null)
-            {
-                _filterViewModel = new FilterWindowViewModel();
-            }
+            // Create FilterWindowViewModel with the main filter
+            var filterViewModel = new FilterWindowViewModel(Filter);
 
             // Populate author names from all commits
-            _filterViewModel.AuthorNames.Clear();
-            _filterViewModel.AuthorNames.Add("All");
+            filterViewModel.AuthorNames.Clear();
+            filterViewModel.AuthorNames.Add("All");
             
             var distinctAuthors = _allCommits
                 .Select(c => c.AuthorName)
@@ -196,16 +201,10 @@ public partial class MainWindowViewModel : BaseViewModel
             
             foreach (var author in distinctAuthors)
             {
-                _filterViewModel.AuthorNames.Add(author);
+                filterViewModel.AuthorNames.Add(author);
             }
 
-            // Set default selection to "All" if no author is selected
-            if (string.IsNullOrEmpty(_filterViewModel.SelectedAuthorName))
-            {
-                _filterViewModel.SelectedAuthorName = "All";
-            }
-
-            _filterWindow = new FilterWindow(_filterViewModel)
+            _filterWindow = new FilterWindow(filterViewModel)
             {
                 Owner = Application.Current.MainWindow
             };
@@ -213,8 +212,7 @@ public partial class MainWindowViewModel : BaseViewModel
             // Subscribe to FiltersApplied event
             _filterWindow.FiltersApplied += (sender, e) => 
             {
-                ApplyFilters();
-                _filterViewModel.SaveAppliedState();
+                filterViewModel.ApplyToMainFilter();
             };
             
             // Clean up when window is closed
@@ -231,12 +229,7 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private void ClearAllFilters()
     {
-        if (_filterViewModel != null)
-        {
-            _filterViewModel.ClearAllFilters();
-            ApplyFilters();
-            _filterViewModel.SaveAppliedState();
-        }
+        Filter.ClearAllFilters();
     }
 
     [RelayCommand]
@@ -482,35 +475,30 @@ public partial class MainWindowViewModel : BaseViewModel
 
     private void ApplyFilters()
     {
-        if (_filterViewModel == null)
-        {
-            return;
-        }
-
         Commits.Clear();
 
         var filteredCommits = _allCommits.AsEnumerable();
 
         // Apply author filter
-        if (!string.IsNullOrEmpty(_filterViewModel.SelectedAuthorName) 
-            && _filterViewModel.SelectedAuthorName != "All")
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) 
+            && Filter.SelectedAuthorName != "All")
         {
             filteredCommits = filteredCommits.Where(c => 
-                c.AuthorName == _filterViewModel.SelectedAuthorName);
+                c.AuthorName == Filter.SelectedAuthorName);
         }
 
         // Apply from date filter
-        if (_filterViewModel.FromDate.HasValue)
+        if (Filter.FromDate.HasValue)
         {
-            var fromDate = _filterViewModel.FromDate.Value.Date;
+            var fromDate = Filter.FromDate.Value.Date;
             filteredCommits = filteredCommits.Where(c => c.Date.Date >= fromDate);
         }
 
         // Apply to date filter
-        if (_filterViewModel.ToDate.HasValue)
+        if (Filter.ToDate.HasValue)
         {
             // Include all commits up to the end of the selected day
-            var toDateEndOfDay = _filterViewModel.ToDate.Value.Date.AddDays(1);
+            var toDateEndOfDay = Filter.ToDate.Value.Date.AddDays(1);
             filteredCommits = filteredCommits.Where(c => c.Date < toDateEndOfDay);
         }
 
@@ -545,27 +533,20 @@ public partial class MainWindowViewModel : BaseViewModel
 
     private void UpdateFilterStatus()
     {
-        if (_filterViewModel == null)
-        {
-            FilterStatusText = string.Empty;
-            HasActiveFilters = false;
-            return;
-        }
-
         int filterCount = 0;
 
-        if (!string.IsNullOrEmpty(_filterViewModel.SelectedAuthorName) 
-            && _filterViewModel.SelectedAuthorName != "All")
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) 
+            && Filter.SelectedAuthorName != "All")
         {
             filterCount++;
         }
 
-        if (_filterViewModel.FromDate.HasValue)
+        if (Filter.FromDate.HasValue)
         {
             filterCount++;
         }
 
-        if (_filterViewModel.ToDate.HasValue)
+        if (Filter.ToDate.HasValue)
         {
             filterCount++;
         }
@@ -623,7 +604,7 @@ public partial class MainWindowViewModel : BaseViewModel
             }
 
             // Apply filters if any are active, otherwise show all commits
-            if (_filterViewModel != null && _filterViewModel.HasActiveFilters())
+            if (Filter.HasActiveFilters())
             {
                 ApplyFilters();
             }

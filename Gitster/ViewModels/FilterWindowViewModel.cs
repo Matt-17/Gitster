@@ -24,12 +24,33 @@ public partial class FilterWindowViewModel : BaseViewModel
 
     public ObservableCollection<string> AuthorNames { get; } = [];
 
+    private readonly CommitFilter _mainFilter;
     private string? _appliedAuthorName;
     private DateTime? _appliedFromDate;
     private DateTime? _appliedToDate;
 
-    public FilterWindowViewModel()
+    public FilterWindowViewModel(CommitFilter mainFilter)
     {
+        _mainFilter = mainFilter;
+        
+        // Load current filter values from main filter
+        LoadFromMainFilter();
+    }
+
+    /// <summary>
+    /// Loads filter values from the main filter.
+    /// </summary>
+    public void LoadFromMainFilter()
+    {
+        SelectedAuthorName = _mainFilter.SelectedAuthorName;
+        FromDate = _mainFilter.FromDate;
+        ToDate = _mainFilter.ToDate;
+        
+        // Set applied state to current values
+        _appliedAuthorName = SelectedAuthorName;
+        _appliedFromDate = FromDate;
+        _appliedToDate = ToDate;
+        UpdatePendingChanges();
     }
 
     partial void OnSelectedAuthorNameChanged(string? value)
@@ -54,8 +75,16 @@ public partial class FilterWindowViewModel : BaseViewModel
                          || _appliedToDate != ToDate;
     }
 
-    public void SaveAppliedState()
+    /// <summary>
+    /// Applies the current filter values to the main filter.
+    /// </summary>
+    public void ApplyToMainFilter()
     {
+        _mainFilter.SelectedAuthorName = SelectedAuthorName;
+        _mainFilter.FromDate = FromDate;
+        _mainFilter.ToDate = ToDate;
+        
+        // Save applied state
         _appliedAuthorName = SelectedAuthorName;
         _appliedFromDate = FromDate;
         _appliedToDate = ToDate;
@@ -77,26 +106,6 @@ public partial class FilterWindowViewModel : BaseViewModel
     [RelayCommand]
     private void ClearToDate()
     {
-        ToDate = null;
-    }
-
-    /// <summary>
-    /// Checks if any filter is active.
-    /// </summary>
-    public bool HasActiveFilters()
-    {
-        return (!string.IsNullOrEmpty(SelectedAuthorName) && SelectedAuthorName != "All") 
-               || FromDate.HasValue 
-               || ToDate.HasValue;
-    }
-
-    /// <summary>
-    /// Clears all filters.
-    /// </summary>
-    public void ClearAllFilters()
-    {
-        SelectedAuthorName = "All";
-        FromDate = null;
         ToDate = null;
     }
 }
