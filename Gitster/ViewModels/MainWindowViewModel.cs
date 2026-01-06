@@ -62,13 +62,30 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial string SelectedRemote { get; set; } = string.Empty;
 
+    [ObservableProperty]
+    public partial string FilterStatusText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasActiveFilters { get; set; }
+
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
+    
+    public CommitFilter Filter { get; } = new();
+    
+    private ObservableCollection<CommitItem> _allCommits = [];
+    private FilterWindow? _filterWindow;
 
     public MainWindowViewModel()
     {
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
+        
+        // Subscribe to filter changes
+        Filter.PropertyChanged += (s, e) => 
+        {
+            ApplyFilters();
+        };
         
         // Initialize with current date/time
         SelectedDate = DateTime.Now;
@@ -155,6 +172,64 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             MessageBox.Show($"Error opening folder dialog: {ex.Message}");
         }
+    }
+
+    [RelayCommand]
+    private void OpenFilter()
+    {
+        try
+        {
+            // If filter window is already open, just activate it
+            if (_filterWindow != null)
+            {
+                _filterWindow.Activate();
+                return;
+            }
+
+            // Create FilterWindowViewModel with the main filter
+            var filterViewModel = new FilterWindowViewModel(Filter);
+
+            // Populate author names from all commits
+            filterViewModel.AuthorNames.Clear();
+            filterViewModel.AuthorNames.Add("All");
+            
+            var distinctAuthors = _allCommits
+                .Select(c => c.AuthorName)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .Distinct()
+                .OrderBy(name => name);
+            
+            foreach (var author in distinctAuthors)
+            {
+                filterViewModel.AuthorNames.Add(author);
+            }
+
+            _filterWindow = new FilterWindow(filterViewModel)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            // Subscribe to FiltersApplied event
+            _filterWindow.FiltersApplied += (sender, e) => 
+            {
+                filterViewModel.ApplyToMainFilter();
+            };
+            
+            // Clean up when window is closed
+            _filterWindow.Closed += (sender, e) => _filterWindow = null;
+
+            _filterWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error opening filter window: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void ClearAllFilters()
+    {
+        Filter.ClearAllFilters();
     }
 
     [RelayCommand]
@@ -398,6 +473,96 @@ public partial class MainWindowViewModel : BaseViewModel
         settings.Save();
     }
 
+    private void ApplyFilters()
+    {
+        Commits.Clear();
+
+        var filteredCommits = _allCommits.AsEnumerable();
+
+        // Apply author filter
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) 
+            && Filter.SelectedAuthorName != "All")
+        {
+            filteredCommits = filteredCommits.Where(c => 
+                c.AuthorName == Filter.SelectedAuthorName);
+        }
+
+        // Apply from date filter
+        if (Filter.FromDate.HasValue)
+        {
+            var fromDate = Filter.FromDate.Value.Date;
+            filteredCommits = filteredCommits.Where(c => c.Date.Date >= fromDate);
+        }
+
+        // Apply to date filter
+        if (Filter.ToDate.HasValue)
+        {
+            // Include all commits up to the end of the selected day
+            var toDateEndOfDay = Filter.ToDate.Value.Date.AddDays(1);
+            filteredCommits = filteredCommits.Where(c => c.Date < toDateEndOfDay);
+        }
+
+        foreach (var commit in filteredCommits)
+        {
+            Commits.Add(commit);
+        }
+
+        // Auto-select commit
+        AutoSelectCommit();
+
+        // Update filter status
+        UpdateFilterStatus();
+    }
+
+    private void AutoSelectCommit()
+    {
+        // Auto-select the second item if available, otherwise first, otherwise null
+        if (Commits.Count >= 2)
+        {
+            SelectedCommit = Commits[1];
+        }
+        else if (Commits.Count == 1)
+        {
+            SelectedCommit = Commits[0];
+        }
+        else
+        {
+            SelectedCommit = null;
+        }
+    }
+
+    private void UpdateFilterStatus()
+    {
+        int filterCount = 0;
+
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) 
+            && Filter.SelectedAuthorName != "All")
+        {
+            filterCount++;
+        }
+
+        if (Filter.FromDate.HasValue)
+        {
+            filterCount++;
+        }
+
+        if (Filter.ToDate.HasValue)
+        {
+            filterCount++;
+        }
+
+        if (filterCount > 0)
+        {
+            FilterStatusText = $"{filterCount} Filter{(filterCount > 1 ? "s" : "")} applied";
+            HasActiveFilters = true;
+        }
+        else
+        {
+            FilterStatusText = string.Empty;
+            HasActiveFilters = false;
+        }
+    }
+
     public void UpdateElements()
     {
         try
@@ -420,19 +585,42 @@ public partial class MainWindowViewModel : BaseViewModel
 
             // Update commit list
             Commits.Clear();
+            _allCommits.Clear();
             foreach (var c in repo.Commits)
             {
-                Commits.Add(new CommitItem(
+                if (c.Author == null)
+                {
+                    continue;
+                }
+
+                var commitId = c.Id.Sha.Length >= 7 ? c.Id.Sha.Substring(0, 7) : c.Id.Sha;
+                var commitItem = new CommitItem(
                     c.MessageShort,
                     c.Author.When.DateTime,
-                    c.Id.Sha.Substring(0, 7)
-                ));
+                    commitId,
+                    c.Author.Name ?? string.Empty
+                );
+                _allCommits.Add(commitItem);
             }
 
-            // Auto-select the second item if available
-            if (Commits.Count >= 2)
+            // Apply filters if any are active, otherwise show all commits
+            if (Filter.HasActiveFilters())
             {
-                SelectedCommit = Commits[1];
+                ApplyFilters();
+            }
+            else
+            {
+                // No filters, show all commits
+                foreach (var commit in _allCommits)
+                {
+                    Commits.Add(commit);
+                }
+
+                // Auto-select commit
+                AutoSelectCommit();
+
+                // Update filter status
+                UpdateFilterStatus();
             }
 
             // Update remotes list
