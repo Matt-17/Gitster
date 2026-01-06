@@ -519,7 +519,16 @@ public partial class MainWindowViewModel : BaseViewModel
             Commits.Add(commit);
         }
 
-        // Auto-select the second item if available
+        // Auto-select commit
+        AutoSelectCommit();
+
+        // Update filter status
+        UpdateFilterStatus();
+    }
+
+    private void AutoSelectCommit()
+    {
+        // Auto-select the second item if available, otherwise first, otherwise null
         if (Commits.Count >= 2)
         {
             SelectedCommit = Commits[1];
@@ -532,9 +541,6 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             SelectedCommit = null;
         }
-
-        // Update filter status
-        UpdateFilterStatus();
     }
 
     private void UpdateFilterStatus()
@@ -629,11 +635,8 @@ public partial class MainWindowViewModel : BaseViewModel
                     Commits.Add(commit);
                 }
 
-                // Auto-select the second item if available
-                if (Commits.Count >= 2)
-                {
-                    SelectedCommit = Commits[1];
-                }
+                // Auto-select commit
+                AutoSelectCommit();
 
                 // Update filter status
                 UpdateFilterStatus();
