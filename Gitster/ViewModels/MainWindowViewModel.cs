@@ -69,22 +69,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public partial bool HasActiveFilters { get; set; }
 
     [ObservableProperty]
-    public partial string CurrentBranch { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string RepositoryName { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial int IncomingCount { get; set; }
-
-    [ObservableProperty]
-    public partial int OutgoingCount { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasIncomingChanges { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasOutgoingChanges { get; set; }
+    public partial StatusBarViewModel StatusBar { get; set; }
 
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
@@ -98,6 +83,7 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
+        StatusBar = new StatusBarViewModel();
         
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) => 
@@ -675,12 +661,7 @@ public partial class MainWindowViewModel : BaseViewModel
             Remotes.Clear();
 
             // Clear status bar
-            CurrentBranch = string.Empty;
-            RepositoryName = string.Empty;
-            IncomingCount = 0;
-            OutgoingCount = 0;
-            HasIncomingChanges = false;
-            HasOutgoingChanges = false;
+            StatusBar.Clear();
         }
     }
 
@@ -694,13 +675,16 @@ public partial class MainWindowViewModel : BaseViewModel
         try
         {
             // Get current branch
-            CurrentBranch = repo.Head.FriendlyName;
+            var branch = repo.Head.FriendlyName;
 
             // Get repository name from path
             var repoPath = repo.Info.WorkingDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar);
-            RepositoryName = System.IO.Path.GetFileName(repoPath);
+            var repoName = System.IO.Path.GetFileName(repoPath);
 
             // Calculate incoming and outgoing commits
+            int incoming = 0;
+            int outgoing = 0;
+            
             var trackedBranch = repo.Head.TrackedBranch;
             if (trackedBranch != null)
             {
@@ -712,37 +696,18 @@ public partial class MainWindowViewModel : BaseViewModel
                     // Use HistoryDivergence for better performance
                     var divergence = repo.ObjectDatabase.CalculateHistoryDivergence(localCommit, remoteCommit);
                     
-                    OutgoingCount = divergence.AheadBy ?? 0;
-                    IncomingCount = divergence.BehindBy ?? 0;
-                    HasOutgoingChanges = OutgoingCount > 0;
-                    HasIncomingChanges = IncomingCount > 0;
-                }
-                else
-                {
-                    OutgoingCount = 0;
-                    IncomingCount = 0;
-                    HasOutgoingChanges = false;
-                    HasIncomingChanges = false;
+                    outgoing = divergence.AheadBy ?? 0;
+                    incoming = divergence.BehindBy ?? 0;
                 }
             }
-            else
-            {
-                // No tracked branch, no incoming/outgoing
-                OutgoingCount = 0;
-                IncomingCount = 0;
-                HasOutgoingChanges = false;
-                HasIncomingChanges = false;
-            }
+
+            // Update status bar with all values at once
+            StatusBar.UpdateStatus(branch, repoName, incoming, outgoing);
         }
         catch (Exception)
         {
             // If there's an error, just clear the status bar
-            CurrentBranch = string.Empty;
-            RepositoryName = string.Empty;
-            IncomingCount = 0;
-            OutgoingCount = 0;
-            HasIncomingChanges = false;
-            HasOutgoingChanges = false;
+            StatusBar.Clear();
         }
     }
 }
