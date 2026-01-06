@@ -68,6 +68,24 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool HasActiveFilters { get; set; }
 
+    [ObservableProperty]
+    public partial string CurrentBranch { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string RepositoryName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial int IncomingCount { get; set; }
+
+    [ObservableProperty]
+    public partial int OutgoingCount { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasIncomingChanges { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasOutgoingChanges { get; set; }
+
     public ObservableCollection<CommitItem> Commits { get; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
     
@@ -635,6 +653,9 @@ public partial class MainWindowViewModel : BaseViewModel
             {
                 SelectedRemote = Remotes[0];
             }
+
+            // Update status bar information
+            UpdateStatusBar(repo);
         }
         catch (Exception)
         {
@@ -652,6 +673,84 @@ public partial class MainWindowViewModel : BaseViewModel
 
             Commits.Clear();
             Remotes.Clear();
+
+            // Clear status bar
+            CurrentBranch = string.Empty;
+            RepositoryName = string.Empty;
+            IncomingCount = 0;
+            OutgoingCount = 0;
+            HasIncomingChanges = false;
+            HasOutgoingChanges = false;
+        }
+    }
+
+    private void UpdateStatusBar(Repository repo)
+    {
+        try
+        {
+            // Get current branch
+            CurrentBranch = repo.Head.FriendlyName;
+
+            // Get repository name from path
+            var repoPath = repo.Info.WorkingDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar);
+            RepositoryName = System.IO.Path.GetFileName(repoPath);
+
+            // Calculate incoming and outgoing commits
+            var trackedBranch = repo.Head.TrackedBranch;
+            if (trackedBranch != null)
+            {
+                var localCommit = repo.Head.Tip;
+                var remoteCommit = trackedBranch.Tip;
+
+                if (localCommit != null && remoteCommit != null)
+                {
+                    // Count commits ahead (outgoing)
+                    var commitsAhead = repo.Commits
+                        .QueryBy(new CommitFilter { 
+                            IncludeReachableFrom = localCommit,
+                            ExcludeReachableFrom = remoteCommit 
+                        })
+                        .Count();
+
+                    // Count commits behind (incoming)
+                    var commitsBehind = repo.Commits
+                        .QueryBy(new CommitFilter { 
+                            IncludeReachableFrom = remoteCommit,
+                            ExcludeReachableFrom = localCommit 
+                        })
+                        .Count();
+
+                    OutgoingCount = commitsAhead;
+                    IncomingCount = commitsBehind;
+                    HasOutgoingChanges = commitsAhead > 0;
+                    HasIncomingChanges = commitsBehind > 0;
+                }
+                else
+                {
+                    OutgoingCount = 0;
+                    IncomingCount = 0;
+                    HasOutgoingChanges = false;
+                    HasIncomingChanges = false;
+                }
+            }
+            else
+            {
+                // No tracked branch, no incoming/outgoing
+                OutgoingCount = 0;
+                IncomingCount = 0;
+                HasOutgoingChanges = false;
+                HasIncomingChanges = false;
+            }
+        }
+        catch (Exception)
+        {
+            // If there's an error, just clear the status bar
+            CurrentBranch = string.Empty;
+            RepositoryName = string.Empty;
+            IncomingCount = 0;
+            OutgoingCount = 0;
+            HasIncomingChanges = false;
+            HasOutgoingChanges = false;
         }
     }
 }
