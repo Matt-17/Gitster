@@ -59,7 +59,7 @@ public partial class FilterWindowViewModel : BaseViewModel
         _appliedAuthorName = SelectedAuthorName;
         _appliedFromDate = FromDate;
         _appliedToDate = ToDate;
-        HasPendingChanges = false;
+        UpdatePendingChanges();
     }
 
     [RelayCommand]

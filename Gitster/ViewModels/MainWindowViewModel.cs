@@ -235,6 +235,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             _filterViewModel.ClearAllFilters();
             ApplyFilters();
+            _filterViewModel.SaveAppliedState();
         }
     }
 
