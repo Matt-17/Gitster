@@ -17,7 +17,7 @@ public partial class CommitItem : ObservableObject
     [ObservableProperty]
     public partial string AuthorName { get; set; }
 
-    public CommitItem(string message, DateTime date, string commitId, string authorName = "")
+    public CommitItem(string message, DateTime date, string commitId, string authorName)
     {
         Message = message;
         Date = date;

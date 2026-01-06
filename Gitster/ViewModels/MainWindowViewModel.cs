@@ -488,8 +488,9 @@ public partial class MainWindowViewModel : BaseViewModel
         // Apply to date filter
         if (_filterViewModel.ToDate.HasValue)
         {
-            var toDate = _filterViewModel.ToDate.Value.Date.AddDays(1).AddTicks(-1);
-            filteredCommits = filteredCommits.Where(c => c.Date <= toDate);
+            // Include all commits up to the end of the selected day
+            var toDateEndOfDay = _filterViewModel.ToDate.Value.Date.AddDays(1);
+            filteredCommits = filteredCommits.Where(c => c.Date < toDateEndOfDay);
         }
 
         foreach (var commit in filteredCommits)
@@ -541,7 +542,7 @@ public partial class MainWindowViewModel : BaseViewModel
                     c.MessageShort,
                     c.Author.When.DateTime,
                     c.Id.Sha.Substring(0, 7),
-                    c.Author.Name
+                    c.Author.Name ?? string.Empty
                 );
                 _allCommits.Add(commitItem);
                 Commits.Add(commitItem);
