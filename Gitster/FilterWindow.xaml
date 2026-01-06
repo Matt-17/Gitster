@@ -10,6 +10,7 @@
        WindowStyle="SingleBorderWindow" 
        ResizeMode="NoResize"
        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
        Icon="pack://application:,,,/Assets/Icon.ico">
     <Window.Resources>
         <Style TargetType="TextBox">
