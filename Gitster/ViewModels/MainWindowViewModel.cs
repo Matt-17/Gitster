@@ -614,13 +614,29 @@ public partial class MainWindowViewModel : BaseViewModel
                     c.Author.Name ?? string.Empty
                 );
                 _allCommits.Add(commitItem);
-                Commits.Add(commitItem);
             }
 
-            // Auto-select the second item if available
-            if (Commits.Count >= 2)
+            // Apply filters if any are active, otherwise show all commits
+            if (_filterViewModel != null && _filterViewModel.HasActiveFilters())
             {
-                SelectedCommit = Commits[1];
+                ApplyFilters();
+            }
+            else
+            {
+                // No filters, show all commits
+                foreach (var commit in _allCommits)
+                {
+                    Commits.Add(commit);
+                }
+
+                // Auto-select the second item if available
+                if (Commits.Count >= 2)
+                {
+                    SelectedCommit = Commits[1];
+                }
+
+                // Update filter status
+                UpdateFilterStatus();
             }
 
             // Update remotes list
