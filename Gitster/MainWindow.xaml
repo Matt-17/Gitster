@@ -101,7 +101,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="4" 
+                <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="2" 
                  Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" />
                 <Button Grid.Column="4" Content="Browse..." Width="80" Command="{Binding BrowseFolderCommand}" />
                 <GroupBox Header="Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
@@ -123,30 +123,9 @@
                     </Grid>
                 </GroupBox>
 
-                <Slider Grid.Row="4" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="1" Maximum="{Binding DaysMaximum}" 
-                Value="{Binding DaysValue}" />
-                <Slider Grid.Row="4" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="1" Maximum="12" 
-                Value="{Binding MonthsValue}" />
-                <Slider Grid.Row="4" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="0" Maximum="23" 
-                Value="{Binding HoursValue}" />
-                <Slider Grid.Row="4" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="0" Maximum="59" 
-                Value="{Binding MinutesValue}" />
+                <controls:DateControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Top" Width="200" SelectedDate="{Binding SelectedDate, Mode=TwoWay}" EditMode="DateTime" Margin="5" Height="30" />
 
-                <controls:DateControl Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DateControl" 
-                    VerticalAlignment="Top" Width="200" 
-                    SelectedDate="{Binding SelectedDate, Mode=TwoWay}"
-                    EditMode="DateTime"
-                    Margin="5" Height="30" />
-                <TextBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" 
-                 Width="200" IsReadOnly="True" Margin="5" 
-                 Text="{Binding TimeText, Mode=OneWay}" />
-
-                <GroupBox Header="Current Commit" Grid.Row="2" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
-                  DataContext="{Binding CurrentCommitDetail}">
+                <GroupBox Header="Current Commit" Grid.Row="2" Grid.ColumnSpan="3" Grid.Column="0" Margin="5" DataContext="{Binding CurrentCommitDetail}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition />
@@ -163,19 +142,9 @@
                         </StackPanel>
                     </Grid>
                 </GroupBox>
-                <controls:DateControl Grid.Row="4" Grid.Column="0" x:Name="DateControl" SelectedDate="{Binding SelectedDate, Mode=TwoWay}" VerticalAlignment="Center" EditMode="DateTime" />
 
-                <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
-                    <Button Width="70" Height="30" Content="Fetch" Command="{Binding FetchCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Download changes from remote without merging" />
-                    <Button Width="70" Height="30" Content="Pull" Command="{Binding PullCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Fetch and merge changes from remote" />
-                    <Button Width="70" Height="30" Content="Push" Command="{Binding PushCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Upload local changes to remote" />
-                    <Button Width="70" Height="30" Content="Sync" Command="{Binding SyncCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Synchronize with remote (fetch + pull + push)" />
-                    <ComboBox Width="120" Height="30" ItemsSource="{Binding Remotes}" SelectedItem="{Binding SelectedRemote, Mode=TwoWay}"
-                      Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Select remote repository" />
+                <StackPanel Orientation="Horizontal" Grid.Row="4" Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right">
+
                     <Button Width="70" Height="30" Content="Amend" Command="{Binding AmendCommitCommand}" 
                     Margin="5" x:Name="GoButton" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Amend the commit timestamp" />
                 </StackPanel>

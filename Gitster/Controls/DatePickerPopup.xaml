@@ -39,10 +39,10 @@
                         <ColumnDefinition Width="2*" />
                         <ColumnDefinition />
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
+                    <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="MonthOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts&#x0a;Oder mit Mausrad" ToolTipService.InitialShowDelay="0" Background="Transparent">
                         <TextBlock Text="{Binding Date, StringFormat='MMMM'}" FontSize="18" TextAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts" ToolTipService.InitialShowDelay="0">
+                    <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts&#x0a;Oder mit Mausrad" ToolTipService.InitialShowDelay="0" Background="Transparent">
                         <TextBlock Text="{Binding Date, StringFormat='yyyy'}" TextAlignment="Center" FontSize="18" VerticalAlignment="Center"/>
                     </Border>
                 </Grid>
@@ -178,33 +178,33 @@
                         </Grid.ColumnDefinitions>
 
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="0" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="1" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="2" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="3" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="4" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="5" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="0" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="1" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="2" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="3" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="4" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="5" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="6" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="7" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="8" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="9" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="10" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="11" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="6" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="7" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="8" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="9" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="10" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="11" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="2" Text="12" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="2" Text="13" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="2" Text="14" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="2" Text="15" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="2" Text="16" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="2" Text="17" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="2" Text="12" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="2" Text="13" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="2" Text="14" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="2" Text="15" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="2" Text="16" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="2" Text="17" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="3" Text="18" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="3" Text="19" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="3" Text="20" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="3" Text="21" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="3" Text="22" MouseDown="HourTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="3" Text="23" MouseDown="HourTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="3" Text="18" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="3" Text="19" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="3" Text="20" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="3" Text="21" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="3" Text="22" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="3" Text="23" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
 
                     </Grid>
                     <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
@@ -224,19 +224,19 @@
                         </Grid.RowDefinitions>
 
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="00" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="10" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="20" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="30" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="40" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="50" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="00" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="10" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="20" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="30" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="40" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="50" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
                                                                                                                            
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="05" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="15" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="25" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="35" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="45" MouseDown="MinuteTextMouseDown" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="55" MouseDown="MinuteTextMouseDown" />
+                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="05" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="15" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="25" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="35" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="45" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
+                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="55" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
 
                     </Grid>
                 </Grid>

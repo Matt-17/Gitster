@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Gitster.Helpers;
 using Gitster.ViewModels;
 
@@ -29,6 +30,8 @@ public partial class DateControl : UserControl
     public static readonly DependencyProperty EditModeProperty =
         DependencyProperty.Register(nameof(EditMode), typeof(EditMode), typeof(DateControl), new PropertyMetadata(EditMode.DateOnly, EditModeChanged));
 
+    private bool _isPopupMouseOver;
+
     static DateControl()
     {
     }
@@ -39,6 +42,60 @@ public partial class DateControl : UserControl
         LayoutRoot.DataContext = new DateControlViewModel();
         ViewModel.SetDate(SystemTime.Today);
         ViewModel.SelectedDateChanged += DateChanged;
+        
+        // Handle popup mouse events to prevent closing when interacting with popup
+        PopupContent.MouseEnter += (s, e) => _isPopupMouseOver = true;
+        PopupContent.MouseLeave += (s, e) => _isPopupMouseOver = false;
+        
+        // Listen for mouse events to close popup when clicking outside
+        this.Loaded += (s, e) => AttachClickOutsideHandler();
+    }
+
+    private void AttachClickOutsideHandler()
+    {
+        // Get the root window
+        var window = Window.GetWindow(this);
+        if (window != null)
+        {
+            window.PreviewMouseDown += Window_PreviewMouseDown;
+            window.Deactivated += Window_Deactivated;
+        }
+    }
+
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        // Close popup when window loses focus
+        if (ViewModel.IsOpen)
+        {
+            ViewModel.IsOpen = false;
+        }
+    }
+
+    private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // If popup is open, check if click is outside the control
+        if (ViewModel.IsOpen && !_isPopupMouseOver && !PopupContent.IsMouseOver)
+        {
+            // Check if the click is within this control
+            var clickedElement = e.OriginalSource as FrameworkElement;
+            if (clickedElement != null && !IsDescendantOf(this, clickedElement))
+            {
+                // Click is outside, close the popup
+                ViewModel.IsOpen = false;
+            }
+        }
+    }
+
+    private static bool IsDescendantOf(FrameworkElement parent, FrameworkElement child)
+    {
+        var current = child;
+        while (current != null)
+        {
+            if (current == parent)
+                return true;
+            current = VisualTreeHelper.GetParent(current) as FrameworkElement;
+        }
+        return false;
     }
 
     public DateTime? SelectedDate
@@ -76,17 +133,16 @@ public partial class DateControl : UserControl
     private void DateChanged(object? sender, DateTime? e)
     {
         SelectedDate = e;
-        ViewModel.IsOpen = false;
     }
 
     private void TbDate_GotFocus(object sender, RoutedEventArgs e)
     {
-        //ViewModel.IsOpen = true;
+        // Don't auto-open popup on focus
     }
 
     private void TbDate_LostFocus(object sender, RoutedEventArgs e)
     {
-        ViewModel.IsOpen = false;
+        // Popup closing is handled by click-outside detection
     }
 
     private void TbDate_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -98,21 +154,29 @@ public partial class DateControl : UserControl
                 Debug.Assert(be != null, nameof(be) + " != null");
                 be.UpdateSource();
                 TbDate.SelectAll();
+                ViewModel.IsOpen = false;
                 break;
             case Key.Escape:
                 ViewModel.Reset();
                 TbDate.SelectAll();
+                ViewModel.IsOpen = false;
                 e.Handled = true;
                 break;
             case Key.H:
-                ViewModel.SelectedDate = SystemTime.Today;
-                TbDate.SelectAll();
-                e.Handled = true;
+                if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                {
+                    ViewModel.SelectedDate = SystemTime.Today;
+                    TbDate.SelectAll();
+                    e.Handled = true;
+                }
                 break;
             case Key.M:
-                ViewModel.SelectedDate = SystemTime.Today.AddDays(1);
-                TbDate.SelectAll();
-                e.Handled = true;
+                if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                {
+                    ViewModel.SelectedDate = SystemTime.Today.AddDays(1);
+                    TbDate.SelectAll();
+                    e.Handled = true;
+                }
                 break;
             case Key.Up:
                 ViewModel.ChangeDate(1);
@@ -127,9 +191,39 @@ public partial class DateControl : UserControl
         }
     }
 
+    private void TbTime_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter:
+                var be = ((TextBox)sender).GetBindingExpression(TextBox.TextProperty);
+                Debug.Assert(be != null, nameof(be) + " != null");
+                be.UpdateSource();
+                TbTime.SelectAll();
+                ViewModel.IsOpen = false;
+                break;
+            case Key.Escape:
+                ViewModel.Reset();
+                TbTime.SelectAll();
+                ViewModel.IsOpen = false;
+                e.Handled = true;
+                break;
+            case Key.Up:
+                ViewModel.ChangeMinute(-1);
+                TbTime.SelectAll();
+                e.Handled = true;
+                break;
+            case Key.Down:
+                ViewModel.ChangeMinute(1);
+                TbTime.SelectAll();
+                e.Handled = true;
+                break;
+        }
+    }
+
     private void Button_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.IsOpen = true;
+        ViewModel.IsOpen = !ViewModel.IsOpen;
     }
 
     private void TbDate_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -141,7 +235,7 @@ public partial class DateControl : UserControl
         }
     }
 
-    private void Date_Click(object sender, RoutedEventArgs e)
+    private void Today_Click(object sender, RoutedEventArgs e)
     {
         // Only set the date part, preserve time
         if (ViewModel.SelectedDate.HasValue)
@@ -153,6 +247,22 @@ public partial class DateControl : UserControl
         else
         {
             ViewModel.SelectedDate = SystemTime.Today;
+        }
+    }
+
+    private void Tomorrow_Click(object sender, RoutedEventArgs e)
+    {
+        var tomorrow = SystemTime.Today.AddDays(1);
+        // Only set the date part, preserve time
+        if (ViewModel.SelectedDate.HasValue)
+        {
+            var currentTime = ViewModel.SelectedDate.Value;
+            ViewModel.SelectedDate = new DateTime(tomorrow.Year, tomorrow.Month, tomorrow.Day, 
+                currentTime.Hour, currentTime.Minute, currentTime.Second);
+        }
+        else
+        {
+            ViewModel.SelectedDate = tomorrow;
         }
     }
 }

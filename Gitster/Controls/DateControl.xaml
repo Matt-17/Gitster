@@ -12,35 +12,90 @@
              mc:Ignorable="d" 
              d:DataContext="{d:DesignInstance Type=viewModels:DateControlViewModel}"
              d:DesignWidth="300" HorizontalAlignment="Left">
-   <StackPanel x:Name="LayoutRoot" Orientation="Horizontal">
-        <Border BorderThickness="1" BorderBrush="{DynamicResource AccentMainBrush}" Background="White" Padding="2">
-            <Grid>
+    <UserControl.Resources>
+        <converters:BoolConverter x:Key="BoolConverterCollapsed" Type="Collapsed"/>
+    </UserControl.Resources>
+    <StackPanel x:Name="LayoutRoot" Orientation="Horizontal">
+        <Border BorderThickness="1" BorderBrush="{DynamicResource AccentMainBrush}" Background="White" Padding="2,0">
+            <Grid VerticalAlignment="Center" MinHeight="22">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="90" />
-                    <ColumnDefinition Width="60" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="TbDate" Grid.Column="0" Text="{Binding DateText, ValidatesOnDataErrors=True}" PreviewMouseDoubleClick="TbDate_MouseDoubleClick" PreviewKeyDown="TbDate_PreviewKeyDown" GotKeyboardFocus="TbDate_GotFocus"  LostKeyboardFocus="TbDate_LostFocus" BorderThickness="0" Background="Transparent">
+                <TextBox x:Name="TbDate" Grid.Column="0" 
+                         Text="{Binding DateText, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
+                         MinWidth="70" Padding="2,1"
+                         PreviewMouseDoubleClick="TbDate_MouseDoubleClick" 
+                         PreviewKeyDown="TbDate_PreviewKeyDown" 
+                         GotKeyboardFocus="TbDate_GotFocus"  
+                         LostKeyboardFocus="TbDate_LostFocus" 
+                         BorderThickness="0" Background="Transparent"
+                         VerticalAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
                     <b:Interaction.Behaviors>
                         <behaviors:FocusBehavior SelectOnFocus="True" />
                     </b:Interaction.Behaviors>
                 </TextBox>
-                <TextBox x:Name="TbTime" Grid.Column="1" Text="{Binding TimeText, ValidatesOnDataErrors=True}" PreviewMouseDoubleClick="TbDate_MouseDoubleClick" PreviewKeyDown="TbDate_PreviewKeyDown" GotKeyboardFocus="TbDate_GotFocus"  LostKeyboardFocus="TbDate_LostFocus" BorderThickness="0" Background="Transparent">
+                <TextBox x:Name="TbTime" Grid.Column="1" 
+                         Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
+                         MinWidth="45" Padding="2,1"
+                         PreviewMouseDoubleClick="TbDate_MouseDoubleClick" 
+                         PreviewKeyDown="TbTime_PreviewKeyDown" 
+                         GotKeyboardFocus="TbDate_GotFocus"  
+                         LostKeyboardFocus="TbDate_LostFocus" 
+                         BorderThickness="0" Background="Transparent"
+                         VerticalAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.DateTime}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
                     <b:Interaction.Behaviors>
                         <behaviors:FocusBehavior SelectOnFocus="True" />
                     </b:Interaction.Behaviors>
                 </TextBox>
-                <Button Grid.Column="2" Focusable="False" Click="Button_Click" HorizontalAlignment="Right" Height="20" VerticalAlignment="Center" Padding="0" Background="Transparent" BorderThickness="0">
-                    <Path Data="M19.100003,21.900019L23.400006,21.900019 23.400006,26.100003 19.100003,26.100003z M13.900004,21.900019L18.200009,21.900019 18.200009,26.100003 13.900004,26.100003z M8.6000004,21.900019L12.900004,21.900019 12.900004,26.100003 8.6000004,26.100003z M3.4000025,21.900019L7.7000065,21.900019 7.7000065,26.100003 3.4000025,26.100003z M24.400008,16.599999L28.700011,16.599999 28.700011,20.800013 24.400008,20.800013z M19.100003,16.599999L23.400006,16.599999 23.400006,20.800013 19.100003,20.800013z M13.900004,16.599999L18.200009,16.599999 18.200009,20.800013 13.900004,20.800013z M8.6000004,16.599999L12.900004,16.599999 12.900004,20.800013 8.6000004,20.800013z M3.4000025,16.599999L7.7000065,16.599999 7.7000065,20.800013 3.4000025,20.800013z M24.400008,11.500005L28.700011,11.500005 28.700011,15.700004 24.400008,15.700004z M19.100003,11.500005L23.400006,11.500005 23.400006,15.700004 19.100003,15.700004z M13.900004,11.500005L18.200009,11.500005 18.200009,15.700004 13.900004,15.700004z M8.6000004,11.500005L12.900004,11.500005 12.900004,15.700004 8.6000004,15.700004z M3.4000025,11.500005L7.7000065,11.500005 7.7000065,15.700004 3.4000025,15.700004z M24.400008,6.2999905L28.700011,6.2999905 28.700011,10.500005 24.400008,10.500005z M19.100003,6.2999905L23.400006,6.2999905 23.400006,10.500005 19.100003,10.500005z M13.900004,6.2999905L18.200009,6.2999905 18.200009,10.500005 13.900004,10.500005z M8.6000004,6.2999905L12.900004,6.2999905 12.900004,10.500005 8.6000004,10.500005z M2.3000035,5.1999992L2.3000035,27.100003 29.600005,27.100003 29.600005,5.1999992z M0,0L31.999999,0 31.999999,29.499998 0,29.499998z" Stretch="Uniform" Fill="{DynamicResource AccentMainBrush}" />
+                <Button Grid.Column="2" Focusable="False" Click="Button_Click" 
+                        HorizontalAlignment="Right" Height="18" Width="18" 
+                        VerticalAlignment="Center" Padding="2" Margin="2,0,0,0"
+                        Background="Transparent" BorderThickness="0">
+                    <Path Data="M19.100003,21.900019L23.400006,21.900019 23.400006,26.100003 19.100003,26.100003z M13.900004,21.900019L18.200009,21.900019 18.200009,26.100003 13.900004,26.100003z M8.6000004,21.900019L12.900004,21.900019 12.900004,26.100003 8.6000004,26.100003z M3.4000025,21.900019L7.7000065,21.900019 7.7000065,26.100003 3.4000025,26.100003z M24.400008,16.599999L28.700011,16.599999 28.700011,20.800013 24.400008,20.800013z M19.100003,16.599999L23.400006,16.599999 23.400006,20.800013 19.100003,20.800013z M13.900004,16.599999L18.200009,16.599999 18.200009,20.800013 13.900004,20.800013z M8.6000004,16.599999L12.900004,16.599999 12.900004,20.800013 8.6000004,20.800013z M3.4000025,16.599999L7.7000065,16.599999 7.7000065,20.800013 3.4000025,20.800013z M24.400008,11.500005L28.700011,11.500005 28.700011,15.700004 24.400008,15.700004z M19.100003,11.500005L23.400006,11.500005 23.400006,15.700004 19.100003,15.700004z M13.900004,11.500005L18.200009,11.500005 18.200009,15.700004 13.900004,15.700004z M8.6000004,11.500005L12.900004,11.500005 12.900004,15.700004 8.6000004,11.500005z M3.4000025,11.500005L7.7000065,11.500005 7.7000065,15.700004 3.4000025,15.700004z M24.400008,6.2999905L28.700011,6.2999905 28.700011,10.500005 24.400008,10.500005z M19.100003,6.2999905L23.400006,6.2999905 23.400006,10.500005 19.100003,10.500005z M13.900004,6.2999905L18.200009,6.2999905 18.200009,10.500005 13.900004,10.500005z M8.6000004,6.2999905L12.900004,6.2999905 12.900004,10.500005 8.6000004,10.500005z M2.3000035,5.1999992L2.3000035,27.100003 29.600005,27.100003 29.600005,5.1999992z M0,0L31.999999,0 31.999999,29.499998 0,29.499998z" 
+                          Stretch="Uniform" Fill="{DynamicResource AccentMainBrush}" Width="12" Height="12"/>
                 </Button>
             </Grid>
         </Border>
 
-        <Button Grid.Column="1" Focusable="False" Click="Date_Click" Margin="2" Height="20" Width="20" Padding="0" VerticalAlignment="Center" SnapsToDevicePixels="True" Content="H" ToolTip="Heute"/>
-        <Button Grid.Column="2" Focusable="False" Click="Date_Click" Margin="2" Height="20" Width="20" Padding="0" VerticalAlignment="Center" SnapsToDevicePixels="True" Content="J" ToolTip="Heute"/>
+        <Button Focusable="False" Click="Today_Click" Margin="2,0" Height="22" Width="22" Padding="0" 
+                VerticalAlignment="Center" SnapsToDevicePixels="True" Content="H" ToolTip="Heute (Today)"/>
+        <Button Focusable="False" Click="Tomorrow_Click" Margin="2,0" Height="22" Width="22" Padding="0" 
+                VerticalAlignment="Center" SnapsToDevicePixels="True" Content="M" ToolTip="Morgen (Tomorrow)"/>
 
-        <Popup Grid.Column="0" IsOpen="{Binding IsOpen, Mode=TwoWay, FallbackValue=True, TargetNullValue=True}" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=TbDate}" VerticalOffset="2">
-            <controls:DatePickerPopup DataContext="{Binding}" />
+        <Popup x:Name="DatePopup" IsOpen="{Binding IsOpen, Mode=TwoWay}" StaysOpen="True" 
+               Placement="Bottom" PlacementTarget="{Binding ElementName=TbDate}" VerticalOffset="2"
+               AllowsTransparency="True" PopupAnimation="Slide">
+            <Border Background="Transparent" Padding="0,0,8,8">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.3"/>
+                </Border.Effect>
+                <controls:DatePickerPopup x:Name="PopupContent" DataContext="{Binding}" />
+            </Border>
         </Popup>
     </StackPanel>
 </UserControl>

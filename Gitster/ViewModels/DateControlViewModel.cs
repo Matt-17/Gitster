@@ -14,12 +14,9 @@ namespace Gitster.ViewModels;
 /// </summary>
 public partial class DateControlViewModel : BaseViewModel
 {
-    private DateTimeHolder[] _days = [];
-    private DateTime _date;
-    private bool _isOpen;
-    private string _text = string.Empty;
+    private string _dateText = string.Empty;
+    private string _timeText = string.Empty;
     private DateTime? _selectedDate;
-    private EditMode _editMode = Controls.EditMode.DateOnly;
     private int _hour;
     private int _minute;
 
@@ -41,27 +38,34 @@ public partial class DateControlViewModel : BaseViewModel
 
     public DateTimeHolder[] Days
     {
-        get => _days;
-        private set => SetProperty(ref _days, value);
-    }
+        get;
+        private set => SetProperty(ref field, value);
+    } = [];
 
     public bool IsOpen
     {
-        get => _isOpen;
-        set => SetProperty(ref _isOpen, value);
+        get;
+        set => SetProperty(ref field, value);
     }
 
     public DateTime Date
     {
-        get => _date;
-        set => SetProperty(ref _date, value);
+        get;
+        set => SetProperty(ref field, value);
     }
 
     public EditMode EditMode
     {
-        get => _editMode;
-        set => SetProperty(ref _editMode, value);
-    }
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                // Update text displays when edit mode changes
+                UpdateTextDisplay();
+            }
+        }
+    } = Controls.EditMode.DateOnly;
 
     public int Hour
     {
@@ -87,26 +91,56 @@ public partial class DateControlViewModel : BaseViewModel
         }
     }
 
-    public string Text
+    public string DateText
     {
-        get => _text;
+        get => _dateText;
         set
         {
-            if (value == _text)
+            if (value == _dateText)
                 return;
             try
             {
-                if (EditMode == Controls.EditMode.DateOnly)
+                var parsedDate = string.IsNullOrWhiteSpace(value) ? null : GetDate(value);
+                if (parsedDate.HasValue && _selectedDate.HasValue)
                 {
-                    SelectedDate = string.IsNullOrWhiteSpace(value) ? null : GetDate(value);
+                    // Preserve time when updating date
+                    SelectedDate = new DateTime(parsedDate.Value.Year, parsedDate.Value.Month, parsedDate.Value.Day,
+                        _hour, _minute, 0);
                 }
                 else
                 {
-                    SelectedDate = string.IsNullOrWhiteSpace(value) ? null : GetDateTime(value);
+                    SelectedDate = parsedDate;
                 }
             }
-            finally
+            catch
             {
+                // Invalid date format - just update the text
+                _dateText = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public string TimeText
+    {
+        get => _timeText;
+        set
+        {
+            if (value == _timeText)
+                return;
+            try
+            {
+                var parsedTime = ParseTime(value);
+                if (parsedTime.HasValue)
+                {
+                    Hour = parsedTime.Value.Hour;
+                    Minute = parsedTime.Value.Minute;
+                }
+            }
+            catch
+            {
+                // Invalid time format - just update the text
+                _timeText = value;
                 OnPropertyChanged();
             }
         }
@@ -119,7 +153,24 @@ public partial class DateControlViewModel : BaseViewModel
         {
             if (value.Equals(_selectedDate))
                 return;
-            _selectedDate = value;
+            
+            var newDate = value;
+            
+            // In DateTime mode, if new date is at midnight and we have an existing time, preserve the time
+            if (EditMode == EditMode.DateTime && newDate.HasValue && _selectedDate.HasValue)
+            {
+                var newDateOnly = newDate.Value;
+                var oldTime = _selectedDate.Value;
+                
+                // If new date is at midnight (00:00:00), preserve existing time
+                if (newDateOnly.Hour == 0 && newDateOnly.Minute == 0 && newDateOnly.Second == 0)
+                {
+                    newDate = new DateTime(newDateOnly.Year, newDateOnly.Month, newDateOnly.Day,
+                        oldTime.Hour, oldTime.Minute, oldTime.Second);
+                }
+            }
+            
+            _selectedDate = newDate;
             
             // Update hour and minute from the selected date
             if (_selectedDate.HasValue)
@@ -133,27 +184,49 @@ public partial class DateControlViewModel : BaseViewModel
             OnPropertyChanged();
             OnSelectedDateChanged(SelectedDate);
             
-            // Update text based on edit mode
-            if (EditMode == Controls.EditMode.DateOnly)
-            {
-                _text = SelectedDate?.ToString("dd.MM.yyyy") ?? string.Empty;
-            }
-            else if (EditMode == Controls.EditMode.TimeOnly)
-            {
-                _text = SelectedDate?.ToString("HH:mm") ?? string.Empty;
-            }
-            else // DateTime
-            {
-                _text = SelectedDate?.ToString("dd.MM.yyyy HH:mm") ?? string.Empty;
-            }
-            
-            OnPropertyChanged(nameof(Text));
+            UpdateTextDisplay();
             SetDate(SelectedDate);
 
             var day = SelectedDate == null ? null : Days.SingleOrDefault(x => x.Date == SelectedDate?.Date);
-            if (day != null)
-                day.IsSelected = true;
+            day?.IsSelected = true;
         }
+    }
+
+    private void UpdateTextDisplay()
+    {
+        // Update DateText
+        _dateText = SelectedDate?.ToString("dd.MM.yyyy") ?? string.Empty;
+        OnPropertyChanged(nameof(DateText));
+
+        // Update TimeText
+        _timeText = SelectedDate?.ToString("HH:mm") ?? string.Empty;
+        OnPropertyChanged(nameof(TimeText));
+    }
+
+    private DateTime? ParseTime(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        var timeFormats = new[] {
+            "HH:mm",
+            "HH:mm:ss",
+            "H:mm",
+            "H:mm:ss",
+            "HHmm",
+            "Hmm"
+        };
+
+        foreach (var format in timeFormats)
+        {
+            if (DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture,
+                DateTimeStyles.AllowWhiteSpaces, out DateTime result))
+            {
+                return result;
+            }
+        }
+
+        return null;
     }
 
     public void SetDate(DateTime? date2)
@@ -192,7 +265,18 @@ public partial class DateControlViewModel : BaseViewModel
             day.IsSelected = false;
         }
         holder.IsSelected = true;
-        SelectedDate = holder.Date;
+        
+        // In DateTime mode, preserve the current time when selecting a new date
+        if (EditMode == EditMode.DateTime && _selectedDate.HasValue)
+        {
+            var currentTime = _selectedDate.Value;
+            SelectedDate = new DateTime(holder.Date.Year, holder.Date.Month, holder.Date.Day,
+                currentTime.Hour, currentTime.Minute, currentTime.Second);
+        }
+        else
+        {
+            SelectedDate = holder.Date;
+        }
     }
 
     public void ChangeDate(int days)
@@ -202,7 +286,7 @@ public partial class DateControlViewModel : BaseViewModel
 
     public void Reset()
     {
-        OnPropertyChanged(nameof(Text));
+        UpdateTextDisplay();
     }
 
     public void ChangeHour(int hours)
@@ -235,16 +319,9 @@ public partial class DateControlViewModel : BaseViewModel
             OnPropertyChanged(nameof(SelectedDate));
             OnSelectedDateChanged(newDateTime);
             
-            // Update text
-            if (EditMode == Controls.EditMode.TimeOnly)
-            {
-                _text = newDateTime.ToString("HH:mm");
-            }
-            else // DateTime
-            {
-                _text = newDateTime.ToString("dd.MM.yyyy HH:mm");
-            }
-            OnPropertyChanged(nameof(Text));
+            // Update time text
+            _timeText = newDateTime.ToString("HH:mm");
+            OnPropertyChanged(nameof(TimeText));
         }
     }
 
@@ -328,51 +405,6 @@ public partial class DateControlViewModel : BaseViewModel
 
         if (success)
             return dateTime;
-
-        throw new ArgumentOutOfRangeException();
-    }
-
-    private DateTime? GetDateTime(string text)
-    {
-        // Try parsing as full datetime first
-        var dateTimeFormats = new[] {
-            "dd.MM.yyyy HH:mm",
-            "dd.MM.yyyy HH:mm:ss",
-            "dd-MM-yyyy HH:mm",
-            "dd-MM-yyyy HH:mm:ss",
-            "dd/MM/yyyy HH:mm",
-            "dd/MM/yyyy HH:mm:ss",
-            "d.M.yyyy HH:mm",
-            "d.M.yyyy HH:mm:ss",
-            "dd.MM.yy HH:mm",
-            "dd.MM.yy HH:mm:ss",
-            "HH:mm",
-            "HH:mm:ss"
-        };
-
-        foreach (var format in dateTimeFormats)
-        {
-            if (DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture, 
-                DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out DateTime result))
-            {
-                return result;
-            }
-        }
-
-        // If that fails, try parsing as date only and add current time
-        try
-        {
-            var dateOnly = GetDate(text);
-            if (dateOnly.HasValue)
-            {
-                return new DateTime(dateOnly.Value.Year, dateOnly.Value.Month, dateOnly.Value.Day, 
-                    _hour, _minute, 0);
-            }
-        }
-        catch
-        {
-            // Continue to exception below
-        }
 
         throw new ArgumentOutOfRangeException();
     }

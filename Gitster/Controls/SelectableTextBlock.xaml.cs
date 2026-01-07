@@ -13,6 +13,8 @@ public partial class SelectableTextBlock : UserControl
 
     public static readonly DependencyProperty IsSelectedProperty = DependencyProperty.Register(nameof(IsSelected), typeof(bool), typeof(SelectableTextBlock), new PropertyMetadata(false));
 
+    public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(nameof(Value), typeof(int), typeof(SelectableTextBlock), new PropertyMetadata(-1, ValuePropertyChanged));
+
     public SelectableTextBlock()
     {
         InitializeComponent();
@@ -31,6 +33,23 @@ public partial class SelectableTextBlock : UserControl
         set => SetValue(TextProperty, value);
     }
 
+    public int Value
+    {
+        get => (int)GetValue(ValueProperty);
+        set => SetValue(ValueProperty, value);
+    }
+
+    private static void ValuePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is SelectableTextBlock control)
+        {
+            // Update IsSelected based on whether Value matches Text
+            if (int.TryParse(control.Text, out int textValue))
+            {
+                control.IsSelected = textValue == (int)e.NewValue;
+            }
+        }
+    }
 
     private void BorderOnMouseDown(object sender, MouseButtonEventArgs e) => OnMouseDown(e);
 }
