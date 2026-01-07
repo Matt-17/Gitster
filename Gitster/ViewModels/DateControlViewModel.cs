@@ -14,9 +14,13 @@ namespace Gitster.ViewModels;
 /// </summary>
 public partial class DateControlViewModel : BaseViewModel
 {
+    private DateTimeHolder[] _days = [];
+    private DateTime _date;
+    private bool _isOpen;
     private string _dateText = string.Empty;
     private string _timeText = string.Empty;
     private DateTime? _selectedDate;
+    private EditMode _editMode = Controls.EditMode.DateOnly;
     private int _hour;
     private int _minute;
 
@@ -38,34 +42,34 @@ public partial class DateControlViewModel : BaseViewModel
 
     public DateTimeHolder[] Days
     {
-        get;
-        private set => SetProperty(ref field, value);
-    } = [];
+        get => _days;
+        private set => SetProperty(ref _days, value);
+    }
 
     public bool IsOpen
     {
-        get;
-        set => SetProperty(ref field, value);
+        get => _isOpen;
+        set => SetProperty(ref _isOpen, value);
     }
 
     public DateTime Date
     {
-        get;
-        set => SetProperty(ref field, value);
+        get => _date;
+        set => SetProperty(ref _date, value);
     }
 
     public EditMode EditMode
     {
-        get;
+        get => _editMode;
         set
         {
-            if (SetProperty(ref field, value))
+            if (SetProperty(ref _editMode, value))
             {
                 // Update text displays when edit mode changes
                 UpdateTextDisplay();
             }
         }
-    } = Controls.EditMode.DateOnly;
+    }
 
     public int Hour
     {
@@ -229,15 +233,16 @@ public partial class DateControlViewModel : BaseViewModel
         return null;
     }
 
-    public void SetDate(DateTime? date2)
+    public void SetDate(DateTime? dateToSet)
     {
-        var date = date2 ?? SystemTime.Today;
+        var monthToDisplay = dateToSet ?? SystemTime.Today;
 
         // Das Kalenderblatt ist immer 6 Wochen lang (wie Standard)
         var days = new DateTimeHolder[42];
-        Date = date.Date;
+        Date = monthToDisplay.Date;
+        
         // Ersten des Monats suchen
-        date = Date.AddDays(-date.Day + 1);
+        var date = monthToDisplay.Date.AddDays(-monthToDisplay.Day + 1);
         var dow = (int)date.DayOfWeek - 1;
         if (dow < 0)
             dow += 7;
@@ -245,10 +250,14 @@ public partial class DateControlViewModel : BaseViewModel
         date = date.AddDays(-dow);
         if (dow < 1)
             date = date.AddDays(-7);
+        
+        // Create calendar days, passing the actual selected date (not the month to display)
+        // Use a dummy date far in the past if no date is selected, so nothing gets highlighted
+        var selectedDateForComparison = _selectedDate ?? DateTime.MinValue;
         for (var i = 0; i < days.Length; i++)
         {
             var day = date.AddDays(i);
-            days[i] = new DateTimeHolder(day, Date);
+            days[i] = new DateTimeHolder(day, selectedDateForComparison);
         }
         Days = days;
     }
