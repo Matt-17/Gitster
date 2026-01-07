@@ -27,25 +27,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public partial string CommitDate { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string TimeText { get; set; } = "00:00";
-
-    [ObservableProperty]
     public partial DateTime? SelectedDate { get; set; }
-
-    [ObservableProperty]
-    public partial double HoursValue { get; set; }
-
-    [ObservableProperty]
-    public partial double MinutesValue { get; set; }
-
-    [ObservableProperty]
-    public partial double DaysValue { get; set; }
-
-    [ObservableProperty]
-    public partial double MonthsValue { get; set; }
-
-    [ObservableProperty]
-    public partial double DaysMaximum { get; set; } = 31;
 
     [ObservableProperty]
     public partial bool IsGoButtonEnabled { get; set; }
@@ -93,16 +75,10 @@ public partial class MainWindowViewModel : BaseViewModel
         
         // Initialize with current date/time
         SelectedDate = DateTime.Now;
-        HoursValue = DateTime.Now.Hour;
-        MinutesValue = DateTime.Now.Minute;
-        DaysValue = DateTime.Now.Day;
-        MonthsValue = DateTime.Now.Month;
         
         // Load saved path or use default
         Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         FolderPath = Path;
-        
-        UpdateTimeText();
     }
 
     partial void OnFolderPathChanged(string value)
@@ -110,38 +86,6 @@ public partial class MainWindowViewModel : BaseViewModel
         Path = value;
         UpdateSettingsPath();
         UpdateElements();
-    }
-
-    partial void OnHoursValueChanged(double value)
-    {
-        UpdateTimeText();
-    }
-
-    partial void OnMinutesValueChanged(double value)
-    {
-        UpdateTimeText();
-    }
-
-    partial void OnSelectedDateChanged(DateTime? value)
-    {
-        if (value == null)
-        {
-            return;
-        }
-
-        var currentDate = value.Value;
-        DaysMaximum = DateTime.DaysInMonth(currentDate.Year, currentDate.Month);
-        DaysValue = Math.Min(DaysValue, DaysMaximum);
-    }
-
-    partial void OnDaysValueChanged(double value)
-    {
-        UpdateDateFromSliders();
-    }
-
-    partial void OnMonthsValueChanged(double value)
-    {
-        UpdateDateFromSliders();
     }
 
     partial void OnSelectedCommitChanged(CommitItem? value)
@@ -258,8 +202,8 @@ public partial class MainWindowViewModel : BaseViewModel
             var year = SelectedDate.Value.Year;
             var month = SelectedDate.Value.Month;
             var day = SelectedDate.Value.Day;
-            var hour = (int)HoursValue;
-            var minute = (int)MinutesValue;
+            var hour = SelectedDate.Value.Hour;
+            var minute = SelectedDate.Value.Minute;
             
             var newAuthor = new Signature(author.Name, author.Email, 
                 new DateTimeOffset(year, month, day, hour, minute, author.When.Second, currentTimezoneOffset));
@@ -291,9 +235,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
         try
         {
-            SelectedDate = new DateTime(SelectedCommit.Date.Year, SelectedCommit.Date.Month, SelectedCommit.Date.Day);
-            HoursValue = SelectedCommit.Date.Hour;
-            MinutesValue = SelectedCommit.Date.Minute;
+            SelectedDate = SelectedCommit.Date;
         }
         catch (Exception ex)
         {
@@ -310,9 +252,7 @@ public partial class MainWindowViewModel : BaseViewModel
             var commit = repo.Head.Tip;
             var author = commit.Author;
 
-            SelectedDate = new DateTime(author.When.Year, author.When.Month, author.When.Day);
-            HoursValue = author.When.Hour;
-            MinutesValue = author.When.Minute;
+            SelectedDate = author.When.DateTime;
         }
         catch (Exception ex)
         {
@@ -438,36 +378,6 @@ public partial class MainWindowViewModel : BaseViewModel
     public void OnWindowActivated()
     {
         UpdateElements();
-    }
-
-    private void UpdateTimeText()
-    {
-        TimeText = $"{(int)HoursValue:00}:{(int)MinutesValue:00}";
-    }
-
-    private void UpdateDateFromSliders()
-    {
-        if (SelectedDate == null)
-        {
-            return;
-        }
-
-        try
-        {
-            var months = (int)MonthsValue;
-            var daysSliderMaximum = DateTime.DaysInMonth(SelectedDate.Value.Year, months);
-            DaysValue = Math.Min(DaysValue, daysSliderMaximum);
-
-            var days = (int)DaysValue;
-            var currentDate = SelectedDate.Value;
-            var newDate = new DateTime(currentDate.Year, months, days);
-
-            SelectedDate = newDate;
-        }
-        catch (Exception)
-        {
-            // Ignore invalid date exceptions
-        }
     }
 
     private void UpdateSettingsPath()
@@ -649,11 +559,6 @@ public partial class MainWindowViewModel : BaseViewModel
             CurrentCommitDetail.Clear();
             SelectedCommitDetail.Clear();
             SelectedDate = null;
-
-            MonthsValue = 1;
-            DaysValue = 1;
-            HoursValue = 0;
-            MinutesValue = 0;
 
             IsGoButtonEnabled = false;
 

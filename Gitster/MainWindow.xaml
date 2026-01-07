@@ -4,6 +4,7 @@
        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
        xmlns:vm="clr-namespace:Gitster.ViewModels"
+       xmlns:controls="clr-namespace:Gitster.Controls"
        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
        mc:Ignorable="d"
        Title="Gitster" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
@@ -16,14 +17,14 @@
                 <Setter Property="Margin" Value="5" />
                 <Setter Property="Height" Value="30" />
             </Style>
-            <Style TargetType="Button">
+            <Style x:Key="ButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="White" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Setter Property="Padding" Value="5" />
                 <Setter Property="Margin" Value="5" />
                 <Setter Property="Height" Value="30" />
             </Style>
-            <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="Margin" Value="0,5,5,5" />
@@ -35,26 +36,26 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid Grid.Row="0">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="420" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        
-        <!-- Left side: Commit ListView with Filter button -->
-        <Grid Grid.Column="0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            
-            <!-- Filter controls -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
-                <TextBlock Text="{Binding FilterStatusText}" 
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="420" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left side: Commit ListView with Filter button -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Filter controls -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding FilterStatusText}" 
                            VerticalAlignment="Center"
                            Margin="5"
                            FontStyle="Italic"
                            Foreground="Gray" />
-                <Button Content="🗑️" 
+                    <Button Content="🗑️" 
                         Width="30" 
                         Height="30"
                         Margin="0,5,5,5"
@@ -63,125 +64,93 @@
                         ToolTip="Clear all filters"
                         Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"
                         Style="{StaticResource IconButtonStyle}" />
-                <Button Content="🔍 Filter" 
+                    <Button Content="🔍 Filter" 
                         HorizontalAlignment="Right" 
                         Width="100" 
                         Command="{Binding OpenFilterCommand}"
                         ToolTip="Open filter window" />
-            </StackPanel>
-            
-            <!-- Commit ListView -->
-            <ListView x:Name="CommitListView" Grid.Row="1" Margin="5" 
+                </StackPanel>
+
+                <!-- Commit ListView -->
+                <ListView x:Name="CommitListView" Grid.Row="1" Margin="5" 
                       ItemsSource="{Binding Commits}" 
                       SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Header="Message" Width="150" DisplayMemberBinding="{Binding Message}" />
-                        <GridViewColumn Header="Author" Width="100" DisplayMemberBinding="{Binding AuthorName}" />
-                        <GridViewColumn Header="Date" Width="100" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
-                        <GridViewColumn Header="Commit ID" Width="60" DisplayMemberBinding="{Binding CommitId}" />
-                    </GridView>
-                </ListView.View>
-            </ListView>
-        </Grid>
-        
-        <!-- Right side: Original content -->
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="200" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Message" Width="150" DisplayMemberBinding="{Binding Message}" />
+                            <GridViewColumn Header="Author" Width="100" DisplayMemberBinding="{Binding AuthorName}" />
+                            <GridViewColumn Header="Date" Width="100" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
+                            <GridViewColumn Header="Commit ID" Width="60" DisplayMemberBinding="{Binding CommitId}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Grid>
 
-        <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="4" 
+            <!-- Right side: Original content -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="FolderTb" Margin="5" Height="30" Grid.ColumnSpan="2" 
                  Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" />
-        <Button Grid.Column="4" Content="Browse..." Width="80" Command="{Binding BrowseFolderCommand}" />
-        <GroupBox Header="Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
+                <Button Grid.Column="4" Content="Browse..." Width="80" Command="{Binding BrowseFolderCommand}" />
+                <GroupBox Header="Selected Commit" Grid.Row="1" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
                   DataContext="{Binding SelectedCommitDetail}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
                          Text="{Binding CommitMessage, Mode=OneWay}" />
-                <TextBox Margin="5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" 
+                        <TextBox Margin="5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" 
                          Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
-                <StackPanel Orientation="Horizontal" Grid.Column="2">
-                    <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadSelectedCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                        <StackPanel Orientation="Horizontal" Grid.Column="2">
+                            <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadSelectedCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                             Style="{StaticResource IconButtonStyle}" />
-                </StackPanel>
-            </Grid>
-        </GroupBox>
+                        </StackPanel>
+                    </Grid>
+                </GroupBox>
 
-        <Slider Grid.Row="4" Grid.Column="0" x:Name="DaysSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="1" Maximum="{Binding DaysMaximum}" 
-                Value="{Binding DaysValue}" />
-        <Slider Grid.Row="4" Grid.Column="1" x:Name="MonthsSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="1" Maximum="12" 
-                Value="{Binding MonthsValue}" />
-        <Slider Grid.Row="4" Grid.Column="2" x:Name="HoursSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="0" Maximum="23" 
-                Value="{Binding HoursValue}" />
-        <Slider Grid.Row="4" Grid.Column="3" x:Name="MinutesSlider" Orientation="Vertical" 
-                HorizontalAlignment="Center" Minimum="0" Maximum="59" 
-                Value="{Binding MinutesValue}" />
+                <controls:DateControl Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" VerticalAlignment="Top" Width="200" SelectedDate="{Binding SelectedDate, Mode=TwoWay}" EditMode="DateTime" Margin="5" Height="30" />
 
-        <DatePicker Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" x:Name="DatePicker" 
-                    VerticalAlignment="Top" Width="200" 
-                    SelectedDate="{Binding SelectedDate, Mode=TwoWay}" 
-                    Margin="5" Height="30" VerticalContentAlignment="Center" Padding="5" />
-        <TextBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" x:Name="TimeTextBlock" 
-                 Width="200" IsReadOnly="True" Margin="5" 
-                 Text="{Binding TimeText, Mode=OneWay}" />
-
-        <GroupBox Header="Current Commit" Grid.Row="2" Grid.ColumnSpan="6" Grid.Column="0" Margin="5"
-                  DataContext="{Binding CurrentCommitDetail}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
+                <GroupBox Header="Current Commit" Grid.Row="2" Grid.ColumnSpan="3" Grid.Column="0" Margin="5" DataContext="{Binding CurrentCommitDetail}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
                          Text="{Binding CommitMessage, Mode=OneWay}" />
-                <TextBox Margin="5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" 
+                        <TextBox Margin="5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" 
                          Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
-                <StackPanel Orientation="Horizontal" Grid.Column="2">
-                    <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadCurrentCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                        <StackPanel Orientation="Horizontal" Grid.Column="2">
+                            <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadCurrentCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                             Style="{StaticResource IconButtonStyle}" />
-                </StackPanel>
-            </Grid>
-        </GroupBox>
-        <StackPanel Orientation="Horizontal" Grid.Row="5" Grid.Column="4" VerticalAlignment="Top" HorizontalAlignment="Right">
-            <Button Width="70" Height="30" Content="Fetch" Command="{Binding FetchCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Download changes from remote without merging" />
-            <Button Width="70" Height="30" Content="Pull" Command="{Binding PullCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Fetch and merge changes from remote" />
-            <Button Width="70" Height="30" Content="Push" Command="{Binding PushCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Upload local changes to remote" />
-            <Button Width="70" Height="30" Content="Sync" Command="{Binding SyncCommand}" CommandParameter="{Binding SelectedRemote}"
-                    Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Synchronize with remote (fetch + pull + push)" />
-            <ComboBox Width="120" Height="30" ItemsSource="{Binding Remotes}" SelectedItem="{Binding SelectedRemote, Mode=TwoWay}"
-                      Margin="5" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Select remote repository" />
-            <Button Width="70" Height="30" Content="Amend" Command="{Binding AmendCommitCommand}" 
+                        </StackPanel>
+                    </Grid>
+                </GroupBox>
+
+                <StackPanel Orientation="Horizontal" Grid.Row="4" Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right">
+
+                    <Button Width="70" Height="30" Content="Amend" Command="{Binding AmendCommitCommand}" 
                     Margin="5" x:Name="GoButton" IsEnabled="{Binding IsGoButtonEnabled}" ToolTip="Amend the commit timestamp" />
-        </StackPanel>
+                </StackPanel>
+            </Grid>
         </Grid>
-        </Grid>
-        
+
         <!-- Status Bar -->
         <StatusBar Grid.Row="1" Height="25" Background="#F0F0F0">
             <StatusBar.ItemsPanel>
@@ -198,23 +167,23 @@
                     </Grid>
                 </ItemsPanelTemplate>
             </StatusBar.ItemsPanel>
-            
+
             <StatusBarItem Grid.Column="0">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="📂 " FontSize="12" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding StatusBar.RepositoryName}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
                 </StackPanel>
             </StatusBarItem>
-            
+
             <Separator Grid.Column="1" />
-            
+
             <StatusBarItem Grid.Column="2">
                 <StackPanel Orientation="Horizontal" Margin="10,0">
                     <TextBlock Text="🔀 " FontSize="12" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding StatusBar.CurrentBranch}" FontWeight="Normal" VerticalAlignment="Center" Margin="0,0,10,0" />
                 </StackPanel>
             </StatusBarItem>
-            
+
             <StatusBarItem Grid.Column="4">
                 <StackPanel Orientation="Horizontal" Margin="10,0">
                     <TextBlock Text="↓ " FontSize="14" VerticalAlignment="Center">
@@ -244,7 +213,7 @@
                     </TextBlock>
                 </StackPanel>
             </StatusBarItem>
-            
+
             <StatusBarItem Grid.Column="5">
                 <StackPanel Orientation="Horizontal" Margin="10,0">
                     <TextBlock Text="↑ " FontSize="14" VerticalAlignment="Center">
