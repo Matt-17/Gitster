@@ -430,18 +430,21 @@ public partial class MainWindowViewModel : BaseViewModel
 
     private void AutoSelectCommit()
     {
-        // Auto-select the second item if available, otherwise first, otherwise null
-        if (Commits.Count >= 2)
+        // if selected commit is still in the list, keep it selected
+        if (SelectedCommit != null && Commits.Contains(SelectedCommit))
         {
-            SelectedCommit = Commits[1];
+            return;
         }
-        else if (Commits.Count == 1)
+
+        // Auto-select the first commit if available
+        if (Commits.Count > 0)
         {
             SelectedCommit = Commits[0];
         }
         else
         {
             SelectedCommit = null;
+            SelectedCommitDetail.Clear();
         }
     }
 
