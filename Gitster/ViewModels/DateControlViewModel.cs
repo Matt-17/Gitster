@@ -1,8 +1,9 @@
-using System;
+using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Linq;
 using System.Windows.Input;
+
 using CommunityToolkit.Mvvm.Input;
+
 using Gitster.Controls;
 using Gitster.Helpers;
 using Gitster.Models;
@@ -157,15 +158,15 @@ public partial class DateControlViewModel : BaseViewModel
         {
             if (value.Equals(_selectedDate))
                 return;
-            
+
             var newDate = value;
-            
+
             // In DateTime mode, if new date is at midnight and we have an existing time, preserve the time
             if (EditMode == EditMode.DateTime && newDate.HasValue && _selectedDate.HasValue)
             {
                 var newDateOnly = newDate.Value;
                 var oldTime = _selectedDate.Value;
-                
+
                 // If new date is at midnight (00:00:00), preserve existing time
                 if (newDateOnly.Hour == 0 && newDateOnly.Minute == 0 && newDateOnly.Second == 0)
                 {
@@ -173,9 +174,9 @@ public partial class DateControlViewModel : BaseViewModel
                         oldTime.Hour, oldTime.Minute, oldTime.Second);
                 }
             }
-            
+
             _selectedDate = newDate;
-            
+
             // Update hour and minute from the selected date
             if (_selectedDate.HasValue)
             {
@@ -184,10 +185,10 @@ public partial class DateControlViewModel : BaseViewModel
                 OnPropertyChanged(nameof(Hour));
                 OnPropertyChanged(nameof(Minute));
             }
-            
+
             OnPropertyChanged();
             OnSelectedDateChanged(SelectedDate);
-            
+
             UpdateTextDisplay();
             SetDate(SelectedDate);
 
@@ -196,6 +197,9 @@ public partial class DateControlViewModel : BaseViewModel
         }
     }
 
+    public ObservableCollection<string> Hours { get; } = new(Enumerable.Range(0, 24).Select(h => h.ToString("00"))
+        );
+    public ObservableCollection<string> Minutes { get; } = new(Enumerable.Range(0, 12).Select(i => (i * 5).ToString("00")));
     private void UpdateTextDisplay()
     {
         // Update DateText
@@ -240,7 +244,7 @@ public partial class DateControlViewModel : BaseViewModel
         // Das Kalenderblatt ist immer 6 Wochen lang (wie Standard)
         var days = new DateTimeHolder[42];
         Date = monthToDisplay.Date;
-        
+
         // Ersten des Monats suchen
         var date = monthToDisplay.Date.AddDays(-monthToDisplay.Day + 1);
         var dow = (int)date.DayOfWeek - 1;
@@ -250,7 +254,7 @@ public partial class DateControlViewModel : BaseViewModel
         date = date.AddDays(-dow);
         if (dow < 1)
             date = date.AddDays(-7);
-        
+
         // Create calendar days, passing the actual selected date (not the month to display)
         // Use a dummy date far in the past if no date is selected, so nothing gets highlighted
         var selectedDateForComparison = _selectedDate ?? DateTime.MinValue;
@@ -274,7 +278,7 @@ public partial class DateControlViewModel : BaseViewModel
             day.IsSelected = false;
         }
         holder.IsSelected = true;
-        
+
         // In DateTime mode, preserve the current time when selecting a new date
         if (EditMode == EditMode.DateTime && _selectedDate.HasValue)
         {
@@ -322,12 +326,12 @@ public partial class DateControlViewModel : BaseViewModel
         {
             var date = _selectedDate.Value.Date;
             var newDateTime = new DateTime(date.Year, date.Month, date.Day, _hour, _minute, 0);
-            
+
             // Update without triggering the setter loop
             _selectedDate = newDateTime;
             OnPropertyChanged(nameof(SelectedDate));
             OnSelectedDateChanged(newDateTime);
-            
+
             // Update time text
             _timeText = newDateTime.ToString("HH:mm");
             OnPropertyChanged(nameof(TimeText));
@@ -425,6 +429,6 @@ public partial class DateControlViewModel : BaseViewModel
 
     public void SetHour(int result)
     {
-        Hour  = result;
+        Hour = result;
     }
 }

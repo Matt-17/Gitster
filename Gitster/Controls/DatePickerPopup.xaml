@@ -142,14 +142,14 @@
                     </Border>
                 </Grid>
 
-                <Border Grid.Row="1" Background="{DynamicResource AccentMainBrush}" Padding="10, 2">
+                <Border Grid.Row="1" Background="{DynamicResource AccentMainBrush}" Padding="0,2">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition />
                             <ColumnDefinition />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Stunde" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="1" Text="Minute" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="0" Text="Stunde" TextAlignment="Center" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <TextBlock Grid.Column="1" Text="Minute" TextAlignment="Center" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
                     </Grid>
                 </Border>
 
@@ -160,85 +160,44 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                    <ItemsControl ItemsSource="{Binding Hours}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- 6 Zeilen × 4 Spalten = 24 Stunden, zeilenweise links->rechts -->
+                                <UniformGrid Rows="6" Columns="4"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
 
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:SelectableTextBlock
+                                    Text="{Binding}"
+                                    MouseDown="HourTextMouseDown"
+                                    Value="{Binding DataContext.Hour, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="0" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="1" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="2" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="3" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="4" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="5" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="6" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="7" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="8" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="9" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="10" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="11" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="2" Text="12" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="2" Text="13" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="2" Text="14" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="2" Text="15" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="2" Text="16" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="2" Text="17" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="3" Text="18" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="3" Text="19" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="3" Text="20" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="3" Text="21" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="3" Text="22" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="3" Text="23" MouseDown="HourTextMouseDown" Value="{Binding Hour}" />
-
-                    </Grid>
                     <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
-                    
-                    <Grid Grid.Column="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition />
-                            <ColumnDefinition />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
 
+                    <ItemsControl Grid.Column="2" ItemsSource="{Binding Minutes}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- 6 Zeilen × 2 Spalten = 12 Werte (00..55), links->rechts -->
+                                <UniformGrid Rows="6" Columns="2"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
 
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="0" Text="00" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="0" Text="10" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="0" Text="20" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="0" Text="30" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="0" Text="40" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="0" Text="50" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                                                                                                                           
-                        <controls:SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="05" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="15" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="25" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="35" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="45" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-                        <controls:SelectableTextBlock Grid.Row="5" Grid.Column="1" Text="55" MouseDown="MinuteTextMouseDown" Value="{Binding Minute}" />
-
-                    </Grid>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:SelectableTextBlock
+                                    Text="{Binding}" 
+                                    MouseDown="MinuteTextMouseDown"
+                                    Value="{Binding DataContext.Minute, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </Grid>
 
             </Grid>
