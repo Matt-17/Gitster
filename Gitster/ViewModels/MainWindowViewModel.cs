@@ -1,10 +1,11 @@
-using System;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Windows;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+
 using LibGit2Sharp;
+
 using Microsoft.Win32;
 
 namespace Gitster.ViewModels;
@@ -14,6 +15,29 @@ namespace Gitster.ViewModels;
 /// </summary>
 public partial class MainWindowViewModel : BaseViewModel
 {
+    private List<CommitItem> _allCommits = [];
+    private FilterWindow? _filterWindow;
+
+    public MainWindowViewModel()
+    {
+        SelectedCommitDetail = new CommitDetailViewModel();
+        CurrentCommitDetail = new CommitDetailViewModel();
+        StatusBar = new StatusBarViewModel();
+
+        // Subscribe to filter changes
+        Filter.PropertyChanged += (s, e) =>
+        {
+            ApplyFilters();
+        };
+
+        // Initialize with current date/time
+        SelectedDate = DateTime.Now;
+
+        // Load saved path or use default
+        Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        FolderPath = Path;
+    }
+
     [ObservableProperty]
     public partial string Path { get; set; } = string.Empty;
 
@@ -53,33 +77,11 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial StatusBarViewModel StatusBar { get; set; }
 
-    public ObservableCollection<CommitItem> Commits { get; } = [];
+    [ObservableProperty]
+    public partial List<CommitItem> Commits { get; set; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
-    
-    public CommitFilter Filter { get; } = new();
-    
-    private ObservableCollection<CommitItem> _allCommits = [];
-    private FilterWindow? _filterWindow;
 
-    public MainWindowViewModel()
-    {
-        SelectedCommitDetail = new CommitDetailViewModel();
-        CurrentCommitDetail = new CommitDetailViewModel();
-        StatusBar = new StatusBarViewModel();
-        
-        // Subscribe to filter changes
-        Filter.PropertyChanged += (s, e) => 
-        {
-            ApplyFilters();
-        };
-        
-        // Initialize with current date/time
-        SelectedDate = DateTime.Now;
-        
-        // Load saved path or use default
-        Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        FolderPath = Path;
-    }
+    public CommitFilter Filter { get; } = new();
 
     partial void OnFolderPathChanged(string value)
     {
@@ -101,10 +103,10 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         try
         {
-            var initialDirectory = string.IsNullOrEmpty(FolderPath) 
-                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) 
+            var initialDirectory = string.IsNullOrEmpty(FolderPath)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 : FolderPath;
-            
+
             var dialog = new OpenFolderDialog
             {
                 Title = "Select Git Repository Folder",
@@ -140,13 +142,13 @@ public partial class MainWindowViewModel : BaseViewModel
             // Populate author names from all commits
             filterViewModel.AuthorNames.Clear();
             filterViewModel.AuthorNames.Add("All");
-            
+
             var distinctAuthors = _allCommits
                 .Select(c => c.AuthorName)
                 .Where(name => !string.IsNullOrEmpty(name))
                 .Distinct()
                 .OrderBy(name => name);
-            
+
             foreach (var author in distinctAuthors)
             {
                 filterViewModel.AuthorNames.Add(author);
@@ -158,11 +160,11 @@ public partial class MainWindowViewModel : BaseViewModel
             };
 
             // Subscribe to FiltersApplied event
-            _filterWindow.FiltersApplied += (sender, e) => 
+            _filterWindow.FiltersApplied += (sender, e) =>
             {
                 filterViewModel.ApplyToMainFilter();
             };
-            
+
             // Clean up when window is closed
             _filterWindow.Closed += (sender, e) => _filterWindow = null;
 
@@ -204,12 +206,12 @@ public partial class MainWindowViewModel : BaseViewModel
             var day = SelectedDate.Value.Day;
             var hour = SelectedDate.Value.Hour;
             var minute = SelectedDate.Value.Minute;
-            
-            var newAuthor = new Signature(author.Name, author.Email, 
+
+            var newAuthor = new Signature(author.Name, author.Email,
                 new DateTimeOffset(year, month, day, hour, minute, author.When.Second, currentTimezoneOffset));
-            var newCommiter = new Signature(committer.Name, committer.Email, 
+            var newCommiter = new Signature(committer.Name, committer.Email,
                 new DateTimeOffset(year, month, day, hour, minute, committer.When.Second, currentTimezoneOffset));
-            
+
             var commitOptions = new CommitOptions
             {
                 AmendPreviousCommit = true,
@@ -267,7 +269,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             using var repo = new Repository(Path);
             var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-            
+
             if (remote == null)
             {
                 MessageBox.Show("No remote found");
@@ -276,7 +278,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
             var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
             Commands.Fetch(repo, remote.Name, refSpecs, null, $"Fetch from {remote.Name}");
-            
+
             MessageBox.Show($"Fetched from {remote.Name} successfully");
             UpdateElements();
         }
@@ -293,7 +295,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             using var repo = new Repository(Path);
             var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-            
+
             if (remote == null)
             {
                 MessageBox.Show("No remote found");
@@ -304,7 +306,7 @@ public partial class MainWindowViewModel : BaseViewModel
             var pullOptions = new PullOptions();
 
             Commands.Pull(repo, signature, pullOptions);
-            
+
             MessageBox.Show($"Pulled from {remote.Name} successfully");
             UpdateElements();
         }
@@ -321,7 +323,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             using var repo = new Repository(Path);
             var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-            
+
             if (remote == null)
             {
                 MessageBox.Show("No remote found");
@@ -330,7 +332,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
             var pushOptions = new PushOptions();
             repo.Network.Push(repo.Head, pushOptions);
-            
+
             MessageBox.Show($"Pushed to {remote.Name} successfully");
         }
         catch (Exception ex)
@@ -346,7 +348,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             using var repo = new Repository(Path);
             var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-            
+
             if (remote == null)
             {
                 MessageBox.Show("No remote found");
@@ -365,7 +367,7 @@ public partial class MainWindowViewModel : BaseViewModel
             // Finally push
             var pushOptions = new PushOptions();
             repo.Network.Push(repo.Head, pushOptions);
-            
+
             MessageBox.Show($"Synced with {remote.Name} successfully");
             UpdateElements();
         }
@@ -389,16 +391,12 @@ public partial class MainWindowViewModel : BaseViewModel
 
     private void ApplyFilters()
     {
-        Commits.Clear();
-
-        var filteredCommits = _allCommits.AsEnumerable();
+        IEnumerable<CommitItem> filteredCommits = _allCommits;
 
         // Apply author filter
-        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) 
-            && Filter.SelectedAuthorName != "All")
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) && Filter.SelectedAuthorName != "All")
         {
-            filteredCommits = filteredCommits.Where(c => 
-                c.AuthorName == Filter.SelectedAuthorName);
+            filteredCommits = filteredCommits.Where(c => c.AuthorName == Filter.SelectedAuthorName);
         }
 
         // Apply from date filter
@@ -416,10 +414,7 @@ public partial class MainWindowViewModel : BaseViewModel
             filteredCommits = filteredCommits.Where(c => c.Date < toDateEndOfDay);
         }
 
-        foreach (var commit in filteredCommits)
-        {
-            Commits.Add(commit);
-        }
+        Commits = filteredCommits.ToList();
 
         // Auto-select commit
         AutoSelectCommit();
@@ -452,7 +447,7 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         int filterCount = 0;
 
-        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) 
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName)
             && Filter.SelectedAuthorName != "All")
         {
             filterCount++;
@@ -482,6 +477,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public void UpdateElements()
     {
+        Commits = [];
         try
         {
             using var repo = new Repository(Path);
@@ -501,7 +497,6 @@ public partial class MainWindowViewModel : BaseViewModel
             IsGoButtonEnabled = true;
 
             // Update commit list
-            Commits.Clear();
             _allCommits.Clear();
             foreach (var c in repo.Commits)
             {
@@ -527,11 +522,7 @@ public partial class MainWindowViewModel : BaseViewModel
             }
             else
             {
-                // No filters, show all commits
-                foreach (var commit in _allCommits)
-                {
-                    Commits.Add(commit);
-                }
+                Commits = _allCommits.ToList();
 
                 // Auto-select commit
                 AutoSelectCommit();
@@ -565,7 +556,6 @@ public partial class MainWindowViewModel : BaseViewModel
 
             IsGoButtonEnabled = false;
 
-            Commits.Clear();
             Remotes.Clear();
 
             // Clear status bar
@@ -592,7 +582,7 @@ public partial class MainWindowViewModel : BaseViewModel
             // Calculate incoming and outgoing commits
             int incoming = 0;
             int outgoing = 0;
-            
+
             var trackedBranch = repo.Head.TrackedBranch;
             if (trackedBranch != null)
             {
@@ -603,7 +593,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 {
                     // Use HistoryDivergence for better performance
                     var divergence = repo.ObjectDatabase.CalculateHistoryDivergence(localCommit, remoteCommit);
-                    
+
                     outgoing = divergence.AheadBy ?? 0;
                     incoming = divergence.BehindBy ?? 0;
                 }
