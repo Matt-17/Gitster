@@ -6,6 +6,8 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
 
+using Gitster.Models;
+
 using LibGit2Sharp;
 
 using Microsoft.Win32;
@@ -115,7 +117,41 @@ public partial class MainWindowViewModel : BaseViewModel
     private void OnCommitListVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CommitListViewModel.SelectedCommit))
+        {
             SelectedCommit = CommitListVM.SelectedCommit;
+            UpdateDiffPreview();
+        }
+    }
+
+    private void UpdateDiffPreview()
+    {
+        var commit = CommitListVM.SelectedCommit;
+        if (commit == null)
+        {
+            CommitListVM.UpdateDiff(string.Empty, []);
+            return;
+        }
+        try
+        {
+            using var repo = new Repository(Path);
+            var gitCommit = repo.Lookup<Commit>(commit.CommitId);
+            if (gitCommit == null)
+            {
+                CommitListVM.UpdateDiff(string.Empty, []);
+                return;
+            }
+            var parent = gitCommit.Parents.FirstOrDefault();
+            var patch = repo.Diff.Compare<Patch>(parent?.Tree, gitCommit.Tree);
+            var files = patch
+                .Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted))
+                .ToList();
+            var header = $"{files.Count} {(files.Count == 1 ? "file" : "files")} · +{patch.LinesAdded} −{patch.LinesDeleted}";
+            CommitListVM.UpdateDiff(header, files);
+        }
+        catch
+        {
+            CommitListVM.UpdateDiff(string.Empty, []);
+        }
     }
 
     [RelayCommand]
