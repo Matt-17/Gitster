@@ -197,6 +197,41 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.CompletedTask;
     }
 
+    public Task<string> GetHeadShaAsync()
+    {
+        using var repo = OpenRepository();
+        var sha = repo.Head.Tip?.Sha
+            ?? throw new InvalidOperationException("No HEAD commit.");
+        return Task.FromResult(sha);
+    }
+
+    public Task<string> ResolveRefAsync(string refSpec)
+    {
+        using var repo = OpenRepository();
+        var obj = repo.Lookup(refSpec)
+            ?? throw new InvalidOperationException($"Cannot resolve ref: {refSpec}");
+        return Task.FromResult(obj.Sha);
+    }
+
+    public Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string fromSha, string toSha)
+    {
+        using var repo = OpenRepository();
+        var filter = new LibGit2Sharp.CommitFilter
+        {
+            IncludeReachableFrom = toSha,
+            ExcludeReachableFrom = fromSha,
+            SortBy = CommitSortStrategies.Topological,
+        };
+        var result = repo.Commits.QueryBy(filter)
+            .Select(c => new CommitInfo(
+                c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha,
+                c.MessageShort,
+                c.Author.When.DateTime,
+                c.Author.Name ?? string.Empty))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
+    }
+
     private Repository OpenRepository()
     {
         if (string.IsNullOrWhiteSpace(RepositoryPath))

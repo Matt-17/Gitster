@@ -1,20 +1,21 @@
 namespace Gitster.Services;
 
-public record OperationRecord(
+// Kept for reference; superseded by Services/OperationsLog/OperationsLogService.cs (Step D)
+internal record LegacyOperationRecord(
     string Description,
     string Sha,
     DateTime Timestamp,
     Func<Task> UndoAction);
 
-public class OperationsLog
+internal class LegacyOperationsLog
 {
-    private readonly Stack<OperationRecord> _stack = new();
+    private readonly Stack<LegacyOperationRecord> _stack = new();
 
     public event EventHandler? Changed;
 
-    public OperationRecord? Peek() => _stack.Count > 0 ? _stack.Peek() : null;
+    public LegacyOperationRecord? Peek() => _stack.Count > 0 ? _stack.Peek() : null;
 
-    public OperationRecord? Pop()
+    public LegacyOperationRecord? Pop()
     {
         if (_stack.Count == 0) return null;
         var op = _stack.Pop();
@@ -22,7 +23,7 @@ public class OperationsLog
         return op;
     }
 
-    public void Record(OperationRecord record)
+    public void Record(LegacyOperationRecord record)
     {
         _stack.Push(record);
         Changed?.Invoke(this, EventArgs.Empty);

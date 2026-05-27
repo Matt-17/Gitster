@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:helper="clr-namespace:Gitster.Views.Helper"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:QuickActionsViewModel}">
 
@@ -24,26 +25,40 @@
             </StackPanel>
 
             <!-- 2×2 action grid -->
-            <ItemsControl ItemsSource="{Binding Actions}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <UniformGrid Rows="2" Columns="2"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Button IsEnabled="{Binding IsAvailable}"
-                                ToolTip="Coming in Phase 2"
-                                ToolTipService.ShowOnDisabled="True"
-                                Style="{StaticResource GhostButton}"
-                                Height="32"
-                                Margin="0,0,4,4"
-                                HorizontalAlignment="Stretch">
-                            <TextBlock Text="{Binding Label}" FontSize="12"/>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <UniformGrid Rows="2" Columns="2">
+                <Button Content="Reword"
+                        helper:Capability.Requires="FixupAutosquash"
+                        Command="{Binding RewordCommand}"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,4"
+                        HorizontalAlignment="Stretch">
+                    <Button.ToolTip>Reword a commit message (requires Git CLI)</Button.ToolTip>
+                </Button>
+                <Button Content="Cherry-pick"
+                        Command="{Binding CherryPickCommand}"
+                        ToolTip="Coming in Phase 2"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,4"
+                        HorizontalAlignment="Stretch"/>
+                <Button Content="Author"
+                        Command="{Binding ChangeAuthorCommand}"
+                        ToolTip="Coming in Phase 2"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,4"
+                        HorizontalAlignment="Stretch"/>
+                <Button Content="Fixup"
+                        helper:Capability.Requires="FixupAutosquash"
+                        Command="{Binding FixupCommand}"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,4"
+                        HorizontalAlignment="Stretch">
+                    <Button.ToolTip>Apply fixup commits (requires Git CLI)</Button.ToolTip>
+                </Button>
+            </UniformGrid>
 
         </StackPanel>
     </Border>

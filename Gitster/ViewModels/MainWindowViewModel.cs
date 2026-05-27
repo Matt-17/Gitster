@@ -6,8 +6,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
+using Gitster.Services.Capabilities;
 using Gitster.Services.Git;
+using Gitster.Services.OperationsLog;
 using Gitster.Views;
+using Gitster.Views.Helper;
 
 using Gitster.Models;
 
@@ -24,7 +27,7 @@ public partial class MainWindowViewModel : BaseViewModel
 {
     private List<CommitItem> _allCommits = [];
     private FilterWindow? _filterWindow;
-    private readonly OperationsLog _operationsLog = new();
+    private readonly OperationsLogService _opsLogService = new();
     private readonly IGitBackend _gitBackend;
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
@@ -46,6 +49,9 @@ public partial class MainWindowViewModel : BaseViewModel
         _recentRepos = new RecentReposService();
         AutoFetch = new AutoFetchService(_gitBackend);
 
+        var capabilityService = new CapabilityService(_gitBackend);
+        Capability.Initialize(capabilityService);
+
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
         StatusBarVM = new StatusBarViewModel(_stateService, _feedbackService);
@@ -61,7 +67,7 @@ public partial class MainWindowViewModel : BaseViewModel
             () => CommitListVM.SelectedCommit,
             () => CurrentCommitDetail.CommitDate);
         QuickActionsVM = new QuickActionsViewModel();
-        UndoBarVM = new UndoBarViewModel(_operationsLog);
+        UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
 
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) =>
@@ -286,7 +292,14 @@ public partial class MainWindowViewModel : BaseViewModel
     private void SwitchBranch() { }
 
     [RelayCommand]
-    private void OpenOperationsLog() { }
+    private void OpenOperationsLog()
+    {
+        var window = new OperationsLogWindow(_opsLogService, TitleBarVM.RepositoryName)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        window.ShowDialog();
+    }
 
     [RelayCommand]
     private void OpenRepoSettings()
@@ -318,17 +331,29 @@ public partial class MainWindowViewModel : BaseViewModel
                 return;
             }
 
-            var amendedSha = await _feedbackService.RunAsync(
+            var beforeSha = await _gitBackend.GetHeadShaAsync();
+
+            var afterSha = await _feedbackService.RunAsync(
                 "Amend",
                 () => _gitBackend.AmendAsync(new AmendRequest(editDate.Value)),
                 sha => sha.Length > 7 ? sha[..7] : sha);
 
-            var shortSha = amendedSha.Length >= 6 ? amendedSha[..6] : amendedSha;
-            _operationsLog.Record(new OperationRecord(
-                $"Amend of {shortSha}",
-                shortSha,
-                DateTime.Now,
-                () => Task.CompletedTask));
+            var reflogSelector = await _gitBackend.GetReflogSelectorForHeadAsync();
+
+            var branchName = TitleBarVM.CurrentBranch;
+            var shortBefore = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
+            var shortAfter = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
+
+            await _opsLogService.RecordAsync(new OperationRecord(
+                Id: Guid.NewGuid().ToString(),
+                Timestamp: DateTimeOffset.Now,
+                Kind: OperationKind.Amend,
+                Description: $"Amend {shortAfter}",
+                BranchName: branchName,
+                BeforeSha: shortBefore,
+                AfterSha: shortAfter,
+                ReflogSelector: reflogSelector,
+                Status: OperationStatus.Active));
 
             await UpdateElementsAsync();
         }
@@ -409,7 +434,7 @@ public partial class MainWindowViewModel : BaseViewModel
         try
         {
             var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
-            await _feedbackService.RunAsync("Push", () => _gitBackend.PushAsync(selectedRemote));
+            await _feedbackService.RunAsync("Push", () => _gitBackend.PushAsync(selectedRemote, forceWithLease: true));
         }
         catch (Exception ex)
         {
@@ -682,6 +707,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             await _gitBackend.OpenAsync(Path);
             _ = _stateService.AttachAsync(Path);
+            _ = _opsLogService.AttachAsync(Path);
         }
         catch
         {
