@@ -9,9 +9,18 @@
              d:DataContext="{d:DesignInstance Type=vm:CommitListViewModel}">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:RelativeDateConverter x:Key="RelativeDateConverter" Mode="Relative"/>
         <converters:RelativeDateConverter x:Key="FullDateConverter"     Mode="Full"/>
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,0.5"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -39,7 +48,7 @@
                 <Border Grid.Column="0"
                         Background="{StaticResource BackgroundPrimary}"
                         BorderBrush="{StaticResource BorderTertiary}"
-                        BorderThickness="1"
+                        BorderThickness="0.5"
                         CornerRadius="{StaticResource CornerRadiusMd}"
                         Padding="6,0">
                     <Grid>
@@ -48,9 +57,11 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0" Text="🔍"
-                                   VerticalAlignment="Center" Margin="0,0,4,0"
-                                   Foreground="{StaticResource TextTertiary}"/>
+                        <Path Grid.Column="0" Width="12" Height="12" Stretch="Uniform"
+                              Stroke="{StaticResource TextTertiary}" StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="M9,9 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M13.5,13.5 L18,18"
+                              VerticalAlignment="Center" Margin="0,0,4,0"/>
 
                         <!-- Placeholder overlay -->
                         <TextBlock Grid.Column="1"
@@ -71,7 +82,7 @@
                             </TextBlock.Style>
                         </TextBlock>
 
-                        <TextBox Grid.Column="1"
+                        <TextBox x:Name="SearchBox" Grid.Column="1"
                                  Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
                                  BorderThickness="0" Background="Transparent"
                                  VerticalContentAlignment="Center" Height="26"
@@ -81,18 +92,28 @@
 
                 <!-- Clear-filter button (visible only when filters are active) -->
                 <Button Grid.Column="1"
-                        Content="🗑️" Width="28" Height="28" Margin="4,0,0,0"
+                        Width="28" Height="28" Margin="4,0,0,0"
                         Command="{Binding ClearAllFiltersCommand}"
                         ToolTip="Reset filters"
-                        Visibility="{Binding HasActiveFilters, Converter={StaticResource BoolToVis}}"
-                        Style="{StaticResource IconButton}"/>
+                        Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Style="{StaticResource GhostButton}">
+                    <Path Stretch="Uniform" Width="12" Height="12"
+                          Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
+                          Fill="Transparent"
+                          Data="M4,4 L16,16 M16,4 L4,16"/>
+                </Button>
 
                 <!-- Advanced filter dialog button -->
                 <Button Grid.Column="2"
-                        Content="⚙" Width="28" Height="28" Margin="4,0,0,0"
+                        Width="28" Height="28" Margin="4,0,0,0"
                         Command="{Binding OpenFilterCommand}"
                         ToolTip="Advanced filter"
-                        Style="{StaticResource IconButton}"/>
+                        Style="{StaticResource GhostButton}">
+                    <Path Stretch="Uniform" Width="12" Height="12"
+                          Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
+                          Fill="Transparent"
+                          Data="M2,4 L18,4 M5,10 L15,10 M8,16 L12,16"/>
+                </Button>
             </Grid>
         </Border>
 
@@ -101,11 +122,19 @@
                   ItemsSource="{Binding Commits}"
                   SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
 
+            <ListView.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F1F1F"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE4F7"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1F1F1F"/>
+            </ListView.Resources>
+
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="Background"  Value="Transparent"/>
                     <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
                     <Setter Property="Padding"     Value="4,2"/>
+                    <Setter Property="BorderThickness" Value="0"/>
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListViewItem">
@@ -159,8 +188,16 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn Header="SHA"     Width="70"
-                                    DisplayMemberBinding="{Binding CommitId}"/>
+                    <GridViewColumn Header="SHA" Width="70">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding CommitId}"
+                                           FontFamily="{StaticResource FontFamilyMono}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextSecondary}"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>

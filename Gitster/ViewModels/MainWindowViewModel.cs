@@ -47,6 +47,11 @@ public partial class MainWindowViewModel : BaseViewModel
         CurrentCommitDetail = new CommitDetailViewModel();
         StatusBarVM = new StatusBarViewModel(_stateService, _feedbackService);
         TitleBarVM = new TitleBarViewModel(BrowseFolder, AutoFetch);
+        TitleBarVM.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(TitleBarViewModel.RepositoryName) or nameof(TitleBarViewModel.CurrentBranch))
+                OnPropertyChanged(nameof(WindowTitle));
+        };
         CommitListVM = new CommitListViewModel(OpenFilter, ClearAllFilters);
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
         TimestampEditVM = new TimestampEditViewModel(
@@ -70,6 +75,11 @@ public partial class MainWindowViewModel : BaseViewModel
 
     [ObservableProperty]
     public partial string Path { get; set; } = string.Empty;
+
+    public string WindowTitle =>
+        string.IsNullOrWhiteSpace(TitleBarVM.RepositoryName)
+            ? "Gitster"
+            : $"{TitleBarVM.RepositoryName} \u00b7 {TitleBarVM.CurrentBranch} \u2013 Gitster";
 
     [ObservableProperty]
     public partial string FolderPath { get; set; } = string.Empty;

@@ -20,6 +20,11 @@ public partial class CommitListViewModel : BaseViewModel
         _clearDialogFilters = clearDialogFilters;
     }
 
+    public event Action? FocusSearchRequested;
+
+    [RelayCommand]
+    private void FocusSearch() => FocusSearchRequested?.Invoke();
+
     [ObservableProperty]
     public partial List<CommitItem> Commits { get; set; } = [];
 
