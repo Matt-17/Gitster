@@ -20,6 +20,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
+    public TimestampEditViewModel TimestampEditVM { get; }
 
     public MainWindowViewModel()
     {
@@ -29,15 +30,15 @@ public partial class MainWindowViewModel : BaseViewModel
         TitleBarVM = new TitleBarViewModel(BrowseFolder);
         CommitListVM = new CommitListViewModel(OpenFilter, ClearAllFilters);
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
+        TimestampEditVM = new TimestampEditViewModel(
+            () => CommitListVM.SelectedCommit,
+            () => CurrentCommitDetail.CommitDate);
 
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) =>
         {
             ApplyFilters();
         };
-
-        // Initialize with current date/time
-        SelectedDate = DateTime.Now;
 
         // Load saved path or use default
         Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -201,7 +202,8 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             using var repo = new Repository(Path);
 
-            if (SelectedDate == null)
+            var editDate = TimestampEditVM.SelectedDate;
+            if (editDate == null)
             {
                 MessageBox.Show("Please select a date");
                 return;
@@ -213,11 +215,11 @@ public partial class MainWindowViewModel : BaseViewModel
 
             var currentTimezoneOffset = DateTimeOffset.Now.Offset;
 
-            var year = SelectedDate.Value.Year;
-            var month = SelectedDate.Value.Month;
-            var day = SelectedDate.Value.Day;
-            var hour = SelectedDate.Value.Hour;
-            var minute = SelectedDate.Value.Minute;
+            var year = editDate.Value.Year;
+            var month = editDate.Value.Month;
+            var day = editDate.Value.Day;
+            var hour = editDate.Value.Hour;
+            var minute = editDate.Value.Minute;
 
             var newAuthor = new Signature(author.Name, author.Email,
                 new DateTimeOffset(year, month, day, hour, minute, author.When.Second, currentTimezoneOffset));
@@ -499,6 +501,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 headTip.MessageShort,
                 headTip.Author.When.DateTime
             );
+            var headSha = headTip.Id.Sha.Length >= 6 ? headTip.Id.Sha[..6] : headTip.Id.Sha;
+            TimestampEditVM.UpdatePreviewBefore($"{headTip.Author.When.DateTime:dd.MM. HH:mm} · {headSha}");
 
             var previousCommit = headTip.Parents.First();
             SelectedCommitDetail.UpdateCommit(
@@ -565,6 +569,7 @@ public partial class MainWindowViewModel : BaseViewModel
             CurrentCommitDetail.Clear();
             SelectedCommitDetail.Clear();
             SelectedDate = null;
+            TimestampEditVM.UpdatePreviewBefore("—");
 
             IsGoButtonEnabled = false;
 
