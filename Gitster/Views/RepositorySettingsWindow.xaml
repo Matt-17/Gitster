@@ -1,0 +1,100 @@
+<Window x:Class="Gitster.Views.RepositorySettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Gitster.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:RepositorySettingsViewModel}"
+        Title="Repository settings – Gitster"
+        Width="600" Height="450"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource BackgroundPrimary}">
+
+    <TabControl Background="{DynamicResource BackgroundPrimary}"
+                BorderBrush="{DynamicResource BorderTertiary}">
+
+        <!-- General tab (placeholder) -->
+        <TabItem Header="General">
+            <StackPanel Margin="16">
+                <TextBlock Text="General settings"
+                           FontSize="13" FontWeight="Medium"
+                           Foreground="{DynamicResource TextPrimary}"
+                           Margin="0,0,0,8"/>
+                <TextBlock Text="Additional per-repository options will appear here in a future release."
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </TabItem>
+
+        <!-- Git config healthcheck tab -->
+        <TabItem Header="Git config healthcheck">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                <StackPanel>
+                    <TextBlock Text="Recommendations for this repository:"
+                               FontSize="13" FontWeight="Medium"
+                               Foreground="{DynamicResource TextPrimary}"
+                               Margin="0,0,0,12"/>
+
+                    <ItemsControl ItemsSource="{Binding HealthcheckItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource BorderTertiary}"
+                                        BorderThickness="0.5"
+                                        CornerRadius="4"
+                                        Padding="12,8"
+                                        Margin="0,0,0,6"
+                                        Background="{DynamicResource BackgroundSecondary}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontWeight="Medium"
+                                                       FontFamily="{DynamicResource FontFamilyMono}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextPrimary}"/>
+                                            <TextBlock Text="{Binding Description}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,3,0,0"/>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1"
+                                                Content="Apply"
+                                                Command="{Binding ApplyCommand}"
+                                                Style="{StaticResource GhostButton}"
+                                                Padding="10,4"
+                                                Margin="12,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Visibility="{Binding IsApplied, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                    VerticalAlignment="Center" Margin="12,0,0,0"
+                                                    Visibility="{Binding IsApplied, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Path Width="10" Height="10" Stretch="Uniform"
+                                                  Stroke="{DynamicResource AccentSuccess}" StrokeThickness="1.5"
+                                                  Fill="Transparent"
+                                                  Data="M2,7 L6,11 L13,3"/>
+                                            <TextBlock Text="Applied"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource AccentSuccess}"
+                                                       Margin="4,0,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+    </TabControl>
+</Window>

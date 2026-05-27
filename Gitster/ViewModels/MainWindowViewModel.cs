@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
 using Gitster.Services.Git;
+using Gitster.Views;
 
 using Gitster.Models;
 
@@ -27,6 +28,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly IGitBackend _gitBackend;
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
+    private readonly RecentReposService _recentRepos;
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -41,6 +43,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _gitBackend = new LibGit2Backend();
         _stateService = new RepositoryStateService(_gitBackend);
         _feedbackService = new OperationFeedbackService();
+        _recentRepos = new RecentReposService();
         AutoFetch = new AutoFetchService(_gitBackend);
 
         SelectedCommitDetail = new CommitDetailViewModel();
@@ -80,6 +83,11 @@ public partial class MainWindowViewModel : BaseViewModel
         string.IsNullOrWhiteSpace(TitleBarVM.RepositoryName)
             ? "Gitster"
             : $"{TitleBarVM.RepositoryName} \u00b7 {TitleBarVM.CurrentBranch} \u2013 Gitster";
+
+    public ObservableCollection<RecentRepoEntry> RecentRepos => _recentRepos.Entries;
+
+    [ObservableProperty]
+    public partial bool IsDarkMode { get; set; }
 
     [ObservableProperty]
     public partial string FolderPath { get; set; } = string.Empty;
@@ -194,6 +202,7 @@ public partial class MainWindowViewModel : BaseViewModel
             if (dialog.ShowDialog() == true)
             {
                 FolderPath = dialog.FolderName;
+                _recentRepos.Record(dialog.FolderName);
             }
         }
         catch (Exception ex)
@@ -259,6 +268,43 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         Filter.ClearAllFilters();
     }
+
+    [RelayCommand]
+    private void OpenRepo(string path)
+    {
+        FolderPath = path;
+        _recentRepos.Record(path);
+    }
+
+    [RelayCommand]
+    private void Exit() => Application.Current.Shutdown();
+
+    [RelayCommand]
+    private async Task Refresh() => await UpdateElementsAsync();
+
+    [RelayCommand]
+    private void SwitchBranch() { }
+
+    [RelayCommand]
+    private void OpenOperationsLog() { }
+
+    [RelayCommand]
+    private void OpenRepoSettings()
+    {
+        if (string.IsNullOrWhiteSpace(Path)) return;
+        var vm = new RepositorySettingsViewModel(Path);
+        var window = new RepositorySettingsWindow(vm) { Owner = Application.Current.MainWindow };
+        window.ShowDialog();
+    }
+
+    [RelayCommand]
+    private void OpenDocs() { }
+
+    [RelayCommand]
+    private void OpenShortcuts() { }
+
+    [RelayCommand]
+    private void OpenAbout() { }
 
     [RelayCommand]
     private async Task AmendCommit()
