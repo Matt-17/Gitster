@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using Gitster.Helpers;
 using Gitster.Models;
 using Gitster.ViewModels;
 
@@ -16,15 +15,7 @@ namespace Gitster.Controls;
 /// </summary>
 public partial class DatePickerPopup : UserControl
 {
-    private static readonly Brush HoverBrush;
-    private static readonly Brush MainBrush;
     private CancellationTokenSource? _source;
-
-    static DatePickerPopup()
-    {
-        HoverBrush = (Brush)Application.Current.Resources["HoverBrush"];
-        MainBrush = (Brush)Application.Current.Resources["AccentMainLightestBrush"];
-    }
 
     public DatePickerPopup()
     {
@@ -43,10 +34,10 @@ public partial class DatePickerPopup : UserControl
                     b.Background = Brushes.Transparent;
                     break;
                 case 1:
-                    b.Background = HoverBrush;
+                    b.Background = (Brush)Application.Current.Resources["BackgroundSecondary"];
                     break;
                 case 2:
-                    b.Background = MainBrush;
+                    b.Background = (Brush)Application.Current.Resources["AccentBlueBackground"];
                     break;
             }
         }
@@ -225,5 +216,15 @@ public partial class DatePickerPopup : UserControl
                     ViewModel.IsOpen = false;
             }
         }
+    }
+
+    private void PrevMonthButton_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ChangeMonth(-1);
+    }
+
+    private void NextMonthButton_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ChangeMonth(1);
     }
 }
