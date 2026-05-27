@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
+using Gitster.Services.Git;
 
 using Gitster.Models;
 
@@ -22,19 +24,29 @@ public partial class MainWindowViewModel : BaseViewModel
     private List<CommitItem> _allCommits = [];
     private FilterWindow? _filterWindow;
     private readonly OperationsLog _operationsLog = new();
+    private readonly IGitBackend _gitBackend;
+    private readonly RepositoryStateService _stateService;
+    private readonly OperationFeedbackService _feedbackService;
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
     public TimestampEditViewModel TimestampEditVM { get; }
     public QuickActionsViewModel QuickActionsVM { get; }
     public UndoBarViewModel UndoBarVM { get; }
+    public StatusBarViewModel StatusBarVM { get; }
+    public AutoFetchService AutoFetch { get; }
 
     public MainWindowViewModel()
     {
+        _gitBackend = new LibGit2Backend();
+        _stateService = new RepositoryStateService(_gitBackend);
+        _feedbackService = new OperationFeedbackService();
+        AutoFetch = new AutoFetchService(_gitBackend);
+
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
-        StatusBar = new StatusBarViewModel();
-        TitleBarVM = new TitleBarViewModel(BrowseFolder);
+        StatusBarVM = new StatusBarViewModel(_stateService, _feedbackService);
+        TitleBarVM = new TitleBarViewModel(BrowseFolder, AutoFetch);
         CommitListVM = new CommitListViewModel(OpenFilter, ClearAllFilters);
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
         TimestampEditVM = new TimestampEditViewModel(
@@ -52,6 +64,8 @@ public partial class MainWindowViewModel : BaseViewModel
         // Load saved path or use default
         Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         FolderPath = Path;
+
+        _stateService.PropertyChanged += OnRepositoryStateChanged;
     }
 
     [ObservableProperty]
@@ -91,9 +105,6 @@ public partial class MainWindowViewModel : BaseViewModel
     public partial bool HasActiveFilters { get; set; }
 
     [ObservableProperty]
-    public partial StatusBarViewModel StatusBar { get; set; }
-
-    [ObservableProperty]
     public partial List<CommitItem> Commits { get; set; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
 
@@ -103,7 +114,8 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         Path = value;
         UpdateSettingsPath();
-        UpdateElements();
+        _ = TryAttachRepositoryServicesAsync();
+        _ = UpdateElementsAsync();
     }
 
     partial void OnSelectedCommitChanged(CommitItem? value)
@@ -239,12 +251,10 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void AmendCommit()
+    private async Task AmendCommit()
     {
         try
         {
-            using var repo = new Repository(Path);
-
             var editDate = TimestampEditVM.SelectedDate;
             if (editDate == null)
             {
@@ -252,38 +262,19 @@ public partial class MainWindowViewModel : BaseViewModel
                 return;
             }
 
-            var commit = repo.Head.Tip;
-            var author = commit.Author;
-            var committer = commit.Author;
+            var amendedSha = await _feedbackService.RunAsync(
+                "Amend",
+                () => _gitBackend.AmendAsync(new AmendRequest(editDate.Value)),
+                sha => sha.Length > 7 ? sha[..7] : sha);
 
-            var currentTimezoneOffset = DateTimeOffset.Now.Offset;
-
-            var year = editDate.Value.Year;
-            var month = editDate.Value.Month;
-            var day = editDate.Value.Day;
-            var hour = editDate.Value.Hour;
-            var minute = editDate.Value.Minute;
-
-            var newAuthor = new Signature(author.Name, author.Email,
-                new DateTimeOffset(year, month, day, hour, minute, author.When.Second, currentTimezoneOffset));
-            var newCommiter = new Signature(committer.Name, committer.Email,
-                new DateTimeOffset(year, month, day, hour, minute, committer.When.Second, currentTimezoneOffset));
-
-            var commitOptions = new CommitOptions
-            {
-                AmendPreviousCommit = true,
-            };
-
-            repo.Commit(commit.Message, newAuthor, newCommiter, commitOptions);
-
-            var amendedSha = commit.Id.Sha.Length >= 6 ? commit.Id.Sha[..6] : commit.Id.Sha;
+            var shortSha = amendedSha.Length >= 6 ? amendedSha[..6] : amendedSha;
             _operationsLog.Record(new OperationRecord(
-                $"Amend of {amendedSha}",
-                amendedSha,
+                $"Amend of {shortSha}",
+                shortSha,
                 DateTime.Now,
                 () => Task.CompletedTask));
 
-            UpdateElements();
+            await UpdateElementsAsync();
         }
         catch (Exception ex)
         {
@@ -327,24 +318,13 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void Fetch(string? remoteName)
+    private async Task Fetch(string? remoteName)
     {
         try
         {
-            using var repo = new Repository(Path);
-            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-
-            if (remote == null)
-            {
-                MessageBox.Show("No remote found");
-                return;
-            }
-
-            var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
-            Commands.Fetch(repo, remote.Name, refSpecs, null, $"Fetch from {remote.Name}");
-
-            MessageBox.Show($"Fetched from {remote.Name} successfully");
-            UpdateElements();
+            var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+            await _feedbackService.RunAsync("Fetch", () => _gitBackend.FetchAsync(selectedRemote));
+            await UpdateElementsAsync();
         }
         catch (Exception ex)
         {
@@ -353,26 +333,13 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void Pull(string? remoteName)
+    private async Task Pull(string? remoteName)
     {
         try
         {
-            using var repo = new Repository(Path);
-            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-
-            if (remote == null)
-            {
-                MessageBox.Show("No remote found");
-                return;
-            }
-
-            var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
-            var pullOptions = new PullOptions();
-
-            Commands.Pull(repo, signature, pullOptions);
-
-            MessageBox.Show($"Pulled from {remote.Name} successfully");
-            UpdateElements();
+            var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+            await _feedbackService.RunAsync("Pull", () => _gitBackend.PullAsync(selectedRemote));
+            await UpdateElementsAsync();
         }
         catch (Exception ex)
         {
@@ -381,23 +348,12 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void Push(string? remoteName)
+    private async Task Push(string? remoteName)
     {
         try
         {
-            using var repo = new Repository(Path);
-            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-
-            if (remote == null)
-            {
-                MessageBox.Show("No remote found");
-                return;
-            }
-
-            var pushOptions = new PushOptions();
-            repo.Network.Push(repo.Head, pushOptions);
-
-            MessageBox.Show($"Pushed to {remote.Name} successfully");
+            var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+            await _feedbackService.RunAsync("Push", () => _gitBackend.PushAsync(selectedRemote));
         }
         catch (Exception ex)
         {
@@ -406,34 +362,19 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void Sync(string? remoteName)
+    private async Task Sync(string? remoteName)
     {
         try
         {
-            using var repo = new Repository(Path);
-            var remote = string.IsNullOrEmpty(remoteName) ? repo.Network.Remotes.FirstOrDefault() : repo.Network.Remotes[remoteName];
-
-            if (remote == null)
+            var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+            await _feedbackService.RunAsync("Sync", async () =>
             {
-                MessageBox.Show("No remote found");
-                return;
-            }
+                await _gitBackend.FetchAsync(selectedRemote);
+                await _gitBackend.PullAsync(selectedRemote);
+                await _gitBackend.PushAsync(selectedRemote);
+            });
 
-            // First fetch
-            var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
-            Commands.Fetch(repo, remote.Name, refSpecs, null, $"Fetch from {remote.Name}");
-
-            // Then pull
-            var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
-            var pullOptions = new PullOptions();
-            Commands.Pull(repo, signature, pullOptions);
-
-            // Finally push
-            var pushOptions = new PushOptions();
-            repo.Network.Push(repo.Head, pushOptions);
-
-            MessageBox.Show($"Synced with {remote.Name} successfully");
-            UpdateElements();
+            await UpdateElementsAsync();
         }
         catch (Exception ex)
         {
@@ -441,9 +382,10 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
-    public void OnWindowActivated()
+    public async Task OnWindowActivatedAsync()
     {
-        UpdateElements();
+        await UpdateElementsAsync();
+        await _stateService.RefreshAsync();
     }
 
     private void UpdateSettingsPath()
@@ -539,11 +481,14 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
-    public void UpdateElements()
+    public async Task UpdateElementsAsync()
     {
         Commits = [];
         try
         {
+            await _gitBackend.OpenAsync(Path);
+            _ = _stateService.AttachAsync(Path);
+
             using var repo = new Repository(Path);
 
             var headTip = repo.Head.Tip;
@@ -626,7 +571,6 @@ public partial class MainWindowViewModel : BaseViewModel
             Remotes.Clear();
 
             // Clear status bar
-            StatusBar.Clear();
             TitleBarVM.Clear();
             CommitListVM.SetBaseCommits([], false, string.Empty);
         }
@@ -668,15 +612,35 @@ public partial class MainWindowViewModel : BaseViewModel
                 }
             }
 
-            // Update status bar with all values at once
-            StatusBar.UpdateStatus(branch, repoName, incoming, outgoing);
             TitleBarVM.UpdateStatus(branch, repoName, incoming, outgoing);
         }
         catch (Exception)
         {
-            // If there's an error, just clear the status bar
-            StatusBar.Clear();
             TitleBarVM.Clear();
         }
+    }
+
+    private async Task TryAttachRepositoryServicesAsync()
+    {
+        try
+        {
+            await _gitBackend.OpenAsync(Path);
+            _ = _stateService.AttachAsync(Path);
+        }
+        catch
+        {
+            // ignore invalid path while user edits
+        }
+    }
+
+    private void OnRepositoryStateChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(RepositoryStateService.CurrentBranch))
+            return;
+
+        if (string.IsNullOrWhiteSpace(_stateService.CurrentBranch))
+            return;
+
+        TitleBarVM.CurrentBranch = _stateService.CurrentBranch;
     }
 }

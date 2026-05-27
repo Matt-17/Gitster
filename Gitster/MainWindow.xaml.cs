@@ -18,8 +18,14 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
     }
 
-    private void Window_Activated(object sender, EventArgs e)
+    private async void Window_Activated(object sender, EventArgs e)
     {
-        _viewModel.OnWindowActivated();
+        await _viewModel.OnWindowActivatedAsync();
+    }
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        _viewModel.AutoFetch.OnWindowStateChanged(WindowState);
     }
 }
