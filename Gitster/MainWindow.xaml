@@ -59,21 +59,7 @@
 
                 <controls:CommitContextCard DataContext="{Binding CommitListVM}"/>
 
-                <!-- Temporary date + amend block — becomes TimestampEditPanel in Step 5 -->
-                <Border Margin="0,8,0,0" Style="{StaticResource PanelCard}">
-                    <StackPanel>
-                        <controls:DateControl SelectedDate="{Binding SelectedDate, Mode=TwoWay}"
-                                              EditMode="DateTime" Height="30"/>
-                        <Button Content="Amend"
-                                Command="{Binding AmendCommitCommand}"
-                                IsEnabled="{Binding IsGoButtonEnabled}"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Stretch"
-                                Height="36"
-                                Margin="0,8,0,0"
-                                ToolTip="Amend the commit timestamp"/>
-                    </StackPanel>
-                </Border>
+                <controls:TimestampEditPanel DataContext="{Binding TimestampEditVM}" Margin="0,8,0,0"/>
 
             </StackPanel>
         </Grid>
