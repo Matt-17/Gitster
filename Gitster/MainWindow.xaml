@@ -44,48 +44,8 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left side: Commit ListView with Filter button -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Filter controls -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <TextBlock Text="{Binding FilterStatusText}" 
-                           VerticalAlignment="Center"
-                           Margin="5"
-                           FontStyle="Italic"
-                           Foreground="Gray" />
-                    <Button Content="🗑️" 
-                        Width="30" 
-                        Height="30"
-                        Margin="0,5,5,5"
-                        Padding="0"
-                        Command="{Binding ClearAllFiltersCommand}"
-                        ToolTip="Clear all filters"
-                        Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"
-                        Style="{StaticResource IconButtonStyle}" />
-                    <Button Content="🔍 Filter" 
-                        HorizontalAlignment="Right" 
-                        Width="100" 
-                        Command="{Binding OpenFilterCommand}"
-                        ToolTip="Open filter window" />
-                </StackPanel>
-
-                <!-- Commit ListView -->
-                <ListView Grid.Row="1" Margin="5" ItemsSource="{Binding Commits}" SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="Message" Width="150" DisplayMemberBinding="{Binding Message}" />
-                            <GridViewColumn Header="Author" Width="100" DisplayMemberBinding="{Binding AuthorName}" />
-                            <GridViewColumn Header="Date" Width="100" DisplayMemberBinding="{Binding Date, StringFormat='dd.MM.yyyy HH:mm'}" />
-                            <GridViewColumn Header="Commit ID" Width="60" DisplayMemberBinding="{Binding CommitId}" />
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-            </Grid>
+            <!-- Left side: CommitListView -->
+            <controls:CommitListView Grid.Column="0" DataContext="{Binding CommitListVM}"/>
 
             <!-- Right side: Original content -->
             <Grid Grid.Column="1">
@@ -116,7 +76,7 @@
                         <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
                          Text="{Binding CommitMessage, Mode=OneWay}" />
                         <TextBox Margin="5" Height="30" Width="150" Grid.Column="1" IsReadOnly="True" 
-                         Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
+                         Text="{Binding CommitDate, StringFormat='dd.MM.yyyy HH:mm', Mode=OneWay}" />
                         <StackPanel Orientation="Horizontal" Grid.Column="2">
                             <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadSelectedCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                             Style="{StaticResource IconButtonStyle}" />
@@ -136,7 +96,7 @@
                         <TextBox Margin="5" Height="30" Grid.Column="0" IsReadOnly="True" 
                          Text="{Binding CommitMessage, Mode=OneWay}" />
                         <TextBox Margin="5" Height="30" Grid.Column="1" Width="150" IsReadOnly="True" 
-                         Text="{Binding CommitDate, StringFormat='dd.MM.yyyy \\u\\m HH:mm', Mode=OneWay}" />
+                         Text="{Binding CommitDate, StringFormat='dd.MM.yyyy HH:mm', Mode=OneWay}" />
                         <StackPanel Orientation="Horizontal" Grid.Column="2">
                             <Button Width="30" Content="🕑" Command="{Binding DataContext.ReadCurrentCommitTimeCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
                             Style="{StaticResource IconButtonStyle}" />

@@ -39,10 +39,10 @@
                         <ColumnDefinition Width="2*" />
                         <ColumnDefinition />
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="MonthOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts&#x0a;Oder mit Mausrad" ToolTipService.InitialShowDelay="0" Background="Transparent">
+                    <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="MonthOnMouseWheel" ToolTip="Change with mouse buttons&#x0a;Back - left&#x0a;Forward - right&#x0a;Or use mouse wheel" ToolTipService.InitialShowDelay="0" Background="Transparent">
                         <TextBlock Text="{Binding Date, StringFormat='MMMM'}" FontSize="18" TextAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Ändern mit Maustasten&#x0a;Zurück - links&#x0a;Vorwärts - rechts&#x0a;Oder mit Mausrad" ToolTipService.InitialShowDelay="0" Background="Transparent">
+                    <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Change with mouse buttons&#x0a;Back - left&#x0a;Forward - right&#x0a;Or use mouse wheel" ToolTipService.InitialShowDelay="0" Background="Transparent">
                         <TextBlock Text="{Binding Date, StringFormat='yyyy'}" TextAlignment="Center" FontSize="18" VerticalAlignment="Center"/>
                     </Border>
                 </Grid>
@@ -127,7 +127,7 @@
                     <!-- Hour Section -->
                     <Border Grid.Column="0"
          MouseDown="HourOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
-         MouseWheel="HourOnMouseWheel" ToolTip="Stunden ändern&#x0a;Zurück - links&#x0a;Vorwärts - rechts" 
+         MouseWheel="HourOnMouseWheel" ToolTip="Change hours&#x0a;Back - left&#x0a;Forward - right" 
          ToolTipService.InitialShowDelay="0" Background="Transparent">
                         <TextBlock Text="{Binding Hour, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
                     </Border>
@@ -136,7 +136,7 @@
                     <!-- Minute Section -->
                     <Border Grid.Column="2"
          MouseDown="MinuteOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
-         MouseWheel="MinuteOnMouseWheel" ToolTip="Minuten ändern&#x0a;Zurück - links&#x0a;Vorwärts - rechts" 
+         MouseWheel="MinuteOnMouseWheel" ToolTip="Change minutes&#x0a;Back - left&#x0a;Forward - right" 
          ToolTipService.InitialShowDelay="0" Background="Transparent">
                         <TextBlock Text="{Binding Minute, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
                     </Border>

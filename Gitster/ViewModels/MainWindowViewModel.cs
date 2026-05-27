@@ -19,6 +19,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private FilterWindow? _filterWindow;
 
     public TitleBarViewModel TitleBarVM { get; }
+    public CommitListViewModel CommitListVM { get; }
 
     public MainWindowViewModel()
     {
@@ -26,6 +27,8 @@ public partial class MainWindowViewModel : BaseViewModel
         CurrentCommitDetail = new CommitDetailViewModel();
         StatusBar = new StatusBarViewModel();
         TitleBarVM = new TitleBarViewModel(BrowseFolder);
+        CommitListVM = new CommitListViewModel(OpenFilter, ClearAllFilters);
+        CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
 
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) =>
@@ -96,9 +99,15 @@ public partial class MainWindowViewModel : BaseViewModel
     partial void OnSelectedCommitChanged(CommitItem? value)
     {
         if (value != null)
-        {
             SelectedCommitDetail.UpdateCommit(value.Message, value.Date);
-        }
+        else
+            SelectedCommitDetail.Clear();
+    }
+
+    private void OnCommitListVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CommitListViewModel.SelectedCommit))
+            SelectedCommit = CommitListVM.SelectedCommit;
     }
 
     [RelayCommand]
@@ -419,11 +428,11 @@ public partial class MainWindowViewModel : BaseViewModel
 
         Commits = filteredCommits.ToList();
 
-        // Auto-select commit
-        AutoSelectCommit();
-
         // Update filter status
         UpdateFilterStatus();
+
+        // Feed CommitListViewModel (handles auto-select and live text filter)
+        CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText);
     }
 
     private void AutoSelectCommit()
@@ -527,11 +536,11 @@ public partial class MainWindowViewModel : BaseViewModel
             {
                 Commits = _allCommits.ToList();
 
-                // Auto-select commit
-                AutoSelectCommit();
-
                 // Update filter status
                 UpdateFilterStatus();
+
+                // Feed CommitListViewModel (handles auto-select and live text filter)
+                CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText);
             }
 
             // Update remotes list
@@ -564,6 +573,7 @@ public partial class MainWindowViewModel : BaseViewModel
             // Clear status bar
             StatusBar.Clear();
             TitleBarVM.Clear();
+            CommitListVM.SetBaseCommits([], false, string.Empty);
         }
     }
 
