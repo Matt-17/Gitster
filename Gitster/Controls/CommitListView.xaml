@@ -17,7 +17,9 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="*" MinHeight="80"/>
+            <RowDefinition Height="3"/>
+            <RowDefinition Height="160" MinHeight="60"/>
         </Grid.RowDefinitions>
 
         <!-- ── Filter row ──────────────────────────────────────────────── -->
@@ -162,5 +164,75 @@
                 </GridView>
             </ListView.View>
         </ListView>
+
+        <!-- ── Horizontal splitter ─────────────────────────────────────── -->
+        <GridSplitter Grid.Row="2"
+                      HorizontalAlignment="Stretch"
+                      Background="{StaticResource BorderTertiary}"
+                      ResizeBehavior="PreviousAndNext"/>
+
+        <!-- ── Diff preview ────────────────────────────────────────────── -->
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header bar -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource BackgroundSecondary}"
+                    BorderBrush="{StaticResource BorderTertiary}"
+                    BorderThickness="0,0,0,1"
+                    Padding="8,5">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="📄 " VerticalAlignment="Center"/>
+                    <TextBlock Text="Diff"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource TextPrimary}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text=" · " Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding DiffHeaderDisplay}"
+                               FontFamily="{StaticResource FontFamilyMono}"
+                               FontSize="11"
+                               VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DiffHeader}" Value="">
+                                        <Setter Property="FontStyle" Value="Italic"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- File list -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding DiffFiles}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="8,3">
+                                <TextBlock DockPanel.Dock="Right"
+                                           FontFamily="{StaticResource FontFamilyMono}"
+                                           FontSize="11"
+                                           Margin="12,0,0,0">
+                                    <Run Text="+" Foreground="{StaticResource AccentSuccess}"/><Run Text="{Binding Added, Mode=OneWay}" Foreground="{StaticResource AccentSuccess}"/><Run Text="  −" Foreground="{StaticResource AccentDanger}"/><Run Text="{Binding Deleted, Mode=OneWay}" Foreground="{StaticResource AccentDanger}"/>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Path}"
+                                           FontFamily="{StaticResource FontFamilyMono}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
     </Grid>
 </UserControl>

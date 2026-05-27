@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Gitster.Models;
+
 namespace Gitster.ViewModels;
 
 public partial class CommitListViewModel : BaseViewModel
@@ -32,6 +34,24 @@ public partial class CommitListViewModel : BaseViewModel
 
     [ObservableProperty]
     public partial string FilterStatusText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string DiffHeader { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial List<DiffFileEntry> DiffFiles { get; set; } = [];
+
+    public string DiffHeaderDisplay =>
+        string.IsNullOrEmpty(DiffHeader) ? "no commit selected" : DiffHeader;
+
+    partial void OnDiffHeaderChanged(string value) =>
+        OnPropertyChanged(nameof(DiffHeaderDisplay));
+
+    public void UpdateDiff(string header, List<DiffFileEntry> files)
+    {
+        DiffHeader = header;
+        DiffFiles = files;
+    }
 
     partial void OnFilterTextChanged(string value) => ApplyLiveFilter();
 
