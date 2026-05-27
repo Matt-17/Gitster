@@ -69,6 +69,10 @@ public partial class MainWindowViewModel : BaseViewModel
         QuickActionsVM = new QuickActionsViewModel();
         UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
 
+        // A.3 — refresh commit list after any backend HEAD mutation (e.g. Undo via ResetHard)
+        _gitBackend.HeadChanged += (_, _) =>
+            Application.Current.Dispatcher.BeginInvoke(async () => await UpdateElementsAsync());
+
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) =>
         {
@@ -388,9 +392,9 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             using var repo = new Repository(Path);
             var commit = repo.Head.Tip;
-            var author = commit.Author;
+            if (commit == null) return;
 
-            SelectedDate = author.When.DateTime;
+            SelectedDate = commit.Author.When.DateTime;
         }
         catch (Exception ex)
         {
@@ -572,7 +576,21 @@ public partial class MainWindowViewModel : BaseViewModel
 
             using var repo = new Repository(Path);
 
+            // A.1 — guard empty repository (no commits yet)
             var headTip = repo.Head.Tip;
+            if (headTip == null)
+            {
+                CurrentCommitDetail.Clear();
+                SelectedCommitDetail.Clear();
+                TimestampEditVM.UpdatePreviewBefore("—");
+                IsGoButtonEnabled = false;
+                _allCommits.Clear();
+                Commits = [];
+                CommitListVM.SetBaseCommits([], false, string.Empty);
+                UpdateStatusBar(repo);
+                return;
+            }
+
             CurrentCommitDetail.UpdateCommit(
                 headTip.MessageShort,
                 headTip.Author.When.DateTime
@@ -580,17 +598,23 @@ public partial class MainWindowViewModel : BaseViewModel
             var headSha = headTip.Id.Sha.Length >= 6 ? headTip.Id.Sha[..6] : headTip.Id.Sha;
             TimestampEditVM.UpdatePreviewBefore($"{headTip.Author.When.DateTime:dd.MM. HH:mm} · {headSha}");
 
-            var previousCommit = headTip.Parents.First();
-            SelectedCommitDetail.UpdateCommit(
-                previousCommit.MessageShort,
-                previousCommit.Author.When.DateTime
-            );
+            // A.1 — guard initial commit (no parents)
+            var previousCommit = headTip.Parents.FirstOrDefault();
+            if (previousCommit != null)
+                SelectedCommitDetail.UpdateCommit(previousCommit.MessageShort, previousCommit.Author.When.DateTime);
+            else
+                SelectedCommitDetail.Clear();
 
             IsGoButtonEnabled = true;
 
-            // Update commit list
+            // Update commit list — A.7: topological order
             _allCommits.Clear();
-            foreach (var c in repo.Commits)
+            var topoCommits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = repo.Head,
+            });
+            foreach (var c in topoCommits)
             {
                 if (c.Author == null)
                 {

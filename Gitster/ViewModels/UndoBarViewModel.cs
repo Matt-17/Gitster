@@ -89,15 +89,21 @@ public partial class UndoBarViewModel : BaseViewModel
 
         if (plan is UndoPlan.Ready ready)
         {
+            // A.6 — when intermediate commits exist, ask user to Discard or Replay
+            bool replayOnTop = false;
             if (ready.WouldDiscard.Count > 0)
             {
                 var dialog = new UndoConfirmationDialog(ready) { Owner = Application.Current.MainWindow };
                 if (dialog.ShowDialog() != true) return;
+                replayOnTop = dialog.ReplayOnTop;
             }
 
             try
             {
-                await _feedback.RunAsync("Undo", () => _opsLog.ExecuteUndoAsync(ready, _git));
+                if (replayOnTop)
+                    await _feedback.RunAsync("Undo (replay)", () => _opsLog.ExecuteUndoWithReplayAsync(ready, _git));
+                else
+                    await _feedback.RunAsync("Undo", () => _opsLog.ExecuteUndoAsync(ready, _git));
             }
             catch (Exception ex)
             {

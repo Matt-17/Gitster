@@ -21,8 +21,18 @@ public partial class OperationsLogService : ObservableObject
     public OperationRecord? MostRecentActive
         => Records.FirstOrDefault(r => r.Status == OperationStatus.Active);
 
+    public Task DetachAsync()
+    {
+        Records.Clear();
+        _storagePath = null;
+        OnPropertyChanged(nameof(MostRecentActive));
+        Changed?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
     public async Task AttachAsync(string repoPath)
     {
+        await DetachAsync();
         _storagePath = ResolveStoragePath(repoPath);
         await LoadAsync();
         Changed?.Invoke(this, EventArgs.Empty);
@@ -30,8 +40,21 @@ public partial class OperationsLogService : ObservableObject
 
     public async Task RecordAsync(OperationRecord record)
     {
+        // Mark the immediate predecessor on the same branch as Replaced
+        var previousActive = Records.FirstOrDefault(r =>
+            r.Status == OperationStatus.Active
+            && r.BranchName == record.BranchName
+            && r.AfterSha == record.BeforeSha);
+
+        if (previousActive != null)
+        {
+            var idx = Records.IndexOf(previousActive);
+            Records[idx] = previousActive with { Status = OperationStatus.Replaced };
+        }
+
         Records.Insert(0, record);
         await SaveAsync();
+        OnPropertyChanged(nameof(MostRecentActive));
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -42,6 +65,7 @@ public partial class OperationsLogService : ObservableObject
         var idx = Records.IndexOf(record);
         Records[idx] = record with { Status = OperationStatus.Undone };
         await SaveAsync();
+        OnPropertyChanged(nameof(MostRecentActive));
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -56,18 +80,14 @@ public partial class OperationsLogService : ObservableObject
 
     public async Task<UndoPlan> PrepareUndoAsync(OperationRecord record, IGitBackend git)
     {
-        if (record.ReflogSelector is null)
-            return new UndoPlan.NotAvailable("No reflog selector recorded.");
+        // A.5: use the stored pre-operation SHA directly — stable across reflog changes
+        var targetSha = record.BeforeSha;
 
-        string targetSha;
-        try
-        {
-            targetSha = await git.ResolveRefAsync(record.ReflogSelector);
-        }
-        catch
+        var exists = await git.CommitExistsAsync(targetSha);
+        if (!exists)
         {
             await MarkExpiredAsync(record.Id);
-            return new UndoPlan.Expired("Reflog entry no longer available.");
+            return new UndoPlan.Expired("Pre-operation commit no longer available (garbage collected).");
         }
 
         var currentHead = await git.GetHeadShaAsync();
@@ -80,6 +100,27 @@ public partial class OperationsLogService : ObservableObject
     public async Task ExecuteUndoAsync(UndoPlan.Ready plan, IGitBackend git)
     {
         await git.ResetHardAsync(plan.TargetSha);
+        await MarkUndoneAsync(plan.Record.Id);
+    }
+
+    public async Task ExecuteUndoWithReplayAsync(UndoPlan.Ready plan, IGitBackend git)
+    {
+        await git.ResetHardAsync(plan.TargetSha);
+        // Replay discarded commits oldest-first on top of the restored HEAD
+        foreach (var commit in plan.WouldDiscard.Reverse())
+        {
+            try
+            {
+                await git.CherryPickAsync(commit.Sha);
+            }
+            catch
+            {
+                // Roll back to the pre-undo state so the repo is not left in an inconsistent state
+                await git.ResetHardAsync(plan.Record.AfterSha);
+                throw new InvalidOperationException(
+                    "Replay produced conflicts. Repository restored to state before undo attempt.");
+            }
+        }
         await MarkUndoneAsync(plan.Record.Id);
     }
 
