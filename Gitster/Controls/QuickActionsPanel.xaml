@@ -1,0 +1,49 @@
+<UserControl x:Class="Gitster.Controls.QuickActionsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:QuickActionsViewModel}">
+
+    <Border Style="{StaticResource PanelCard}">
+        <StackPanel>
+
+            <!-- Header -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <TextBlock Text="⚡" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="More Actions"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource TextPrimary}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- 2×2 action grid -->
+            <ItemsControl ItemsSource="{Binding Actions}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="2" Columns="2"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button IsEnabled="{Binding IsAvailable}"
+                                ToolTip="Coming in Phase 2"
+                                ToolTipService.ShowOnDisabled="True"
+                                Style="{StaticResource GhostButton}"
+                                Height="40"
+                                Margin="0,0,4,4"
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Icon}" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding Label}"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </Border>
+</UserControl>

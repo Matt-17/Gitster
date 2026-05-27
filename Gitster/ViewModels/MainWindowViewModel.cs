@@ -4,6 +4,8 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Gitster.Services;
+
 using LibGit2Sharp;
 
 using Microsoft.Win32;
@@ -17,10 +19,13 @@ public partial class MainWindowViewModel : BaseViewModel
 {
     private List<CommitItem> _allCommits = [];
     private FilterWindow? _filterWindow;
+    private readonly OperationsLog _operationsLog = new();
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
     public TimestampEditViewModel TimestampEditVM { get; }
+    public QuickActionsViewModel QuickActionsVM { get; }
+    public UndoBarViewModel UndoBarVM { get; }
 
     public MainWindowViewModel()
     {
@@ -33,6 +38,8 @@ public partial class MainWindowViewModel : BaseViewModel
         TimestampEditVM = new TimestampEditViewModel(
             () => CommitListVM.SelectedCommit,
             () => CurrentCommitDetail.CommitDate);
+        QuickActionsVM = new QuickActionsViewModel();
+        UndoBarVM = new UndoBarViewModel(_operationsLog);
 
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) =>
@@ -232,6 +239,13 @@ public partial class MainWindowViewModel : BaseViewModel
             };
 
             repo.Commit(commit.Message, newAuthor, newCommiter, commitOptions);
+
+            var amendedSha = commit.Id.Sha.Length >= 6 ? commit.Id.Sha[..6] : commit.Id.Sha;
+            _operationsLog.Record(new OperationRecord(
+                $"Amend of {amendedSha}",
+                amendedSha,
+                DateTime.Now,
+                () => Task.CompletedTask));
 
             UpdateElements();
         }
