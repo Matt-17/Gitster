@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:git="clr-namespace:Gitster.Services.Git"
              xmlns:converters="clr-namespace:Gitster.Converters"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:CommitListViewModel}">
@@ -119,8 +120,45 @@
 
         <!-- ── Commit list ─────────────────────────────────────────────── -->
         <ListView Grid.Row="1"
-                  ItemsSource="{Binding Commits}"
+                  ItemsSource="{Binding GroupedCommits}"
                   SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
+
+            <ListView.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.ContainerStyle>
+                        <Style TargetType="GroupItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="GroupItem">
+                                        <StackPanel>
+                                            <Border Background="{StaticResource BackgroundSecondary}"
+                                                    BorderBrush="{StaticResource BorderTertiary}"
+                                                    BorderThickness="0,0,0,0.5"
+                                                    Padding="8,4">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="Medium" FontSize="11"
+                                                               Foreground="{StaticResource TextSecondary}"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Text=" · "
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextTertiary}"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding ItemCount}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource TextTertiary}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ItemsPresenter/>
+                                        </StackPanel>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </GroupStyle.ContainerStyle>
+                </GroupStyle>
+            </ListView.GroupStyle>
 
             <ListView.Resources>
                 <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7"/>
@@ -176,6 +214,38 @@
 
             <ListView.View>
                 <GridView>
+                    <!-- Remote state indicator -->
+                    <GridViewColumn Width="20">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <Ellipse Width="8" Height="8"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill"            Value="{StaticResource TextTertiary}"/>
+                                            <Setter Property="Stroke"          Value="Transparent"/>
+                                            <Setter Property="StrokeThickness" Value="0"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
+                                                    <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RemoteState}" Value="OnRemote">
+                                                    <Setter Property="Fill"            Value="Transparent"/>
+                                                    <Setter Property="Stroke"          Value="{StaticResource TextTertiary}"/>
+                                                    <Setter Property="StrokeThickness" Value="1"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RemoteState}" Value="NotAhead">
+                                                    <Setter Property="Fill" Value="{StaticResource AccentDanger}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
                     <GridViewColumn Header="Message" Width="170"
                                     DisplayMemberBinding="{Binding Message}"/>
                     <GridViewColumn Header="Author"  Width="100"

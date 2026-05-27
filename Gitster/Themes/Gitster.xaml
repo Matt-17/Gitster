@@ -12,9 +12,13 @@
     <SolidColorBrush x:Key="TextTertiary"         Color="#9E9E9E"/>
     <SolidColorBrush x:Key="AccentBlue"           Color="#007ACC"/>
     <SolidColorBrush x:Key="AccentBlueBackground" Color="#CCE4F7"/>
-    <SolidColorBrush x:Key="AccentWarning"        Color="#D97706"/>
-    <SolidColorBrush x:Key="AccentSuccess"        Color="#16A34A"/>
-    <SolidColorBrush x:Key="AccentDanger"         Color="#DC2626"/>
+    <SolidColorBrush x:Key="AccentWarning"           Color="#D97706"/>
+    <SolidColorBrush x:Key="AccentSuccess"           Color="#16A34A"/>
+    <SolidColorBrush x:Key="AccentDanger"            Color="#DC2626"/>
+    <SolidColorBrush x:Key="AccentWarningBackground" Color="#FEF3C7"/>
+    <SolidColorBrush x:Key="AccentDangerBackground"  Color="#FEE2E2"/>
+    <SolidColorBrush x:Key="AccentSuccessBackground" Color="#DCFCE7"/>
+    <SolidColorBrush x:Key="AccentInfoBackground"    Color="#DBEAFE"/>
 
     <!-- ── Spacing ────────────────────────────────────────────────── -->
     <sys:Double  x:Key="PaddingSm">6</sys:Double>

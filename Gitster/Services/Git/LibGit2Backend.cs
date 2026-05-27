@@ -75,6 +75,27 @@ public sealed class LibGit2Backend : IGitBackend
     {
         using var repo = OpenRepository();
 
+        // Determine which SHAs are outgoing (local-only) vs already on the remote
+        var trackingBranch = repo.Head.TrackedBranch;
+        HashSet<string>? localOnlyShas = null;
+        CommitRemoteState defaultState;
+
+        if (trackingBranch?.Tip == null || repo.Head.Tip == null)
+        {
+            defaultState = CommitRemoteState.NoTrackingBranch;
+        }
+        else
+        {
+            defaultState = CommitRemoteState.OnRemote;
+            localOnlyShas = new HashSet<string>(
+                repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+                {
+                    IncludeReachableFrom = repo.Head.Tip,
+                    ExcludeReachableFrom = trackingBranch.Tip,
+                }).Select(c => c.Id.Sha),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
         IEnumerable<Commit> commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
         {
             SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
@@ -100,11 +121,20 @@ public sealed class LibGit2Backend : IGitBackend
         }
 
         var result = commits
-            .Select(c => new CommitInfo(
-                c.Id.Sha[..7],
-                c.MessageShort,
-                c.Author.When.DateTime,
-                c.Author.Name ?? string.Empty))
+            .Select(c =>
+            {
+                var remoteState = localOnlyShas == null
+                    ? defaultState
+                    : localOnlyShas.Contains(c.Id.Sha) ? CommitRemoteState.LocalOnly : CommitRemoteState.OnRemote;
+
+                return new CommitInfo(
+                    c.Id.Sha[..7],
+                    c.MessageShort,
+                    c.Author.When.DateTime,
+                    c.Author.Name ?? string.Empty,
+                    c.Author.Email ?? string.Empty,
+                    remoteState);
+            })
             .ToList();
 
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
@@ -119,7 +149,112 @@ public sealed class LibGit2Backend : IGitBackend
             commit.Id.Sha,
             commit.Message,
             commit.Author.When.DateTime,
-            commit.Author.Name ?? string.Empty));
+            commit.Author.Name ?? string.Empty,
+            commit.Author.Email ?? string.Empty,
+            commit.Committer.Name ?? string.Empty,
+            commit.Committer.Email ?? string.Empty));
+    }
+
+    public Task AmendAuthorAsync(AmendAuthorRequest request)
+    {
+        using var repo = OpenRepository();
+
+        var commit = repo.Head.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+
+        var newAuthor = new Signature(
+            request.AuthorName    ?? commit.Author.Name,
+            request.AuthorEmail   ?? commit.Author.Email,
+            commit.Author.When);
+
+        var newCommitter = new Signature(
+            request.CommitterName  ?? commit.Committer.Name,
+            request.CommitterEmail ?? commit.Committer.Email,
+            DateTimeOffset.Now);
+
+        repo.Commit(commit.Message, newAuthor, newCommitter, new CommitOptions { AmendPreviousCommit = true });
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites)
+    {
+        using var repo = OpenRepository();
+
+        // Collect all commits oldest-first for deterministic parent mapping
+        var allCommits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+        {
+            SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+            IncludeReachableFrom = repo.Head,
+        }).ToList();
+        allCommits.Reverse(); // oldest-first
+
+        // Resolve short SHAs from rewrites to full SHAs
+        var rewriteByFullSha = new Dictionary<string, CommitRewrite>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in rewrites)
+        {
+            var match = allCommits.FirstOrDefault(c =>
+                c.Id.Sha.Equals(r.Sha, StringComparison.OrdinalIgnoreCase) ||
+                c.Id.Sha.StartsWith(r.Sha, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+                rewriteByFullSha[match.Id.Sha] = r;
+        }
+
+        if (rewriteByFullSha.Count == 0)
+        {
+            HeadChanged?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        }
+
+        var mapping = new Dictionary<string, Commit>(StringComparer.OrdinalIgnoreCase);
+        bool anyChanged = false;
+
+        foreach (var oldCommit in allCommits)
+        {
+            rewriteByFullSha.TryGetValue(oldCommit.Id.Sha, out var rewrite);
+
+            var oldParents = oldCommit.Parents.ToList();
+            var newParents = oldParents
+                .Select(p => mapping.TryGetValue(p.Id.Sha, out var mapped) ? mapped : p)
+                .ToList();
+
+            bool parentsChanged = newParents.Zip(oldParents, (n, o) => n.Id != o.Id).Any(x => x);
+
+            if (rewrite == null && !parentsChanged)
+            {
+                mapping[oldCommit.Id.Sha] = oldCommit;
+                continue;
+            }
+
+            anyChanged = true;
+
+            var newAuthor = new Signature(
+                rewrite?.NewAuthorName    ?? oldCommit.Author.Name,
+                rewrite?.NewAuthorEmail   ?? oldCommit.Author.Email,
+                rewrite?.NewAuthorDate    ?? oldCommit.Author.When);
+
+            var newCommitter = new Signature(
+                rewrite?.NewCommitterName  ?? oldCommit.Committer.Name,
+                rewrite?.NewCommitterEmail ?? oldCommit.Committer.Email,
+                rewrite?.NewCommitterDate  ?? oldCommit.Committer.When);
+
+            var newCommit = repo.ObjectDatabase.CreateCommit(
+                newAuthor, newCommitter,
+                rewrite?.NewMessage ?? oldCommit.Message,
+                oldCommit.Tree,
+                newParents,
+                prettifyMessage: false);
+
+            mapping[oldCommit.Id.Sha] = newCommit;
+        }
+
+        if (anyChanged && repo.Head.Tip != null &&
+            mapping.TryGetValue(repo.Head.Tip.Id.Sha, out var newHead))
+        {
+            repo.Refs.UpdateTarget(repo.Head.Reference, newHead.Id);
+        }
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
     }
 
     public Task<string> AmendAsync(AmendRequest request)

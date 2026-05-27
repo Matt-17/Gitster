@@ -50,6 +50,8 @@
                 <Separator/>
                 <MenuItem Header="Operations log..."     Command="{Binding OpenOperationsLogCommand}"/>
                 <MenuItem Header="Repository settings..." Command="{Binding OpenRepoSettingsCommand}"/>
+                <Separator/>
+                <MenuItem Header="Repair author..."       Command="{Binding OpenAuthorRepairCommand}"/>
             </MenuItem>
 
             <MenuItem Header="_Edit">
@@ -102,6 +104,8 @@
                 <controls:CommitContextCard DataContext="{Binding CommitListVM}"/>
 
                 <controls:TimestampEditPanel DataContext="{Binding TimestampEditVM}" Margin="0,8,0,0"/>
+
+                <controls:AuthorPanel DataContext="{Binding AuthorPanelVM}" Margin="0,8,0,0"/>
 
                 <controls:QuickActionsPanel DataContext="{Binding QuickActionsVM}" Margin="0,8,0,0"/>
 
