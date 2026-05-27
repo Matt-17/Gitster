@@ -161,9 +161,9 @@
             </ListView.GroupStyle>
 
             <ListView.Resources>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F1F1F"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE4F7"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"                Color="#007ACC"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}"            Color="White"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}"     Color="#CCE4F7"/>
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1F1F1F"/>
             </ListView.Resources>
 
@@ -193,7 +193,8 @@
                                     </Trigger>
                                     <Trigger Property="IsSelected" Value="True">
                                         <Setter TargetName="Bd" Property="Background"
-                                                Value="{StaticResource AccentBlueBackground}"/>
+                                                Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="White"/>
                                     </Trigger>
                                     <MultiTrigger>
                                         <MultiTrigger.Conditions>
@@ -202,7 +203,8 @@
                                         </MultiTrigger.Conditions>
                                         <MultiTrigger.Setters>
                                             <Setter TargetName="Bd" Property="Background"
-                                                    Value="{StaticResource AccentBlueBackground}"/>
+                                                    Value="{StaticResource AccentBlue}"/>
+                                            <Setter Property="Foreground" Value="White"/>
                                         </MultiTrigger.Setters>
                                     </MultiTrigger>
                                 </ControlTemplate.Triggers>
@@ -214,34 +216,55 @@
 
             <ListView.View>
                 <GridView>
-                    <!-- Remote state indicator -->
-                    <GridViewColumn Width="20">
+                    <!-- Branch graph spine + remote state indicator -->
+                    <GridViewColumn Width="24">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <Ellipse Width="8" Height="8"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Center">
-                                    <Ellipse.Style>
-                                        <Style TargetType="Ellipse">
-                                            <Setter Property="Fill"            Value="{StaticResource TextTertiary}"/>
-                                            <Setter Property="Stroke"          Value="Transparent"/>
-                                            <Setter Property="StrokeThickness" Value="0"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
-                                                    <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding RemoteState}" Value="OnRemote">
-                                                    <Setter Property="Fill"            Value="Transparent"/>
-                                                    <Setter Property="Stroke"          Value="{StaticResource TextTertiary}"/>
-                                                    <Setter Property="StrokeThickness" Value="1"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding RemoteState}" Value="NotAhead">
-                                                    <Setter Property="Fill" Value="{StaticResource AccentDanger}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Ellipse.Style>
-                                </Ellipse>
+                                <Grid Width="24">
+                                    <!-- Spine line -->
+                                    <Rectangle Width="1.5"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Stretch">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Setter Property="Fill" Value="{StaticResource TextTertiary}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="NoTrackingBranch">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                    <!-- Circle indicator (remote state) -->
+                                    <Ellipse Width="8" Height="8"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill"            Value="{StaticResource TextTertiary}"/>
+                                                <Setter Property="Stroke"          Value="Transparent"/>
+                                                <Setter Property="StrokeThickness" Value="0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="OnRemote">
+                                                        <Setter Property="Fill"            Value="{StaticResource BackgroundPrimary}"/>
+                                                        <Setter Property="Stroke"          Value="{StaticResource TextTertiary}"/>
+                                                        <Setter Property="StrokeThickness" Value="1"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="NotAhead">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentDanger}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                </Grid>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>

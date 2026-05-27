@@ -393,6 +393,19 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.CompletedTask;
     }
 
+    public Task<Dictionary<string, string>> GetAllRefsAsync()
+    {
+        using var repo = OpenRepository();
+        var refs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in repo.Refs)
+        {
+            var target = r.TargetIdentifier;
+            if (target != null)
+                refs[r.CanonicalName] = target;
+        }
+        return Task.FromResult(refs);
+    }
+
     private Repository OpenRepository()
     {
         if (string.IsNullOrWhiteSpace(RepositoryPath))

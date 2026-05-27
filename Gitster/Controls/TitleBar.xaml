@@ -7,9 +7,8 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:TitleBarViewModel}">
 
-    <Border Background="{StaticResource BackgroundPrimary}"
-            BorderBrush="{StaticResource BorderTertiary}"
-            BorderThickness="0,0,0,1">
+    <Border Background="{StaticResource AccentBlue}"
+            BorderThickness="0">
 
         <Grid Height="42">
             <Grid.ColumnDefinitions>
@@ -25,14 +24,14 @@
                            VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBlock Text="{Binding RepositoryName}"
                            FontWeight="Medium"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="White"
                            VerticalAlignment="Center"/>
                 <TextBlock Text=" · "
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="#80FFFFFF"
                            VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding CurrentBranch}"
                            FontFamily="{StaticResource FontFamilyMono}"
-                           Foreground="{StaticResource TextSecondary}"
+                           Foreground="#CCFFFFFF"
                            VerticalAlignment="Center"/>
             </StackPanel>
 
@@ -45,7 +44,7 @@
                     <TextBlock Text="↓" FontSize="13" VerticalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Setter Property="Foreground" Value="#99FFFFFF"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasIncoming}" Value="True">
                                         <Setter Property="Foreground" Value="{StaticResource AccentSuccess}"/>
@@ -58,7 +57,7 @@
                                Margin="2,0,0,0" VerticalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Setter Property="Foreground" Value="#99FFFFFF"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasIncoming}" Value="True">
                                         <Setter Property="Foreground" Value="{StaticResource AccentSuccess}"/>
@@ -75,7 +74,7 @@
                     <TextBlock Text="↑" FontSize="13" VerticalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Setter Property="Foreground" Value="#99FFFFFF"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasOutgoing}" Value="True">
                                         <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
@@ -88,7 +87,7 @@
                                Margin="2,0,0,0" VerticalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Setter Property="Foreground" Value="#99FFFFFF"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasOutgoing}" Value="True">
                                         <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
@@ -107,7 +106,7 @@
                               Margin="0,0,8,0">
                     <Grid>
                         <Path Stretch="Uniform" Width="14" Height="14"
-                              Stroke="{DynamicResource TextSecondary}" StrokeThickness="1.5"
+                              Stroke="White" StrokeThickness="1.5"
                               Fill="Transparent"
                               Data="M3,10 a7,7 0 0,1 14,0 M17,10 L14,7 M17,10 L20,7 M17,10 a7,7 0 0,1 -14,0 M3,10 L6,13 M3,10 L0,13"/>
                         <Ellipse Width="5" Height="5" Fill="{DynamicResource AccentSuccess}"
@@ -119,6 +118,8 @@
 
                 <Button Content="Switch repo"
                         Command="{Binding BrowseFolderCommand}"
+                        Foreground="White"
+                        BorderBrush="#50FFFFFF"
                         Style="{StaticResource GhostButton}"/>
             </StackPanel>
         </Grid>
