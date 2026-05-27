@@ -51,7 +51,8 @@
                 <MenuItem Header="Operations log..."     Command="{Binding OpenOperationsLogCommand}"/>
                 <MenuItem Header="Repository settings..." Command="{Binding OpenRepoSettingsCommand}"/>
                 <Separator/>
-                <MenuItem Header="Repair author..."       Command="{Binding OpenAuthorRepairCommand}"/>
+                <MenuItem Header="Repair author..."           Command="{Binding OpenAuthorRepairCommand}"/>
+                <MenuItem Header="Rewrite timestamps..."      Command="{Binding OpenRewriteTimestampsCommand}"/>
             </MenuItem>
 
             <MenuItem Header="_Edit">

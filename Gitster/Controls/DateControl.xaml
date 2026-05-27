@@ -45,8 +45,6 @@
     <StackPanel x:Name="LayoutRoot" Orientation="Horizontal">
         <Border x:Name="InputFrame"
                 Height="30"
-                BorderThickness="0.5"
-                BorderBrush="{DynamicResource BorderTertiary}"
                 Background="{DynamicResource BackgroundPrimary}"
                 Padding="8,0"
                 CornerRadius="4"
@@ -54,9 +52,11 @@
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
+                    <Setter Property="BorderThickness" Value="0.5"/>
                     <Style.Triggers>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter Property="BorderBrush" Value="{DynamicResource BorderSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                            <Setter Property="BorderThickness" Value="1.5"/>
                         </Trigger>
                         <DataTrigger Binding="{Binding ElementName=TbDate, Path=(Validation.HasError)}" Value="True">
                             <Setter Property="BorderBrush" Value="{DynamicResource AccentDanger}"/>

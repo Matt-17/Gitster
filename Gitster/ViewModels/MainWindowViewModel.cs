@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedbackService;
     private readonly RecentReposService _recentRepos;
     private readonly AuthorDirectoryService _authorDirService;
+    private readonly SnapshotService _snapshotService = new();
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -333,6 +334,45 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
+    private async Task OpenRewriteTimestamps()
+    {
+        if (_allCommits.Count == 0) return;
+
+        try
+        {
+            var beforeSha = await _gitBackend.GetHeadShaAsync();
+            var vm = new RangeTimestampViewModel(_gitBackend, _allCommits.ToList());
+            var window = new Views.RangeTimestampDialog(vm) { Owner = Application.Current.MainWindow };
+
+            if (window.ShowDialog() == true)
+            {
+                var afterSha = await _gitBackend.GetHeadShaAsync();
+                var branchName = TitleBarVM.CurrentBranch;
+                var n = vm.Preview.Count;
+                var shortBefore = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
+                var shortAfter  = afterSha.Length  >= 7 ? afterSha[..7]  : afterSha;
+
+                await _opsLogService.RecordAsync(new OperationRecord(
+                    Id: Guid.NewGuid().ToString(),
+                    Timestamp: DateTimeOffset.Now,
+                    Kind: OperationKind.RangeRewrite,
+                    Description: $"Rewrite timestamps ({n} commit{(n == 1 ? "" : "s")})",
+                    BranchName: branchName,
+                    BeforeSha: shortBefore,
+                    AfterSha: shortAfter,
+                    ReflogSelector: null,
+                    Status: OperationStatus.Active));
+
+                _ = _snapshotService.CaptureAsync(_gitBackend, "Range timestamp rewrite");
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error rewriting timestamps: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
     private void OpenDocs() { }
 
     [RelayCommand]
@@ -376,6 +416,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 AfterSha: shortAfter,
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
+
+            _ = _snapshotService.CaptureAsync(_gitBackend, "Amend");
 
             await UpdateElementsAsync();
         }
@@ -743,6 +785,7 @@ public partial class MainWindowViewModel : BaseViewModel
             await _gitBackend.OpenAsync(Path);
             _ = _stateService.AttachAsync(Path);
             _ = _opsLogService.AttachAsync(Path);
+            _ = _snapshotService.AttachAsync(Path);
         }
         catch
         {

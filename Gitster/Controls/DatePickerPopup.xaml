@@ -329,7 +329,7 @@
                                 <controls:SelectableTextBlock
                                     Text="{Binding}"
                                     MouseDown="HourTextMouseDown"
-                                    Width="32"
+                                    Width="24"
                                     Height="24"
                                     Value="{Binding DataContext.Hour, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
                             </DataTemplate>

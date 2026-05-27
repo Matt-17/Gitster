@@ -59,6 +59,24 @@ public partial class RepositorySettingsViewModel : BaseViewModel
             "Automatically set upstream when pushing a new branch for the first time.",
             r => r.Config.Get<bool>("push.autoSetupRemote")?.Value == true,
             r => r.Config.Set("push.autoSetupRemote", true));
+
+        AddCheck(repoPath,
+            "branch.sort = -committerdate",
+            "Show recently-used branches at the top in branch listings.",
+            r => r.Config.Get<string>("branch.sort")?.Value == "-committerdate",
+            r => r.Config.Set("branch.sort", "-committerdate"));
+
+        AddCheck(repoPath,
+            "init.defaultBranch = main",
+            "New repositories start on 'main' instead of 'master'.",
+            r => r.Config.Get<string>("init.defaultBranch")?.Value == "main",
+            r => r.Config.Set("init.defaultBranch", "main"));
+
+        AddCheck(repoPath,
+            "pull.rebase = true",
+            "Rebase instead of merge when pulling — keeps history linear. Only enable if you understand rebasing.",
+            r => r.Config.Get<bool>("pull.rebase")?.Value == true,
+            r => r.Config.Set("pull.rebase", true));
     }
 
     private void AddCheck(string repoPath, string title, string description,

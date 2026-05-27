@@ -30,5 +30,7 @@ public interface IGitBackend
     Task<bool> CommitExistsAsync(string sha);
     Task CherryPickAsync(string sha);
 
+    Task<Dictionary<string, string>> GetAllRefsAsync();
+
     GitCapabilities Capabilities { get; }
 }
