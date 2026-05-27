@@ -22,6 +22,8 @@
     <sys:Double  x:Key="PaddingLg">14</sys:Double>
     <sys:Double  x:Key="RadiusMd">8</sys:Double>
     <sys:Double  x:Key="RadiusLg">12</sys:Double>
+    <CornerRadius x:Key="CornerRadiusMd">8</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusLg">12</CornerRadius>
 
     <Thickness x:Key="PaddingSmThickness">6</Thickness>
     <Thickness x:Key="PaddingMdThickness">10</Thickness>

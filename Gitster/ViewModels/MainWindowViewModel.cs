@@ -18,11 +18,14 @@ public partial class MainWindowViewModel : BaseViewModel
     private List<CommitItem> _allCommits = [];
     private FilterWindow? _filterWindow;
 
+    public TitleBarViewModel TitleBarVM { get; }
+
     public MainWindowViewModel()
     {
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
         StatusBar = new StatusBarViewModel();
+        TitleBarVM = new TitleBarViewModel(BrowseFolder);
 
         // Subscribe to filter changes
         Filter.PropertyChanged += (s, e) =>
@@ -560,6 +563,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
             // Clear status bar
             StatusBar.Clear();
+            TitleBarVM.Clear();
         }
     }
 
@@ -601,11 +605,13 @@ public partial class MainWindowViewModel : BaseViewModel
 
             // Update status bar with all values at once
             StatusBar.UpdateStatus(branch, repoName, incoming, outgoing);
+            TitleBarVM.UpdateStatus(branch, repoName, incoming, outgoing);
         }
         catch (Exception)
         {
             // If there's an error, just clear the status bar
             StatusBar.Clear();
+            TitleBarVM.Clear();
         }
     }
 }

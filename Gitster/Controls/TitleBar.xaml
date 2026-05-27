@@ -1,0 +1,109 @@
+<UserControl x:Class="Gitster.Controls.TitleBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:TitleBarViewModel}">
+
+    <Border Background="{StaticResource BackgroundPrimary}"
+            BorderBrush="{StaticResource BorderTertiary}"
+            BorderThickness="0,0,0,1">
+
+        <Grid Height="42">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: folder icon · repo name · branch -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                        VerticalAlignment="Center" Margin="12,0,0,0">
+                <TextBlock Text="📂" FontSize="14"
+                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="{Binding RepositoryName}"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource TextPrimary}"
+                           VerticalAlignment="Center"/>
+                <TextBlock Text=" · "
+                           Foreground="{StaticResource TextTertiary}"
+                           VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding CurrentBranch}"
+                           FontFamily="{StaticResource FontFamilyMono}"
+                           Foreground="{StaticResource TextSecondary}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Right: ↓ incoming  ↑ outgoing  [Repo wechseln] -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                        VerticalAlignment="Center" Margin="0,0,12,0">
+
+                <!-- ↓ Incoming -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                    <TextBlock Text="↓" FontSize="13" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasIncoming}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource AccentSuccess}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding IncomingCount}"
+                               Margin="2,0,0,0" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasIncoming}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource AccentSuccess}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- ↑ Outgoing -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                    <TextBlock Text="↑" FontSize="13" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasOutgoing}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding OutgoingCount}"
+                               Margin="2,0,0,0" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasOutgoing}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+
+                <Button Content="Repo wechseln"
+                        Command="{Binding BrowseFolderCommand}"
+                        Style="{StaticResource GhostButton}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

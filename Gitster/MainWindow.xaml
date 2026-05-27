@@ -9,7 +9,9 @@
        mc:Ignorable="d"          
        ResizeMode="CanResizeWithGrip"
        Title="Gitster" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
-    <Grid>
+    <DockPanel>
+        <controls:TitleBar DockPanel.Dock="Top" DataContext="{Binding TitleBarVM}"/>
+        <Grid>
         <Grid.Resources>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <Style TargetType="TextBox">
@@ -243,5 +245,6 @@
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
-    </Grid>
+        </Grid>
+    </DockPanel>
 </Window>
