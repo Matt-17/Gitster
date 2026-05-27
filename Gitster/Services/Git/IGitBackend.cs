@@ -7,6 +7,8 @@ public interface IGitBackend
     string? RepositoryPath { get; }
     Task OpenAsync(string path);
 
+    event EventHandler? HeadChanged;
+
     Task<WorkingTreeState> GetWorkingTreeStateAsync();
     Task<BranchInfo> GetCurrentBranchAsync();
 
@@ -23,6 +25,8 @@ public interface IGitBackend
     Task<string> GetHeadShaAsync();
     Task<string> ResolveRefAsync(string refSpec);
     Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string fromSha, string toSha);
+    Task<bool> CommitExistsAsync(string sha);
+    Task CherryPickAsync(string sha);
 
     GitCapabilities Capabilities { get; }
 }

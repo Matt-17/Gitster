@@ -36,7 +36,7 @@
 
         <!-- Description -->
         <TextBlock Grid.Row="2"
-                   Text="The following commits were made after the operation you are undoing and will be permanently discarded:"
+                   Text="The following commits were made after the operation you are undoing. Choose what to do with them:"
                    Foreground="{DynamicResource TextSecondary}"
                    FontSize="12" TextWrapping="Wrap"/>
 
@@ -75,12 +75,17 @@
                     Style="{StaticResource GhostButton}"
                     Padding="16,6" Margin="0,0,8,0"
                     Click="CancelButton_Click"/>
-            <Button x:Name="UndoButton"
-                    Content="Undo anyway"
+            <Button x:Name="ReplayButton"
+                    Content="Replay on top"
+                    Style="{StaticResource GhostButton}"
+                    Padding="16,6" Margin="0,0,8,0"
+                    Click="ReplayButton_Click"/>
+            <Button x:Name="DiscardButton"
+                    Content="Discard commits"
                     IsDefault="True"
                     Style="{StaticResource PrimaryButton}"
                     Padding="16,6"
-                    Click="UndoButton_Click"/>
+                    Click="DiscardButton_Click"/>
         </StackPanel>
     </Grid>
 </Window>

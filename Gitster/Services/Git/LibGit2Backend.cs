@@ -8,6 +8,8 @@ public sealed class LibGit2Backend : IGitBackend
 {
     public string? RepositoryPath { get; private set; }
 
+    public event EventHandler? HeadChanged;
+
     public GitCapabilities Capabilities =>
         GitCapabilities.Read | GitCapabilities.BasicWrite | GitCapabilities.ReflogUndo;
 
@@ -73,7 +75,11 @@ public sealed class LibGit2Backend : IGitBackend
     {
         using var repo = OpenRepository();
 
-        IEnumerable<Commit> commits = repo.Commits;
+        IEnumerable<Commit> commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+        {
+            SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+            IncludeReachableFrom = repo.Head,
+        });
 
         if (filter != null)
         {
@@ -194,6 +200,7 @@ public sealed class LibGit2Backend : IGitBackend
             ?? throw new InvalidOperationException($"Target reference not found: {targetReference}");
 
         repo.Reset(ResetMode.Hard, commit);
+        HeadChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
     }
 
@@ -230,6 +237,25 @@ public sealed class LibGit2Backend : IGitBackend
                 c.Author.Name ?? string.Empty))
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
+    }
+
+    public Task<bool> CommitExistsAsync(string sha)
+    {
+        using var repo = OpenRepository();
+        return Task.FromResult(repo.Lookup<Commit>(sha) != null);
+    }
+
+    public Task CherryPickAsync(string sha)
+    {
+        using var repo = OpenRepository();
+        var commit = repo.Lookup<Commit>(sha)
+            ?? throw new InvalidOperationException($"Commit not found: {sha}");
+        var sig = repo.Config.BuildSignature(DateTimeOffset.Now)
+            ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+        var result = repo.CherryPick(commit, sig);
+        if (result.Status == CherryPickStatus.Conflicts)
+            throw new InvalidOperationException($"Cherry-pick produced conflicts on {sha[..Math.Min(7, sha.Length)]}");
+        return Task.CompletedTask;
     }
 
     private Repository OpenRepository()
