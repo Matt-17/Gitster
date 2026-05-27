@@ -74,7 +74,7 @@
 
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="before"
-                               Foreground="{StaticResource TextSecondary}"
+                               Foreground="{StaticResource TextTertiary}"
                                FontSize="11"
                                Margin="0,0,10,3"/>
                     <TextBlock Grid.Row="0" Grid.Column="1"
@@ -85,7 +85,7 @@
 
                     <TextBlock Grid.Row="1" Grid.Column="0"
                                Text="after"
-                               Foreground="{StaticResource TextSecondary}"
+                               Foreground="{StaticResource TextTertiary}"
                                FontSize="11"
                                Margin="0,0,10,0"/>
                     <TextBlock Grid.Row="1" Grid.Column="1"

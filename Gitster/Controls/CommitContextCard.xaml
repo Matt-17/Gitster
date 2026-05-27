@@ -12,10 +12,14 @@
 
             <!-- Header -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <TextBlock Text="🎯" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <Path Width="12" Height="12" Stretch="Uniform"
+                      Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
+                      Fill="Transparent"
+                      Data="M10,10 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 M10,10 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"
+                      VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBlock Text="Selected Commit"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource TextPrimary}"
+                           FontSize="11"
+                           Foreground="{StaticResource TextSecondary}"
                            VerticalAlignment="Center"/>
             </StackPanel>
 
@@ -26,6 +30,7 @@
                     <Style TargetType="TextBlock">
                         <Setter Property="Text"       Value="{Binding SelectedCommit.Message}"/>
                         <Setter Property="FontWeight"  Value="Medium"/>
+                        <Setter Property="FontSize"    Value="13"/>
                         <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding SelectedCommit}" Value="{x:Null}">
