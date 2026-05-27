@@ -11,6 +11,7 @@
        Title="Gitster" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
     <DockPanel>
         <controls:TitleBar DockPanel.Dock="Top" DataContext="{Binding TitleBarVM}"/>
+        <controls:UndoBar DockPanel.Dock="Top" DataContext="{Binding UndoBarVM}"/>
         <Grid>
         <Grid.Resources>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -60,6 +61,8 @@
                 <controls:CommitContextCard DataContext="{Binding CommitListVM}"/>
 
                 <controls:TimestampEditPanel DataContext="{Binding TimestampEditVM}" Margin="0,8,0,0"/>
+
+                <controls:QuickActionsPanel DataContext="{Binding QuickActionsVM}" Margin="0,8,0,0"/>
 
             </StackPanel>
         </Grid>
