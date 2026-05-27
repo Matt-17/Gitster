@@ -1,16 +1,27 @@
-using System.Collections.Generic;
+using System.Windows;
 
-using Gitster.Models;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Gitster.ViewModels;
 
-public class QuickActionsViewModel : BaseViewModel
+public partial class QuickActionsViewModel : BaseViewModel
 {
-    public IReadOnlyList<QuickAction> Actions { get; } =
-    [
-        new QuickAction("✏",  "Reword",       false),
-        new QuickAction("🍒", "Cherry-pick",  false),
-        new QuickAction("👤", "Author",       false),
-        new QuickAction("📌", "Fixup",        false),
-    ];
+    // Reword and Fixup require Git CLI (FixupAutosquash capability).
+    // Capability.Requires="FixupAutosquash" on the buttons handles enable/disable.
+    [RelayCommand]
+    private void Reword() =>
+        MessageBox.Show("Reword will be available in Phase 2.", "Coming soon", MessageBoxButton.OK, MessageBoxImage.Information);
+
+    [RelayCommand]
+    private void Fixup() =>
+        MessageBox.Show("Fixup will be available in Phase 2.", "Coming soon", MessageBoxButton.OK, MessageBoxImage.Information);
+
+    // Cherry-pick and ChangeAuthor work via LibGit2Sharp but are not yet implemented.
+    [RelayCommand(CanExecute = nameof(CanCherryPick))]
+    private void CherryPick() { }
+    private static bool CanCherryPick() => false;
+
+    [RelayCommand(CanExecute = nameof(CanChangeAuthor))]
+    private void ChangeAuthor() { }
+    private static bool CanChangeAuthor() => false;
 }

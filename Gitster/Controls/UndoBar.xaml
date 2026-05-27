@@ -26,9 +26,7 @@
                         Padding="10,2"
                         Margin="0,0,4,0"/>
                 <Button Content="Log"
-                        IsEnabled="False"
-                        ToolTip="Coming in Phase 1"
-                        ToolTipService.ShowOnDisabled="True"
+                        Command="{Binding OpenLogCommand}"
                         Style="{StaticResource GhostButton}"
                         Height="26"
                         Padding="10,2"/>

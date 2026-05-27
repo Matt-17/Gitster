@@ -20,6 +20,9 @@ public interface IGitBackend
 
     Task<string> GetReflogSelectorForHeadAsync();
     Task ResetHardAsync(string targetReference);
+    Task<string> GetHeadShaAsync();
+    Task<string> ResolveRefAsync(string refSpec);
+    Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string fromSha, string toSha);
 
     GitCapabilities Capabilities { get; }
 }
