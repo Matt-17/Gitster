@@ -4,8 +4,17 @@
              xmlns:local="clr-namespace:Gitster"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <SolidColorBrush x:Key="HoverBrush" Color="#E0E0E0" />
-        <SolidColorBrush x:Key="AccentMainBrush" Color="#007ACC" />
-        <SolidColorBrush x:Key="AccentMainLightestBrush" Color="#CCE4F7" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Gitster.xaml"/>
+                <ResourceDictionary Source="Themes/Buttons.xaml"/>
+                <ResourceDictionary Source="Themes/Cards.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Legacy aliases kept for existing bindings -->
+            <SolidColorBrush x:Key="HoverBrush"               Color="#E0E0E0"/>
+            <SolidColorBrush x:Key="AccentMainBrush"           Color="#007ACC"/>
+            <SolidColorBrush x:Key="AccentMainLightestBrush"   Color="#CCE4F7"/>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
