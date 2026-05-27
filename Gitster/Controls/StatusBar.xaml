@@ -1,0 +1,61 @@
+<UserControl x:Class="Gitster.Controls.StatusBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Gitster.Controls"
+             Height="26">
+    <Border Background="{DynamicResource BackgroundSecondary}"
+            BorderBrush="{DynamicResource BorderTertiary}"
+            BorderThickness="0,0.5,0,0">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0">
+                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{Binding StateIndicatorBrush}"/>
+                <TextBlock Text="{Binding StateText}" Margin="6,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"/>
+            </StackPanel>
+
+            <Grid Grid.Column="1" HorizontalAlignment="Center"
+                  Visibility="{Binding HasFeedback, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <controls:RingSpinner Width="12" Height="12"
+                                          Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <TextBlock Text="{Binding FeedbackIcon}"
+                               FontSize="11"
+                               Foreground="{Binding FeedbackBrush}"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding IsRunning, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
+                    <TextBlock Text="{Binding FeedbackText}" Margin="6,0,0,0"
+                               FontSize="12"
+                               Foreground="{Binding FeedbackBrush}"
+                               VerticalAlignment="Center"/>
+                    <Button Margin="6,0,0,0" Padding="2"
+                            Background="Transparent" BorderThickness="0"
+                            Width="16" Height="16"
+                            Command="{Binding DismissFeedbackCommand}"
+                            Visibility="{Binding IsFailure, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            ToolTip="Dismiss">
+                        <Path Stretch="Uniform" Width="8" Height="8"
+                              Stroke="{DynamicResource TextSecondary}" StrokeThickness="1.5"
+                              Data="M2,2 L10,10 M10,2 L2,10"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Column="2" Text="{Binding RepositoryPathDisplay}"
+                       FontFamily="{DynamicResource FontFamilyMono}"
+                       FontSize="11"
+                       Foreground="{DynamicResource TextTertiary}"
+                       VerticalAlignment="Center"
+                       Margin="10,0"
+                       ToolTip="{Binding RepositoryPath}"/>
+        </Grid>
+    </Border>
+</UserControl>

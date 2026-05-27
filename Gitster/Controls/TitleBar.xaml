@@ -100,6 +100,23 @@
                     </TextBlock>
                 </StackPanel>
 
+                <ToggleButton IsChecked="{Binding AutoFetchEnabled}"
+                              Width="28" Height="28"
+                              Background="Transparent" BorderThickness="0"
+                              ToolTip="{Binding AutoFetchTooltip}"
+                              Margin="0,0,8,0">
+                    <Grid>
+                        <Path Stretch="Uniform" Width="14" Height="14"
+                              Stroke="{DynamicResource TextSecondary}" StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="M3,10 a7,7 0 0,1 14,0 M17,10 L14,7 M17,10 L20,7 M17,10 a7,7 0 0,1 -14,0 M3,10 L6,13 M3,10 L0,13"/>
+                        <Ellipse Width="5" Height="5" Fill="{DynamicResource AccentSuccess}"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top"
+                                 Margin="0,2,2,0"
+                                 Visibility="{Binding AutoFetchEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </Grid>
+                </ToggleButton>
+
                 <Button Content="Switch repo"
                         Command="{Binding BrowseFolderCommand}"
                         Style="{StaticResource GhostButton}"/>
