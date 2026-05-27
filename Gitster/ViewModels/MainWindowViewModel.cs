@@ -32,6 +32,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
     private readonly RecentReposService _recentRepos;
+    private readonly AuthorDirectoryService _authorDirService;
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -40,6 +41,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public UndoBarViewModel UndoBarVM { get; }
     public StatusBarViewModel StatusBarVM { get; }
     public AutoFetchService AutoFetch { get; }
+    public AuthorPanelViewModel AuthorPanelVM { get; }
 
     public MainWindowViewModel()
     {
@@ -47,6 +49,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _stateService = new RepositoryStateService(_gitBackend);
         _feedbackService = new OperationFeedbackService();
         _recentRepos = new RecentReposService();
+        _authorDirService = new AuthorDirectoryService(_gitBackend);
         AutoFetch = new AutoFetchService(_gitBackend);
 
         var capabilityService = new CapabilityService(_gitBackend);
@@ -68,6 +71,7 @@ public partial class MainWindowViewModel : BaseViewModel
             () => CurrentCommitDetail.CommitDate);
         QuickActionsVM = new QuickActionsViewModel();
         UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
+        AuthorPanelVM = new AuthorPanelViewModel(_gitBackend, _authorDirService);
 
         // A.3 — refresh commit list after any backend HEAD mutation (e.g. Undo via ResetHard)
         _gitBackend.HeadChanged += (_, _) =>
@@ -138,6 +142,9 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public CommitFilter Filter { get; } = new();
 
+    /// <summary>True when the selected commit is already on the remote — amending it requires a force-push.</summary>
+    public bool IsAmendUnsafe => SelectedCommit?.RemoteState == Gitster.Services.Git.CommitRemoteState.OnRemote;
+
     partial void OnFolderPathChanged(string value)
     {
         Path = value;
@@ -152,6 +159,9 @@ public partial class MainWindowViewModel : BaseViewModel
             SelectedCommitDetail.UpdateCommit(value.Message, value.Date);
         else
             SelectedCommitDetail.Clear();
+
+        OnPropertyChanged(nameof(IsAmendUnsafe));
+        _ = AuthorPanelVM.LoadFromCommitAsync(value);
     }
 
     private void OnCommitListVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -311,6 +321,14 @@ public partial class MainWindowViewModel : BaseViewModel
         if (string.IsNullOrWhiteSpace(Path)) return;
         var vm = new RepositorySettingsViewModel(Path);
         var window = new RepositorySettingsWindow(vm) { Owner = Application.Current.MainWindow };
+        window.ShowDialog();
+    }
+
+    [RelayCommand]
+    private void OpenAuthorRepair()
+    {
+        var vm = new AuthorRepairViewModel(_gitBackend, _authorDirService.Authors);
+        var window = new Views.AuthorRepairDialog(vm) { Owner = Application.Current.MainWindow };
         window.ShowDialog();
     }
 
@@ -607,29 +625,22 @@ public partial class MainWindowViewModel : BaseViewModel
 
             IsGoButtonEnabled = true;
 
-            // Update commit list — A.7: topological order
+            // Update commit list using backend (includes RemoteState computation)
             _allCommits.Clear();
-            var topoCommits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            var commitInfos = await _gitBackend.GetCommitsAsync();
+            foreach (var c in commitInfos)
             {
-                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
-                IncludeReachableFrom = repo.Head,
-            });
-            foreach (var c in topoCommits)
-            {
-                if (c.Author == null)
-                {
-                    continue;
-                }
-
-                var commitId = c.Id.Sha.Length >= 7 ? c.Id.Sha.Substring(0, 7) : c.Id.Sha;
-                var commitItem = new CommitItem(
-                    c.MessageShort,
-                    c.Author.When.DateTime,
-                    commitId,
-                    c.Author.Name ?? string.Empty
-                );
-                _allCommits.Add(commitItem);
+                _allCommits.Add(new CommitItem(
+                    c.Message,
+                    c.Date,
+                    c.Sha,
+                    c.AuthorName,
+                    c.AuthorEmail,
+                    c.RemoteState));
             }
+
+            // Refresh author directory from loaded commits
+            _ = _authorDirService.RefreshAsync();
 
             // Apply filters if any are active, otherwise show all commits
             if (Filter.HasActiveFilters())

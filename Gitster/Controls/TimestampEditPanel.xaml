@@ -97,15 +97,43 @@
                 </Grid>
             </Border>
 
+            <!-- Safety warning (shown when selected commit is already on remote) -->
+            <Border Visibility="{Binding DataContext.IsAmendUnsafe,
+                                         RelativeSource={RelativeSource AncestorType=Window},
+                                         Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Background="{StaticResource AccentWarningBackground}"
+                    BorderBrush="{StaticResource AccentWarning}"
+                    BorderThickness="0.5"
+                    CornerRadius="{StaticResource CornerRadiusMd}"
+                    Padding="10,7"
+                    Margin="0,0,0,8">
+                <TextBlock TextWrapping="Wrap" FontSize="11">
+                    <Run Text="⚠" Foreground="{StaticResource AccentWarning}"/>
+                    <Run Text=" This commit is already on the remote. Amending it will require a force-push."
+                         Foreground="{StaticResource TextPrimary}"/>
+                </TextBlock>
+            </Border>
+
             <!-- Amend button — command lives on the Window's MainWindowViewModel -->
-            <Button Content="✏  Amend"
-                    Command="{Binding DataContext.AmendCommitCommand,
+            <Button Command="{Binding DataContext.AmendCommitCommand,
                               RelativeSource={RelativeSource AncestorType=Window}}"
                     IsEnabled="{Binding DataContext.IsGoButtonEnabled,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
-                    Style="{StaticResource PrimaryButton}"
                     HorizontalAlignment="Stretch"
-                    Height="36"/>
+                    Height="36">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                        <Setter Property="Content" Value="✏  Amend"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DataContext.IsAmendUnsafe,
+                                                           RelativeSource={RelativeSource AncestorType=Window}}"
+                                         Value="True">
+                                <Setter Property="Content" Value="✏  Amend (force-push required)"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
 
         </StackPanel>
     </Border>

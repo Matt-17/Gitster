@@ -1,0 +1,97 @@
+<UserControl x:Class="Gitster.Controls.AuthorPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:AuthorPanelViewModel}">
+
+    <Border Style="{StaticResource PanelCard}">
+        <StackPanel>
+
+            <!-- Header -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <TextBlock Text="✍" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="Author"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource TextPrimary}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Author row -->
+            <Grid Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="30"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Author"
+                           Foreground="{StaticResource TextSecondary}"
+                           FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1"
+                          IsEditable="True"
+                          ItemsSource="{Binding Authors}"
+                          DisplayMemberPath="DisplayName"
+                          Text="{Binding AuthorText, UpdateSourceTrigger=PropertyChanged}"
+                          Height="28"
+                          FontSize="12"
+                          Foreground="{StaticResource TextPrimary}"
+                          BorderBrush="{StaticResource BorderTertiary}"/>
+                <Button Grid.Column="2"
+                        Content="+"
+                        Command="{Binding AddAuthorCommand}"
+                        Width="26" Height="28"
+                        Margin="4,0,0,0"
+                        ToolTip="Add new author"
+                        Style="{StaticResource GhostButton}"/>
+            </Grid>
+
+            <!-- Committer row -->
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="30"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Committer"
+                           Foreground="{StaticResource TextSecondary}"
+                           FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1"
+                          IsEditable="True"
+                          ItemsSource="{Binding Authors}"
+                          DisplayMemberPath="DisplayName"
+                          Text="{Binding CommitterText, UpdateSourceTrigger=PropertyChanged}"
+                          IsEnabled="{Binding IsCommitterEnabled}"
+                          Height="28"
+                          FontSize="12"
+                          Foreground="{StaticResource TextPrimary}"
+                          BorderBrush="{StaticResource BorderTertiary}"/>
+                <Button Grid.Column="2"
+                        Content="+"
+                        Command="{Binding AddAuthorCommand}"
+                        Width="26" Height="28"
+                        Margin="4,0,0,0"
+                        IsEnabled="{Binding IsCommitterEnabled}"
+                        ToolTip="Add new author"
+                        Style="{StaticResource GhostButton}"/>
+            </Grid>
+
+            <!-- Sync checkbox -->
+            <CheckBox Content="Sync author and committer"
+                      IsChecked="{Binding SyncAuthorCommitter}"
+                      Foreground="{StaticResource TextSecondary}"
+                      FontSize="12"
+                      Margin="0,0,0,10"/>
+
+            <!-- Apply button -->
+            <Button Content="Apply"
+                    Command="{Binding ApplyCommand}"
+                    IsEnabled="{Binding IsApplyEnabled}"
+                    Style="{StaticResource GhostButton}"
+                    HorizontalAlignment="Stretch"
+                    Height="30"/>
+
+        </StackPanel>
+    </Border>
+</UserControl>

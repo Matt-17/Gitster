@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Windows.Data;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -18,6 +21,7 @@ public partial class CommitListViewModel : BaseViewModel
     {
         _openFilter = openFilter;
         _clearDialogFilters = clearDialogFilters;
+        GroupedCommits = CollectionViewSource.GetDefaultView(new List<CommitItem>());
     }
 
     public event Action? FocusSearchRequested;
@@ -27,6 +31,18 @@ public partial class CommitListViewModel : BaseViewModel
 
     [ObservableProperty]
     public partial List<CommitItem> Commits { get; set; } = [];
+
+    /// <summary>Grouped view of <see cref="Commits"/> for the ListView (groups by GroupLabel).</summary>
+    public ICollectionView GroupedCommits { get; private set; }
+
+    partial void OnCommitsChanged(List<CommitItem> value)
+    {
+        var view = CollectionViewSource.GetDefaultView(value);
+        if (!view.GroupDescriptions.Any())
+            view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CommitItem.GroupLabel)));
+        GroupedCommits = view;
+        OnPropertyChanged(nameof(GroupedCommits));
+    }
 
     [ObservableProperty]
     public partial CommitItem? SelectedCommit { get; set; }
