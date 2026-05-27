@@ -4,50 +4,127 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:models="clr-namespace:Gitster.Models"
-             xmlns:converters="clr-namespace:Gitster.Converters"
              xmlns:controls="clr-namespace:Gitster.Controls"
              xmlns:viewModels="clr-namespace:Gitster.ViewModels"
              mc:Ignorable="d" 
              d:DataContext="{d:DesignInstance Type=viewModels:DateControlViewModel}"
              d:DesignHeight="300" d:DesignWidth="330">
     <UserControl.Resources>
-        <converters:BoolConverter x:Key="BoolConverterVisible" Type="Visible"/>
-        <converters:BoolConverter x:Key="BoolConverterCollapsed" Type="Collapsed"/>
-        <converters:BoolConverter x:Key="BoolConverterFontWeightBold" Type="FontWeightBold"/>
-        <converters:BoolConverter x:Key="BoolConverterOpaque" Type="Opaque"/>
-        <Style x:Key="HoverStyle" TargetType="Border">
+        <Style x:Key="HoverSurfaceStyle" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="4"/>
             <Style.Triggers>
                 <Trigger Property="Border.IsMouseOver" Value="True">
-                    <Setter Property="Border.Background" Value="{DynamicResource HoverBrush}" />
+                    <Setter Property="Border.Background" Value="{DynamicResource BackgroundSecondary}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="GhostButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
-    <Border Background="White" BorderBrush="{DynamicResource AccentMainBrush}" BorderThickness="2" SnapsToDevicePixels="True">
+    <Border Background="{DynamicResource BackgroundPrimary}"
+            BorderBrush="{DynamicResource BorderSecondary}"
+            BorderThickness="0.5"
+            CornerRadius="{DynamicResource CornerRadiusMd}"
+            MinHeight="220"
+            SnapsToDevicePixels="True"
+            Padding="{DynamicResource PaddingMdThickness}">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition />
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel>
-                <Grid Height="28">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <Grid Height="30">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition />
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" MouseDown="MonthOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="MonthOnMouseWheel" ToolTip="Change with mouse buttons&#x0a;Back - left&#x0a;Forward - right&#x0a;Or use mouse wheel" ToolTipService.InitialShowDelay="0" Background="Transparent">
-                        <TextBlock Text="{Binding Date, StringFormat='MMMM'}" FontSize="18" TextAlignment="Center" VerticalAlignment="Center"/>
+                    <Button Grid.Column="0"
+                            Click="PrevMonthButton_Click"
+                            Style="{StaticResource GhostButtonStyle}">
+                        <Path Width="8"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource TextSecondary}"
+                              StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="M8,2 L2,8 L8,14"/>
+                    </Button>
+
+                    <!-- TODO: phase-2 i18n -->
+                    <Border Grid.Column="1"
+                            Margin="6,0"
+                            MouseDown="MonthOnMouseDown"
+                            MouseUp="OnMouseUp"
+                            MouseEnter="OnMouseEnter"
+                            MouseLeave="OnMouseLeave"
+                            MouseWheel="MonthOnMouseWheel"
+                            ToolTip="Click or scroll to change month&#x0a;Left click - back&#x0a;Right click - forward&#x0a;Mouse wheel - fine adjust"
+                            ToolTipService.InitialShowDelay="0"
+                            Style="{StaticResource HoverSurfaceStyle}">
+                        <TextBlock Text="{Binding Date, StringFormat='MMMM yyyy'}"
+                                   FontFamily="{DynamicResource FontFamilyUi}"
+                                   FontSize="15"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   TextAlignment="Center"
+                                   VerticalAlignment="Center"/>
                     </Border>
-                    <Border Grid.Column="1" MouseDown="YearOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" MouseWheel="YearOnMouseWheel" ToolTip="Change with mouse buttons&#x0a;Back - left&#x0a;Forward - right&#x0a;Or use mouse wheel" ToolTipService.InitialShowDelay="0" Background="Transparent">
-                        <TextBlock Text="{Binding Date, StringFormat='yyyy'}" TextAlignment="Center" FontSize="18" VerticalAlignment="Center"/>
-                    </Border>
+
+                    <Button Grid.Column="2"
+                            Click="NextMonthButton_Click"
+                            Style="{StaticResource GhostButtonStyle}">
+                        <Path Width="8"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource TextSecondary}"
+                              StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="M2,2 L8,8 L2,14"/>
+                    </Button>
                 </Grid>
 
-                <Border Background="{DynamicResource AccentMainBrush}" Padding="10, 2">
+                <Border Background="{DynamicResource BackgroundPrimary}"
+                        BorderBrush="{DynamicResource BorderTertiary}"
+                        BorderThickness="0,0,0,0.5"
+                        Padding="2,4,2,4">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition />
@@ -58,30 +135,63 @@
                             <ColumnDefinition />
                             <ColumnDefinition />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Mo" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="1" Text="Di" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="2" Text="Mi" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="3" Text="Do" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="4" Text="Fr" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="5" Text="Sa" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
-                        <TextBlock Grid.Column="6" Text="So" TextAlignment="Center" Width="25" FontWeight="Bold" FontSize="9" Opacity="0.6" Foreground="White"/>
+                        <!-- TODO: phase-2 i18n -->
+                        <TextBlock Grid.Column="0" Text="Mon" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Grid.Column="1" Text="Tue" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Grid.Column="2" Text="Wed" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Grid.Column="3" Text="Thu" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Grid.Column="4" Text="Fri" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Grid.Column="5" Text="Sat" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextTertiary}"/>
+                        <TextBlock Grid.Column="6" Text="Sun" TextAlignment="Center" Width="32" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextTertiary}"/>
                     </Grid>
                 </Border>
-                <ItemsControl ItemsSource="{Binding Days}" MaxWidth="210" Margin="10, 0" MouseWheel="MonthOnMouseWheel">
+
+                <ItemsControl ItemsSource="{Binding Days}" MaxWidth="224" Margin="0,6,0,0" MouseWheel="MonthOnMouseWheel">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:DateTimeHolder}">
-                            <Border Width="30" Height="28" Style="{DynamicResource HoverStyle}" MouseDown="DayOnMouseDown">
+                            <Border Width="32" Height="30" Style="{StaticResource HoverSurfaceStyle}" MouseDown="DayOnMouseDown">
                                 <Grid>
-                                    <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentMainBrush}" >
-                                        <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center" Foreground="White"
-                                           FontWeight="{Binding IsToday, Converter={StaticResource BoolConverterFontWeightBold}}"
-                                           Opacity="{Binding IsSelectedMonth, Converter={StaticResource BoolConverterOpaque}}"/>
-                                    </Border>
-                                    <TextBlock Text="{Binding Date, StringFormat='dd'}" TextAlignment="Center" VerticalAlignment="Center"  Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}"
-                                               FontWeight="{Binding IsToday, Converter={StaticResource BoolConverterFontWeightBold}}"
-                                               Opacity="{Binding IsSelectedMonth, Converter={StaticResource BoolConverterOpaque}}"/>
+                                    <Border x:Name="TodayRing"
+                                            BorderBrush="{DynamicResource AccentBlue}"
+                                            BorderThickness="0"
+                                            CornerRadius="4"/>
+                                    <Border x:Name="SelectedFill"
+                                            Margin="0"
+                                            CornerRadius="4"
+                                            Background="Transparent"/>
+                                    <TextBlock x:Name="DayText"
+                                               Text="{Binding Date, StringFormat='dd'}"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontFamily="{DynamicResource FontFamilyUi}"
+                                               Foreground="{DynamicResource TextPrimary}"/>
                                 </Grid>
                             </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                    <Setter TargetName="TodayRing" Property="BorderThickness" Value="1"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSelectedMonth}" Value="False">
+                                    <Setter TargetName="DayText" Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Date.DayOfWeek}" Value="Saturday">
+                                    <Setter TargetName="DayText" Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Date.DayOfWeek}" Value="Sunday">
+                                    <Setter TargetName="DayText" Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="SelectedFill" Property="Background" Value="{DynamicResource AccentBlue}"/>
+                                    <Setter TargetName="DayText" Property="Foreground" Value="{DynamicResource BackgroundPrimary}"/>
+                                </DataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                        <Condition Binding="{Binding IsToday}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter TargetName="SelectedFill" Property="Margin" Value="1"/>
+                                </MultiDataTrigger>
+                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                     <ItemsControl.ItemsPanel>
@@ -90,14 +200,25 @@
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
-
-                <!-- Time Editor Section (visible when EditMode != DateOnly) -->
-
             </StackPanel>
 
-            <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
+            <Border Grid.Column="1" Width="0.5" Background="{DynamicResource BorderTertiary}" Margin="10,0">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.DateTime}">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            </Border>
 
-            <Grid Grid.Column="2" Width="200">
+            <Grid Grid.Column="2" Width="220">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -113,43 +234,79 @@
                             <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
                                 <Setter Property="Visibility" Value="Visible"/>
                             </DataTrigger>
+                            <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
+                                <Setter Property="Width" Value="220"/>
+                                <Setter Property="Margin" Value="0"/>
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Grid.Style>
 
-                <Grid Grid.Row="0" Height="28">
+                <Grid Grid.Row="0" Height="36" Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Hour Section -->
+                    <!-- TODO: phase-2 i18n -->
                     <Border Grid.Column="0"
-         MouseDown="HourOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
-         MouseWheel="HourOnMouseWheel" ToolTip="Change hours&#x0a;Back - left&#x0a;Forward - right" 
-         ToolTipService.InitialShowDelay="0" Background="Transparent">
-                        <TextBlock Text="{Binding Hour, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
+                            MouseDown="HourOnMouseDown"
+                            MouseUp="OnMouseUp"
+                            MouseEnter="OnMouseEnter"
+                            MouseLeave="OnMouseLeave"
+                            MouseWheel="HourOnMouseWheel"
+                            ToolTip="Click or scroll to change hour&#x0a;Left click - back&#x0a;Right click - forward&#x0a;Mouse wheel - fine adjust"
+                            ToolTipService.InitialShowDelay="0"
+                            Style="{StaticResource HoverSurfaceStyle}">
+                        <TextBlock Text="{Binding Hour, StringFormat='00'}"
+                                   TextAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="18"
+                                   Foreground="{DynamicResource TextPrimary}"/>
                     </Border>
 
-                    <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
-                    <!-- Minute Section -->
+                    <TextBlock Grid.Column="1"
+                               Text=":"
+                               Margin="8,0"
+                               TextAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="18"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                    <!-- TODO: phase-2 i18n -->
                     <Border Grid.Column="2"
-         MouseDown="MinuteOnMouseDown" MouseUp="OnMouseUp" MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave" 
-         MouseWheel="MinuteOnMouseWheel" ToolTip="Change minutes&#x0a;Back - left&#x0a;Forward - right" 
-         ToolTipService.InitialShowDelay="0" Background="Transparent">
-                        <TextBlock Text="{Binding Minute, StringFormat='00'}" TextAlignment="Center" VerticalAlignment="Center" FontSize="18"/>
+                            MouseDown="MinuteOnMouseDown"
+                            MouseUp="OnMouseUp"
+                            MouseEnter="OnMouseEnter"
+                            MouseLeave="OnMouseLeave"
+                            MouseWheel="MinuteOnMouseWheel"
+                            ToolTip="Click or scroll to change minute&#x0a;Left click - back&#x0a;Right click - forward&#x0a;Mouse wheel - fine adjust"
+                            ToolTipService.InitialShowDelay="0"
+                            Style="{StaticResource HoverSurfaceStyle}">
+                        <TextBlock Text="{Binding Minute, StringFormat='00'}"
+                                   TextAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="18"
+                                   Foreground="{DynamicResource TextPrimary}"/>
                     </Border>
                 </Grid>
 
-                <Border Grid.Row="1" Background="{DynamicResource AccentMainBrush}" Padding="0,2">
+                <Border Grid.Row="1"
+                        Background="{DynamicResource BackgroundPrimary}"
+                        BorderBrush="{DynamicResource BorderTertiary}"
+                        BorderThickness="0,0,0,0.5"
+                        Padding="0,3"
+                        Margin="0,0,0,4">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition />
                             <ColumnDefinition />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Stunde" TextAlignment="Center" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
-                        <TextBlock Grid.Column="1" Text="Minute" TextAlignment="Center" FontWeight="Bold" FontSize="9" Opacity="0.8" Foreground="White"/>
+                        <!-- TODO: phase-2 i18n -->
+                        <TextBlock Grid.Column="0" Text="Hour" TextAlignment="Center" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                        <!-- TODO: phase-2 i18n -->
+                        <TextBlock Grid.Column="1" Text="Minute" TextAlignment="Center" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
                     </Grid>
                 </Border>
 
@@ -163,7 +320,6 @@
                     <ItemsControl ItemsSource="{Binding Hours}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <!-- 6 Zeilen × 4 Spalten = 24 Stunden, zeilenweise links->rechts -->
                                 <UniformGrid Rows="6" Columns="4"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
@@ -173,18 +329,18 @@
                                 <controls:SelectableTextBlock
                                     Text="{Binding}"
                                     MouseDown="HourTextMouseDown"
+                                    Width="32"
+                                    Height="24"
                                     Value="{Binding DataContext.Hour, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-
-                    <Rectangle Grid.Column="1" Fill="{DynamicResource AccentMainBrush}" Width="2" />
+                    <Border Grid.Column="1" Width="0.5" Background="{DynamicResource BorderTertiary}" Margin="8,0"/>
 
                     <ItemsControl Grid.Column="2" ItemsSource="{Binding Minutes}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <!-- 6 Zeilen × 2 Spalten = 12 Werte (00..55), links->rechts -->
                                 <UniformGrid Rows="6" Columns="2"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
@@ -194,6 +350,8 @@
                                 <controls:SelectableTextBlock
                                     Text="{Binding}" 
                                     MouseDown="MinuteTextMouseDown"
+                                    Width="32"
+                                    Height="24"
                                     Value="{Binding DataContext.Minute, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

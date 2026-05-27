@@ -7,26 +7,27 @@
              xmlns:converters="clr-namespace:Gitster.Converters"
              mc:Ignorable="d" 
              d:DataContext="{d:DesignInstance Type=local:SelectableTextBlock}"
-             d:DesignHeight="28" d:DesignWidth="30">
+             d:DesignHeight="24" d:DesignWidth="32">
     <UserControl.Resources>
         <converters:BoolConverter x:Key="BoolConverterVisible" Type="Visible"/>
         <converters:BoolConverter x:Key="BoolConverterCollapsed" Type="Collapsed"/>
         <Style x:Key="HoverStyle" TargetType="Border">
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="4"/>
             <Style.Triggers>
                 <Trigger Property="Border.IsMouseOver" Value="True">
-                    <Setter Property="Border.Background" Value="{DynamicResource HoverBrush}" />
+                    <Setter Property="Border.Background" Value="{DynamicResource BackgroundSecondary}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
-    <Border x:Name="LayoutRoot" x:FieldModifier="private"  Height="28" Style="{DynamicResource HoverStyle}" MouseDown="BorderOnMouseDown">
+    <Border x:Name="LayoutRoot" x:FieldModifier="private" Height="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Height}" MinHeight="24" Style="{DynamicResource HoverStyle}" MouseDown="BorderOnMouseDown">
         <Grid>
-            <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentMainBrush}" >
-                <TextBlock Text="{Binding Text}" TextAlignment="Center" VerticalAlignment="Center" Foreground="White" FontWeight="{Binding FontWeight}" Opacity="{Binding Opacity}"/>
+            <Border Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterVisible}}" Background="{DynamicResource AccentBlue}" CornerRadius="4">
+                <TextBlock Text="{Binding Text}" TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource BackgroundPrimary}" FontWeight="{Binding FontWeight}" Opacity="{Binding Opacity}"/>
             </Border>
-            <TextBlock Text="{Binding Text}" TextAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}" FontWeight="{Binding FontWeight}" Opacity="{Binding Opacity}"/>
+            <TextBlock Text="{Binding Text}" TextAlignment="Center" VerticalAlignment="Center" Visibility="{Binding IsSelected, Converter={StaticResource BoolConverterCollapsed}}" FontWeight="{Binding FontWeight}" Opacity="{Binding Opacity}" Foreground="{DynamicResource TextPrimary}"/>
         </Grid>
     </Border>
 </UserControl>

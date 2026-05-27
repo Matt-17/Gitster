@@ -202,11 +202,11 @@ public partial class DateControlViewModel : BaseViewModel
     public ObservableCollection<string> Minutes { get; } = new(Enumerable.Range(0, 12).Select(i => (i * 5).ToString("00")));
     private void UpdateTextDisplay()
     {
-        // Update DateText
+        // TODO: phase-2 culture-aware format
         _dateText = SelectedDate?.ToString("dd.MM.yyyy") ?? string.Empty;
         OnPropertyChanged(nameof(DateText));
 
-        // Update TimeText
+        // TODO: phase-2 culture-aware format
         _timeText = SelectedDate?.ToString("HH:mm") ?? string.Empty;
         OnPropertyChanged(nameof(TimeText));
     }
@@ -279,8 +279,8 @@ public partial class DateControlViewModel : BaseViewModel
         }
         holder.IsSelected = true;
 
-        // In DateTime mode, preserve the current time when selecting a new date
-        if (EditMode == EditMode.DateTime && _selectedDate.HasValue)
+        // Preserve the current time whenever a new date is selected.
+        if (_selectedDate.HasValue)
         {
             var currentTime = _selectedDate.Value;
             SelectedDate = new DateTime(holder.Date.Year, holder.Date.Month, holder.Date.Day,
@@ -345,80 +345,22 @@ public partial class DateControlViewModel : BaseViewModel
 
     private DateTime? GetDate(string text)
     {
-        var formate = new[] {
-                "ddMMyy",
-                "ddMMyyyy",
-                "dd-MM-yy",
-                "dd-MM-yyyy",
-                "dd.MM.yy",
-                "dd.MM.yyyy",
-                "dd MM yy",
-                "dd MM yyyy",
-                "d-M-yy",
-                "d-M-yyyy",
-                "d.M.yy",
-                "d.M.yyyy",
-                "d M yy",
-                "d M yyyy",
-
-                "MMddyy",
-                "MMddyyyy",
-                "MM-dd-yy",
-                "MM-dd-yyyy",
-                "MM.dd.yy",
-                "MM.dd.yyyy",
-                "MM dd yy",
-                "MM dd yyyy",
-                "M-d-yy",
-                "M-d-yyyy",
-                "M.d.yy",
-                "M.d.yyyy",
-                "M d yy",
-                "M d yyyy",
-                "ddMM",
-                "ddMM",
-                "dd-MM",
-                "dd-MM",
-                "dd.MM",
-                "dd.MM",
-                "dd MM",
-                "dd MM",
-                "d-M",
-                "d-M",
-                "d.M",
-                "d.M",
-                "d M",
-                "d M",
-
-                "MMdd",
-                "MMdd",
-                "MM-dd",
-                "MM-dd",
-                "MM.dd",
-                "MM.dd",
-                "MM dd",
-                "MM dd",
-                "M-d",
-                "M-d",
-                "M.d",
-                "M.d",
-                "M d",
-                "M d"
-        };
-
-        var success = false;
-        DateTime dateTime = DateTime.MinValue;
-
-        foreach (var format in formate)
+        // TODO: phase-2 i18n/culture-aware parsing
+        var formats = new[]
         {
-            success = DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out dateTime);
-            if (success)
-                break;
+            "ddMMyy", "ddMMyyyy", "dd-MM-yy", "dd-MM-yyyy", "dd.MM.yy", "dd.MM.yyyy", "dd MM yy", "dd MM yyyy",
+            "d-M-yy", "d-M-yyyy", "d.M.yy", "d.M.yyyy", "d M yy", "d M yyyy",
+            "MMddyy", "MMddyyyy", "MM-dd-yy", "MM-dd-yyyy", "MM.dd.yy", "MM.dd.yyyy", "MM dd yy", "MM dd yyyy",
+            "M-d-yy", "M-d-yyyy", "M.d.yy", "M.d.yyyy", "M d yy", "M d yyyy",
+            "ddMM", "dd-MM", "dd.MM", "dd MM", "d-M", "d.M", "d M",
+            "MMdd", "MM-dd", "MM.dd", "MM dd", "M-d", "M.d", "M d"
+        };
+        var distinctFormats = formats.Distinct();
+        foreach (var format in distinctFormats)
+        {
+            if (DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out var dateTime))
+                return dateTime;
         }
-
-        if (success)
-            return dateTime;
-
         throw new ArgumentOutOfRangeException();
     }
 
