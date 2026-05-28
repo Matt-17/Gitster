@@ -28,4 +28,10 @@ public record CommitItem(
 
     /// <summary>True when this commit and its orphaned pair (same tree, rewritten) are visible in the list.</summary>
     public bool IsOrphanedPair => OrphanedPairSha != null;
+
+    /// <summary>
+    /// True for sentinel placeholder items injected to keep empty groups visible.
+    /// These items are never shown in the UI and must never be selected.
+    /// </summary>
+    public bool IsPlaceholder { get; init; }
 }

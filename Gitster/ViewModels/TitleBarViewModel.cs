@@ -1,6 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Windows.Threading;
 
 namespace Gitster.ViewModels;
@@ -8,21 +11,30 @@ namespace Gitster.ViewModels;
 public partial class TitleBarViewModel : BaseViewModel
 {
     private readonly Action _browseFolder;
+    private readonly Action<string> _openRepo;
     private readonly AutoFetchService _autoFetch;
     private readonly DispatcherTimer _timer;
 
-    public TitleBarViewModel(Action browseFolder, AutoFetchService autoFetch)
+    public RecentReposService RecentRepos { get; }
+    public ObservableCollection<RecentRepositoryItemViewModel> RecentRepositoryItems { get; } = [];
+
+    public TitleBarViewModel(Action browseFolder, Action<string> openRepo, AutoFetchService autoFetch, RecentReposService recentRepos)
     {
         _browseFolder = browseFolder;
-        _autoFetch = autoFetch;
+        _openRepo     = openRepo;
+        _autoFetch    = autoFetch;
+        RecentRepos   = recentRepos;
 
         AutoFetchEnabled = _autoFetch.IsEnabled;
         _autoFetch.PropertyChanged += (_, _) => RefreshAutoFetchInfo();
+        RecentRepos.PropertyChanged += OnRecentReposPropertyChanged;
+        RecentRepos.Entries.CollectionChanged += OnRecentReposChanged;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _timer.Tick += (_, _) => RefreshAutoFetchInfo();
         _timer.Start();
 
+        RefreshRecentRepositoryItems();
         RefreshAutoFetchInfo();
     }
 
@@ -50,10 +62,26 @@ public partial class TitleBarViewModel : BaseViewModel
     [ObservableProperty]
     public partial string AutoFetchTooltip { get; set; } = "Auto-fetch: off";
 
+    [ObservableProperty]
+    public partial string CurrentRepositoryPath { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsRecentRepositoriesPopupOpen { get; set; }
+
+    [ObservableProperty]
+    public partial RecentRepositoryItemViewModel? SelectedRecentRepository { get; set; }
+
+    public bool HasRecentRepositories => RecentRepositoryItems.Count > 0;
+
     partial void OnAutoFetchEnabledChanged(bool value)
     {
         _autoFetch.IsEnabled = value;
         RefreshAutoFetchInfo();
+    }
+
+    partial void OnCurrentRepositoryPathChanged(string value)
+    {
+        RefreshRecentRepositoryItems();
     }
 
     public void UpdateStatus(string branch, string repoName, int incoming, int outgoing)
@@ -70,6 +98,7 @@ public partial class TitleBarViewModel : BaseViewModel
     {
         CurrentBranch = string.Empty;
         RepositoryName = string.Empty;
+        CurrentRepositoryPath = string.Empty;
         IncomingCount = 0;
         OutgoingCount = 0;
         HasIncoming = false;
@@ -77,7 +106,100 @@ public partial class TitleBarViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void BrowseFolder() => _browseFolder();
+    private void BrowseFolder()
+    {
+        IsRecentRepositoriesPopupOpen = false;
+        _browseFolder();
+    }
+
+    [RelayCommand]
+    private void OpenRecentRepo(string path)
+    {
+        IsRecentRepositoriesPopupOpen = false;
+        _openRepo(path);
+    }
+
+    [RelayCommand]
+    private void OpenSelectedRecentRepo()
+    {
+        if (SelectedRecentRepository is null) return;
+        OpenRecentRepo(SelectedRecentRepository.FullPath);
+    }
+
+    [RelayCommand]
+    private void OpenRecentRepositoriesPopup()
+    {
+        RefreshRecentRepositoryItems();
+        IsRecentRepositoriesPopupOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseRecentRepositoriesPopup()
+    {
+        IsRecentRepositoriesPopupOpen = false;
+    }
+
+    [RelayCommand]
+    private void PinRepo(string path) => RecentRepos.Pin(path);
+
+    [RelayCommand]
+    private void UnpinRepo(string path) => RecentRepos.Unpin(path);
+
+    [RelayCommand]
+    private void TogglePinRepo(string path)
+    {
+        if (RecentRepos.IsPinned(path))
+            RecentRepos.Unpin(path);
+        else
+            RecentRepos.Pin(path);
+    }
+
+    private void OnRecentReposPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(RecentReposService.Entries)) return;
+
+        RecentRepos.Entries.CollectionChanged += OnRecentReposChanged;
+        RefreshRecentRepositoryItems();
+    }
+
+    private void OnRecentReposChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RefreshRecentRepositoryItems();
+    }
+
+    private void RefreshRecentRepositoryItems()
+    {
+        var selectedPath = SelectedRecentRepository?.FullPath;
+        var currentPath = CurrentRepositoryPath;
+
+        var items = RecentRepos.GetPinned()
+            .Concat(RecentRepos.GetRecent())
+            .Select(entry => new RecentRepositoryItemViewModel(
+                entry.FullPath,
+                entry.DisplayName,
+                entry.DisplayPath,
+                entry.Pinned,
+                IsSamePath(entry.FullPath, currentPath)))
+            .ToList();
+
+        RecentRepositoryItems.Clear();
+        foreach (var item in items)
+            RecentRepositoryItems.Add(item);
+
+        SelectedRecentRepository = RecentRepositoryItems.FirstOrDefault(item =>
+            IsSamePath(item.FullPath, selectedPath))
+            ?? RecentRepositoryItems.FirstOrDefault(item => item.IsActive)
+            ?? RecentRepositoryItems.FirstOrDefault();
+        OnPropertyChanged(nameof(HasRecentRepositories));
+    }
+
+    private static bool IsSamePath(string? left, string? right)
+        => !string.IsNullOrWhiteSpace(left)
+           && !string.IsNullOrWhiteSpace(right)
+           && string.Equals(
+               left.TrimEnd('\\', '/'),
+               right.TrimEnd('\\', '/'),
+               StringComparison.OrdinalIgnoreCase);
 
     private void RefreshAutoFetchInfo()
     {
@@ -103,4 +225,19 @@ public partial class TitleBarViewModel : BaseViewModel
 
         AutoFetchTooltip = $"Auto-fetch: every {interval}s · last fetched {ageText}";
     }
+}
+
+public sealed partial class RecentRepositoryItemViewModel(
+    string fullPath,
+    string displayName,
+    string displayPath,
+    bool isPinned,
+    bool isActive) : ObservableObject
+{
+    public string FullPath { get; } = fullPath;
+    public string DisplayName { get; } = displayName;
+    public string DisplayPath { get; } = displayPath;
+    public bool IsPinned { get; } = isPinned;
+    public bool IsActive { get; } = isActive;
+    public string PinTooltip => IsPinned ? "Unpin repository" : "Pin repository";
 }

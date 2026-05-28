@@ -26,3 +26,28 @@ public partial class CommitListView : UserControl
 
     private void OnFocusSearchRequested() => SearchBox.Focus();
 }
+
+/// <summary>
+/// Hides invisible placeholder sentinel items and gives real commits the full
+/// interactive container style.
+/// </summary>
+public class CommitListItemStyleSelector : StyleSelector
+{
+    public Style? CommitStyle { get; set; }
+
+    // Placeholder items are completely invisible and take no space.
+    private static readonly Style _placeholderStyle = new(typeof(ListViewItem))
+    {
+        Setters =
+        {
+            new Setter(UIElement.VisibilityProperty,       Visibility.Collapsed),
+            new Setter(UIElement.IsHitTestVisibleProperty, false),
+            new Setter(Control.PaddingProperty,            new Thickness(0)),
+            new Setter(Control.BorderThicknessProperty,    new Thickness(0)),
+            new Setter(FrameworkElement.HeightProperty,    0d),
+        }
+    };
+
+    public override Style SelectStyle(object item, DependencyObject container)
+        => item is CommitItem { IsPlaceholder: true } ? _placeholderStyle : CommitStyle!;
+}

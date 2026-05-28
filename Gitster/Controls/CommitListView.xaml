@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:Gitster.Controls"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:git="clr-namespace:Gitster.Services.Git"
              xmlns:converters="clr-namespace:Gitster.Converters"
@@ -21,6 +22,52 @@
             <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
             <Setter Property="BorderThickness" Value="0,0,0,0.5"/>
+        </Style>
+
+        <!-- Commit-row container style (used by CommitListItemStyleSelector for real commits) -->
+        <Style x:Key="CommitItemStyle" TargetType="ListViewItem">
+            <Setter Property="Background"  Value="Transparent"/>
+            <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Padding"     Value="4,2"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <GridViewRowPresenter
+                                Columns="{TemplateBinding GridView.ColumnCollection}"
+                                Content="{TemplateBinding Content}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="{StaticResource BackgroundSecondary}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background"
+                                        Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected"  Value="True"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <MultiTrigger.Setters>
+                                    <Setter TargetName="Bd" Property="Background"
+                                            Value="{StaticResource AccentBlue}"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </MultiTrigger.Setters>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
@@ -167,6 +214,7 @@
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
+                                                    <!-- Section label with per-section color -->
                                                     <TextBlock Text="{Binding Name}"
                                                                FontWeight="Medium" FontSize="11"
                                                                VerticalAlignment="Center">
@@ -184,14 +232,29 @@
                                                             </Style>
                                                         </TextBlock.Style>
                                                     </TextBlock>
-                                                    <TextBlock Text=" · "
-                                                               FontSize="11"
+                                                    <!-- Count text – reads real counts from the ViewModel (not ItemCount,
+                                                         which includes the invisible placeholder sentinel).
+                                                         Shows "· unknown" for Incoming when no tracking branch. -->
+                                                    <TextBlock FontSize="11"
                                                                Foreground="{StaticResource TextTertiary}"
-                                                               VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding ItemCount}"
-                                                               FontSize="11"
-                                                               Foreground="{StaticResource TextTertiary}"
-                                                               VerticalAlignment="Center"/>
+                                                               VerticalAlignment="Center"
+                                                               Margin="4,0,0,0"
+                                                               ToolTip="{Binding DataContext.IncomingNoTrackingTooltip, RelativeSource={RelativeSource AncestorType=ListView}}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <!-- Default = Synced -->
+                                                                <Setter Property="Text" Value="{Binding DataContext.SyncedCountText, RelativeSource={RelativeSource AncestorType=ListView}}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Name}" Value="Incoming">
+                                                                        <Setter Property="Text" Value="{Binding DataContext.IncomingCountText, RelativeSource={RelativeSource AncestorType=ListView}}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Name}" Value="Outgoing">
+                                                                        <Setter Property="Text" Value="{Binding DataContext.OutgoingCountText, RelativeSource={RelativeSource AncestorType=ListView}}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                 </StackPanel>
                                             </Border>
                                             <ItemsPresenter/>
@@ -211,52 +274,11 @@
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1F1F1F"/>
             </ListView.Resources>
 
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="Background"  Value="Transparent"/>
-                    <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
-                    <Setter Property="Padding"     Value="4,2"/>
-                    <Setter Property="BorderThickness" Value="0"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="ListViewItem">
-                                <Border x:Name="Bd"
-                                        Background="{TemplateBinding Background}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                        Padding="{TemplateBinding Padding}"
-                                        SnapsToDevicePixels="True">
-                                    <GridViewRowPresenter
-                                        Columns="{TemplateBinding GridView.ColumnCollection}"
-                                        Content="{TemplateBinding Content}"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background"
-                                                Value="{StaticResource BackgroundSecondary}"/>
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Bd" Property="Background"
-                                                Value="{StaticResource AccentBlue}"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </Trigger>
-                                    <MultiTrigger>
-                                        <MultiTrigger.Conditions>
-                                            <Condition Property="IsSelected"  Value="True"/>
-                                            <Condition Property="IsMouseOver" Value="True"/>
-                                        </MultiTrigger.Conditions>
-                                        <MultiTrigger.Setters>
-                                            <Setter TargetName="Bd" Property="Background"
-                                                    Value="{StaticResource AccentBlue}"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                        </MultiTrigger.Setters>
-                                    </MultiTrigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </ListView.ItemContainerStyle>
+            <ListView.ItemContainerStyleSelector>
+                <!-- Placeholder sentinels → Collapsed (invisible, 0 height).
+                     Real commits        → CommitItemStyle with full hover/select visuals. -->
+                <local:CommitListItemStyleSelector CommitStyle="{StaticResource CommitItemStyle}"/>
+            </ListView.ItemContainerStyleSelector>
 
             <ListView.View>
                 <GridView>
