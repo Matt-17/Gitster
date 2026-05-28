@@ -26,7 +26,8 @@ public static class GitCli
 
     /// <summary>
     /// Runs <c>git <paramref name="args"/></c> in <paramref name="workDir"/>, capturing
-    /// stdout and stderr.  Times out after 60 s.
+    /// stdout and stderr.  Times out after 60 s; a hung process is killed (whole tree)
+    /// so it can never freeze the app.
     /// </summary>
     public static async Task<GitResult> RunAsync(
         string? workDir,
@@ -54,15 +55,43 @@ public static class GitCli
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = false };
         process.Start();
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(token);
-        var stderrTask = process.StandardError.ReadToEndAsync(token);
+        // Read both streams concurrently so neither buffer can fill and deadlock the
+        // other (the classic stdout/stderr pipe-buffer deadlock). The reads are NOT
+        // tied to the cancellation token: when we kill the process the pipes close and
+        // the reads complete naturally, which keeps them from becoming unobserved tasks.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
 
-        await process.WaitForExitAsync(token);
+        try
+        {
+            await process.WaitForExitAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+            try { await Task.WhenAll(stdoutTask, stderrTask); } catch { /* drain */ }
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+
+            var verb = args.Split(' ', 2)[0];
+            throw new TimeoutException(
+                $"git {verb} did not finish within 60 seconds and was terminated.");
+        }
+
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
 
         return new GitResult(process.ExitCode, stdout.TrimEnd(), stderr.TrimEnd());
     }
+
+    /// <summary>
+    /// Converts a Windows path to a form that survives Git's editor invocation.
+    /// Git evaluates <c>GIT_EDITOR</c>/<c>GIT_SEQUENCE_EDITOR</c> through its bundled
+    /// <c>sh</c>, which eats backslashes and splits on spaces.  Returning a
+    /// single-quoted forward-slash path makes both safe.
+    /// </summary>
+    public static string ToEditorArg(string path) => "'" + path.Replace('\\', '/') + "'";
 
     /// <summary>
     /// Writes a batch (.cmd) file to a temp path and returns that path.

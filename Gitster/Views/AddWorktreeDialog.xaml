@@ -1,0 +1,67 @@
+<Window x:Class="Gitster.Views.AddWorktreeDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Add worktree"
+        Width="520" Height="260"
+        MinWidth="460" MinHeight="240"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource BackgroundPrimary}">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="6"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="6"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Worktree folder"
+                   FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" x:Name="PathBox"
+                     FontSize="13" Padding="6,4"
+                     Background="{DynamicResource BackgroundSecondary}"
+                     Foreground="{DynamicResource TextPrimary}"
+                     BorderBrush="{DynamicResource BorderTertiary}"/>
+            <Button Grid.Column="2" Content="Browse…"
+                    Style="{DynamicResource GhostButton}" Padding="10,4"
+                    Click="Browse_Click"/>
+        </Grid>
+
+        <TextBlock Grid.Row="4" Text="Branch"
+                   FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+        <TextBox Grid.Row="6" x:Name="BranchBox"
+                 FontSize="13" Padding="6,4"
+                 Background="{DynamicResource BackgroundSecondary}"
+                 Foreground="{DynamicResource TextPrimary}"
+                 BorderBrush="{DynamicResource BorderTertiary}"/>
+
+        <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,8,0,0">
+            <CheckBox x:Name="CreateBranchCheck"
+                      Content="Create a new branch with this name"
+                      Foreground="{DynamicResource TextSecondary}"
+                      VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel" Style="{DynamicResource GhostButton}" Width="80"
+                    Margin="0,0,8,0" Click="Cancel_Click"/>
+            <Button Content="Add" Style="{DynamicResource PrimaryButton}" Width="80"
+                    IsDefault="True" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

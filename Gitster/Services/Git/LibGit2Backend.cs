@@ -27,9 +27,12 @@ public sealed class LibGit2Backend : IGitBackend
         using var repo = OpenRepository();
 
         var gitDir = repo.Info.Path;
-        if (Directory.Exists(Path.Combine(gitDir, "rebase-merge")) || Directory.Exists(Path.Combine(gitDir, "rebase-apply")))
+        var rebaseMerge = Path.Combine(gitDir, "rebase-merge");
+        var rebaseApply = Path.Combine(gitDir, "rebase-apply");
+        if (Directory.Exists(rebaseMerge) || Directory.Exists(rebaseApply))
         {
-            return Task.FromResult<WorkingTreeState>(new WorkingTreeState.Rebasing(0, 0));
+            var (step, total) = ReadRebaseProgress(rebaseMerge, rebaseApply);
+            return Task.FromResult<WorkingTreeState>(new WorkingTreeState.Rebasing(step, total));
         }
 
         if (File.Exists(Path.Combine(gitDir, "MERGE_HEAD")))
@@ -480,10 +483,35 @@ public sealed class LibGit2Backend : IGitBackend
             ?? throw new InvalidOperationException($"Commit not found: {sha}");
         var sig = repo.Config.BuildSignature(DateTimeOffset.Now)
             ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+
+        var originalHead = repo.Head.Tip;
         var result = repo.CherryPick(commit, sig);
+
         if (result.Status == CherryPickStatus.Conflicts)
-            throw new InvalidOperationException($"Cherry-pick produced conflicts on {sha[..Math.Min(7, sha.Length)]}");
+        {
+            // Abort: restore the working tree/index and clear the cherry-pick state
+            // so the repo is never left half-finished. (Gitster never resolves
+            // conflicts — it aborts and reports, by design.)
+            if (originalHead != null)
+                repo.Reset(ResetMode.Hard, originalHead);
+            CleanupSequencerState(repo);
+            throw new InvalidOperationException(
+                $"Cherry-pick of {sha[..Math.Min(7, sha.Length)]} produced conflicts and was aborted — " +
+                "history and working tree are unchanged.");
+        }
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
+    }
+
+    /// <summary>Removes leftover cherry-pick/merge state files (libgit2's abort equivalent).</summary>
+    private static void CleanupSequencerState(Repository repo)
+    {
+        var gitDir = repo.Info.Path;
+        foreach (var name in new[] { "CHERRY_PICK_HEAD", "MERGE_HEAD", "MERGE_MSG", "MERGE_MODE" })
+        {
+            try { File.Delete(Path.Combine(gitDir, name)); } catch { /* best-effort */ }
+        }
     }
 
     public Task<Dictionary<string, string>> GetAllRefsAsync()
@@ -688,6 +716,33 @@ public sealed class LibGit2Backend : IGitBackend
         return new Repository(RepositoryPath);
     }
 
+    /// <summary>Reads the (current, total) step of an in-progress rebase, 0/0 if unknown.</summary>
+    private static (int Step, int Total) ReadRebaseProgress(string rebaseMerge, string rebaseApply)
+    {
+        try
+        {
+            // Interactive / merge-based rebase: msgnum + end
+            if (Directory.Exists(rebaseMerge))
+            {
+                var step  = ReadIntFile(Path.Combine(rebaseMerge, "msgnum"));
+                var total = ReadIntFile(Path.Combine(rebaseMerge, "end"));
+                return (step, total);
+            }
+            // Apply-based rebase: next + last
+            if (Directory.Exists(rebaseApply))
+            {
+                var step  = ReadIntFile(Path.Combine(rebaseApply, "next"));
+                var total = ReadIntFile(Path.Combine(rebaseApply, "last"));
+                return (step, total);
+            }
+        }
+        catch { /* fall through */ }
+        return (0, 0);
+    }
+
+    private static int ReadIntFile(string path)
+        => File.Exists(path) && int.TryParse(File.ReadAllText(path).Trim(), out var n) ? n : 0;
+
     // ── Fixup-workflow methods (Steps F-H) ─────────────────────────────────
 
     /// <summary>
@@ -744,13 +799,63 @@ public sealed class LibGit2Backend : IGitBackend
         var sig = repo.Config.BuildSignature(overrideDate ?? DateTimeOffset.Now)
                   ?? new Signature("Gitster", "gitster@local", overrideDate ?? DateTimeOffset.Now);
 
-        var when = overrideDate ?? DateTimeOffset.Now;
+        // When the user picks a date, apply it to BOTH author and committer — the same
+        // convention Gitster's combined-amend uses. Otherwise keep the natural "now".
+        var when          = overrideDate ?? DateTimeOffset.Now;
+        var committerWhen = overrideDate ?? DateTimeOffset.Now;
         var author    = new Signature(sig.Name, sig.Email, when);
-        var committer = new Signature(sig.Name, sig.Email, DateTimeOffset.Now);
+        var committer = new Signature(sig.Name, sig.Email, committerWhen);
 
         repo.Commit(combinedMessage, author, committer);
         HeadChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// True when <paramref name="shas"/> form a contiguous first-parent chain (no gaps).
+    /// Non-contiguous squash is ill-defined, so callers validate before squashing.
+    /// </summary>
+    public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)
+    {
+        if (shas.Count <= 1) return Task.FromResult(true);
+
+        using var repo = OpenRepository();
+        var commits = shas
+            .Select(s => repo.Lookup<Commit>(s))
+            .Where(c => c != null)
+            .Cast<Commit>()
+            .ToList();
+
+        if (commits.Count != shas.Count) return Task.FromResult(false);
+
+        var bySha = commits.ToDictionary(c => c.Id.Sha, c => c, StringComparer.OrdinalIgnoreCase);
+
+        // The "newest" selected commit is the one that is not the first-parent of any
+        // other selected commit. A contiguous range has exactly one such head.
+        var parentShas = commits
+            .Select(c => c.Parents.FirstOrDefault()?.Id.Sha)
+            .Where(s => s != null && bySha.ContainsKey(s!))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var heads = commits.Where(c => !parentShas.Contains(c.Id.Sha)).ToList();
+        if (heads.Count != 1) return Task.FromResult(false);
+
+        // Walk first-parents from the head; every step must stay inside the selection
+        // until we've visited every selected commit.
+        var current = heads[0];
+        int visited = 1;
+        while (true)
+        {
+            var parent = current.Parents.FirstOrDefault();
+            if (parent != null && bySha.TryGetValue(parent.Id.Sha, out var next))
+            {
+                current = next;
+                visited++;
+            }
+            else break;
+        }
+
+        return Task.FromResult(visited == commits.Count);
     }
 
     // Non-HEAD squash requires CLI — HybridGitBackend routes there.
@@ -796,6 +901,290 @@ public sealed class LibGit2Backend : IGitBackend
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
     }
+
+    // ── Phase 3: Branch operations ─────────────────────────────────────────
+
+    public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync()
+    {
+        using var repo = OpenRepository();
+        var currentTip = repo.Head.Tip;
+        var result = new List<BranchListItem>();
+
+        foreach (var b in repo.Branches)
+        {
+            var tip = b.Tip;
+
+            int ahead = 0, behind = 0;
+            var tracked = b.TrackedBranch;
+            if (tracked?.Tip != null && tip != null)
+            {
+                var div = repo.ObjectDatabase.CalculateHistoryDivergence(tip, tracked.Tip);
+                ahead  = div.AheadBy  ?? 0;
+                behind = div.BehindBy ?? 0;
+            }
+
+            // "Merged" = this branch's tip is already an ancestor of the current HEAD
+            // (so deleting it loses nothing). Never flag the current branch.
+            bool isMerged = false;
+            if (!b.IsCurrentRepositoryHead && tip != null && currentTip != null)
+            {
+                var mergeBase = repo.ObjectDatabase.FindMergeBase(tip, currentTip);
+                isMerged = mergeBase != null &&
+                           mergeBase.Sha.Equals(tip.Sha, StringComparison.OrdinalIgnoreCase);
+            }
+
+            result.Add(new BranchListItem(
+                Name:         b.FriendlyName,
+                UpstreamName: tracked?.FriendlyName,
+                TipSha:       tip?.Sha ?? string.Empty,
+                TipMessage:   tip?.MessageShort ?? string.Empty,
+                LastActivity: tip?.Committer.When ?? DateTimeOffset.MinValue,
+                Ahead:        ahead,
+                Behind:       behind,
+                IsCurrent:    b.IsCurrentRepositoryHead,
+                IsRemote:     b.IsRemote,
+                IsMerged:     isMerged));
+        }
+
+        return Task.FromResult<IReadOnlyList<BranchListItem>>(result);
+    }
+
+    public Task CheckoutBranchAsync(string branchName)
+    {
+        using var repo = OpenRepository();
+        var branch = repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Branch not found: {branchName}");
+
+        if (branch.IsRemote)
+        {
+            // Create (or reuse) a local tracking branch and check that out.
+            var localName = branchName.Contains('/') ? branchName[(branchName.IndexOf('/') + 1)..] : branchName;
+            var local = repo.Branches[localName];
+            if (local == null)
+            {
+                local = repo.CreateBranch(localName, branch.Tip);
+                repo.Branches.Update(local, b => b.TrackedBranch = branch.CanonicalName);
+            }
+            Commands.Checkout(repo, local);
+        }
+        else
+        {
+            Commands.Checkout(repo, branch);
+        }
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public Task<string> CreateBranchAsync(string name, string startPointSha)
+    {
+        using var repo = OpenRepository();
+        var commit = repo.Lookup<Commit>(startPointSha)
+            ?? throw new InvalidOperationException($"Start point not found: {startPointSha}");
+        var branch = repo.CreateBranch(name, commit);
+        return Task.FromResult(branch.FriendlyName);
+    }
+
+    public Task DeleteBranchAsync(string name, bool force)
+    {
+        using var repo = OpenRepository();
+        var branch = repo.Branches[name]
+            ?? throw new InvalidOperationException($"Branch not found: {name}");
+        if (branch.IsCurrentRepositoryHead)
+            throw new InvalidOperationException("Cannot delete the branch that is currently checked out.");
+        repo.Branches.Remove(branch);
+        return Task.CompletedTask;
+    }
+
+    public Task RenameBranchAsync(string oldName, string newName)
+    {
+        using var repo = OpenRepository();
+        var branch = repo.Branches[oldName]
+            ?? throw new InvalidOperationException($"Branch not found: {oldName}");
+        repo.Branches.Rename(branch, newName);
+        if (branch.IsCurrentRepositoryHead)
+            HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    // ── Phase 3: Commit-to-another-branch (Step B) ──────────────────────────
+
+    public Task<string> CommitToBranchAsync(CommitToBranchRequest request)
+    {
+        using var repo = OpenRepository();
+
+        if (string.Equals(request.TargetBranch, repo.Head.FriendlyName, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "Target is the current branch — use the normal commit/amend flow instead.");
+
+        var target = repo.Branches[request.TargetBranch]
+            ?? throw new InvalidOperationException($"Target branch not found: {request.TargetBranch}");
+        var targetTip = target.Tip
+            ?? throw new InvalidOperationException("Target branch has no commits to build on.");
+
+        // Capture the chosen changes as a tree WITHOUT touching the index or working tree.
+        var (tree, capturedPaths) = BuildCapturedTree(repo, request.IncludeUnstaged);
+        if (capturedPaths.Count == 0)
+            throw new InvalidOperationException("There are no changes to commit.");
+
+        var fallback = repo.Config.BuildSignature(DateTimeOffset.Now)
+                       ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+        var author = new Signature(
+            request.AuthorName  ?? fallback.Name,
+            request.AuthorEmail ?? fallback.Email,
+            DateTimeOffset.Now);
+
+        var commit = repo.ObjectDatabase.CreateCommit(
+            author, author, request.Message, tree, new[] { targetTip }, prettifyMessage: true);
+
+        repo.Refs.UpdateTarget(target.Reference, commit.Id,
+            $"commit to {request.TargetBranch}: {request.Message}");
+
+        // Move (opt-in): remove exactly the captured changes from the current branch.
+        if (request.RemoveFromCurrent)
+            RemoveCapturedChanges(repo, capturedPaths);
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.FromResult(commit.Sha);
+    }
+
+    // ── Phase 3: Branch snapshot (Step C) ───────────────────────────────────
+
+    public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted)
+    {
+        using var repo = OpenRepository();
+        var head = repo.Head.Tip
+            ?? throw new InvalidOperationException("Cannot snapshot — the repository has no commits yet.");
+
+        var branch = repo.CreateBranch(branchName, head);
+
+        if (includeUncommitted)
+        {
+            var (tree, capturedPaths) = BuildCapturedTree(repo, includeUnstaged: true);
+            if (capturedPaths.Count > 0)
+            {
+                var sig = repo.Config.BuildSignature(DateTimeOffset.Now)
+                          ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+                var commit = repo.ObjectDatabase.CreateCommit(
+                    sig, sig, "snapshot: uncommitted changes", tree, new[] { head }, prettifyMessage: true);
+                repo.Refs.UpdateTarget(branch.Reference, commit.Id, "snapshot uncommitted changes");
+            }
+        }
+
+        // The current branch and working tree are deliberately left untouched.
+        return Task.FromResult(branch.FriendlyName);
+    }
+
+    /// <summary>
+    /// Builds a tree object capturing the requested changes without disturbing the
+    /// index or working tree. Returns the tree and the set of paths it touched
+    /// (relative to the work dir). Staged-only uses the index tree; including unstaged
+    /// overlays working-dir modifications, additions and deletions on top.
+    /// </summary>
+    private static (Tree Tree, HashSet<string> Paths) BuildCapturedTree(Repository repo, bool includeUnstaged)
+    {
+        var headTree = repo.Head.Tip?.Tree;
+        var stagedTree = repo.ObjectDatabase.CreateTree(repo.Index);   // tree of the current index
+
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+
+        // Which paths differ between HEAD and the index (i.e. staged)?
+        if (headTree != null)
+        {
+            foreach (var change in repo.Diff.Compare<TreeChanges>(headTree, stagedTree))
+                paths.Add(change.Path);
+        }
+        else
+        {
+            foreach (var entry in repo.Index)
+                paths.Add(entry.Path);
+        }
+
+        if (!includeUnstaged)
+            return (stagedTree, paths);
+
+        // Overlay working-directory changes on top of the staged tree.
+        var td = TreeDefinition.From(stagedTree);
+        var workdir = repo.Info.WorkingDirectory;
+
+        var status = repo.RetrieveStatus(new StatusOptions
+        {
+            IncludeUntracked      = true,
+            RecurseUntrackedDirs  = true,
+            Show                  = StatusShowOption.WorkDirOnly,
+        });
+
+        foreach (var entry in status)
+        {
+            var state = entry.State;
+            if ((state & FileStatus.DeletedFromWorkdir) != 0)
+            {
+                td.Remove(entry.FilePath);
+                paths.Add(entry.FilePath);
+            }
+            else if ((state & FileStatus.ModifiedInWorkdir) != 0 ||
+                     (state & FileStatus.NewInWorkdir) != 0 ||
+                     (state & FileStatus.TypeChangeInWorkdir) != 0)
+            {
+                var full = Path.Combine(workdir, entry.FilePath);
+                if (File.Exists(full))
+                {
+                    var blob = repo.ObjectDatabase.CreateBlob(full);
+                    td.Add(entry.FilePath, blob, Mode.NonExecutableFile);
+                    paths.Add(entry.FilePath);
+                }
+            }
+        }
+
+        var combined = repo.ObjectDatabase.CreateTree(td);
+        return (combined, paths);
+    }
+
+    /// <summary>
+    /// Removes the given paths' changes from the working tree and index, restoring each
+    /// to its HEAD state (or deleting it if it does not exist in HEAD). Used by the
+    /// opt-in "move" mode of commit-to-branch. Other paths are left untouched.
+    /// </summary>
+    private static void RemoveCapturedChanges(Repository repo, HashSet<string> paths)
+    {
+        var headTip = repo.Head.Tip;
+        var headTree = headTip?.Tree;
+        var workdir = repo.Info.WorkingDirectory;
+
+        var inHead = new List<string>();
+        foreach (var path in paths)
+        {
+            var existsInHead = headTree?[path] != null;
+            if (existsInHead)
+            {
+                inHead.Add(path);
+            }
+            else
+            {
+                // Added by the user — unstage and delete from the working tree.
+                repo.Index.Remove(path);
+                try { File.Delete(Path.Combine(workdir, path)); } catch { /* best-effort */ }
+            }
+        }
+        repo.Index.Write();
+
+        if (inHead.Count > 0 && headTip != null)
+        {
+            repo.CheckoutPaths(headTip.Sha, inHead,
+                new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+        }
+    }
+
+    // ── Phase 3: Worktrees — routed to CLI via HybridGitBackend ─────────────
+
+    public Task<IReadOnlyList<WorktreeInfo>> GetWorktreesAsync() =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+    public Task<string> AddWorktreeAsync(string path, string branchName, bool createBranch) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+    public Task RemoveWorktreeAsync(string path, bool force) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+    public Task PruneWorktreesAsync() =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
 
     private static Remote ResolveRemote(Repository repo, string remoteName)
     {

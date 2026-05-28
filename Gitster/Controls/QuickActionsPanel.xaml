@@ -68,6 +68,26 @@
                 </Button>
             </UniformGrid>
 
+            <!-- Branch actions (Phase 3) -->
+            <UniformGrid Rows="1" Columns="2" Margin="0,4,0,0">
+                <Button Content="To branch…"
+                        Command="{Binding CommitToBranchCommand}"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,0"
+                        HorizontalAlignment="Stretch">
+                    <Button.ToolTip>Commit your changes onto another branch without switching</Button.ToolTip>
+                </Button>
+                <Button Content="Snapshot…"
+                        Command="{Binding SnapshotToBranchCommand}"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,0"
+                        HorizontalAlignment="Stretch">
+                    <Button.ToolTip>Save the current state as a named branch</Button.ToolTip>
+                </Button>
+            </UniformGrid>
+
         </StackPanel>
     </Border>
 </UserControl>

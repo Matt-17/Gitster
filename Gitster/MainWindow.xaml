@@ -83,6 +83,10 @@
                           IsEnabled="False" ToolTip="Coming in a future release"/>
             </MenuItem>
 
+            <MenuItem Header="_Tools" x:Name="ToolsMenu" SubmenuOpened="ToolsMenu_SubmenuOpened">
+                <MenuItem Header="Manage tools…" Command="{Binding ManageToolsCommand}"/>
+            </MenuItem>
+
             <MenuItem Header="_Help">
                 <MenuItem Header="Documentation"       Command="{Binding OpenDocsCommand}"/>
                 <MenuItem Header="Keyboard shortcuts"  Command="{Binding OpenShortcutsCommand}"/>

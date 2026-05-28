@@ -58,7 +58,9 @@ public partial class QuickActionsViewModel : BaseViewModel
             return;
         }
 
-        if (isNonHead && commit.RemoteState == CommitRemoteState.OnRemote)
+        // A reword rewrites the commit (new SHA) regardless of whether it's HEAD, so the
+        // force-push warning must fire for any already-pushed commit.
+        if (commit.RemoteState == CommitRemoteState.OnRemote)
         {
             var r = MessageBox.Show(
                 "This commit has already been pushed. Rewording it will require a force-push.\n\nContinue?",
@@ -122,22 +124,26 @@ public partial class QuickActionsViewModel : BaseViewModel
 
         try
         {
+            // BeforeSha must be the pre-operation HEAD (the undo target), NOT the fixup
+            // target commit — otherwise undo would reset to an older commit and discard work.
+            var beforeSha = await _git.GetHeadShaAsync();
             _ = _snapshots.CaptureAsync(_git, $"Fixup into {commit.CommitId}");
 
             await _feedback.RunAsync("Fixup", () => _git.FixupIntoCommitAsync(commit.FullSha));
 
             var afterSha = await _git.GetHeadShaAsync();
             var branch   = (await _git.GetCurrentBranchAsync()).Name;
-            var short7   = commit.FullSha.Length >= 7 ? commit.FullSha[..7] : commit.FullSha;
+            var target7  = commit.FullSha.Length >= 7 ? commit.FullSha[..7] : commit.FullSha;
+            var short7b  = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
             var short7a  = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
                 Timestamp:      DateTimeOffset.Now,
                 Kind:           OperationKind.Fixup,
-                Description:    $"Fixup into {short7}",
+                Description:    $"Fixup into {target7}",
                 BranchName:     branch,
-                BeforeSha:      short7,
+                BeforeSha:      short7b,
                 AfterSha:       short7a,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
@@ -160,6 +166,22 @@ public partial class QuickActionsViewModel : BaseViewModel
         var commits = _getMultiSelected();
         if (commits.Count < 2) return;
 
+        // Non-contiguous squash is ill-defined (a gap would silently fold unselected
+        // commits in). Require a continuous range and tell the user if there's a gap.
+        var selectedShas = commits.Select(c => c.FullSha).ToList();
+        bool contiguous;
+        try { contiguous = await _git.AreCommitsContiguousAsync(selectedShas); }
+        catch { contiguous = false; }
+
+        if (!contiguous)
+        {
+            MessageBox.Show(
+                "Squash needs a contiguous range of commits — your selection has a gap.\n\n" +
+                "Select commits that are directly next to each other in history and try again.",
+                "Cannot squash", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         var anyOnRemote = commits.Any(c => c.RemoteState == CommitRemoteState.OnRemote);
         if (anyOnRemote)
         {
@@ -175,12 +197,11 @@ public partial class QuickActionsViewModel : BaseViewModel
 
         try
         {
-            var shas      = commits.Select(c => c.FullSha).ToList();
             var beforeSha = await _git.GetHeadShaAsync();
             _ = _snapshots.CaptureAsync(_git, $"Squash {commits.Count} commits");
 
             await _feedback.RunAsync("Squash",
-                () => _git.SquashCommitsAsync(shas, dlg.CombinedMessage, dlg.OverrideDate));
+                () => _git.SquashCommitsAsync(selectedShas, dlg.CombinedMessage, dlg.OverrideDate));
 
             var afterSha  = await _git.GetHeadShaAsync();
             var branch    = (await _git.GetCurrentBranchAsync()).Name;
@@ -249,16 +270,18 @@ public partial class QuickActionsViewModel : BaseViewModel
 
             var afterSha = await _git.GetHeadShaAsync();
             var branch   = (await _git.GetCurrentBranchAsync()).Name;
-            var short7   = dlg.SelectedSha.Length >= 7 ? dlg.SelectedSha[..7] : dlg.SelectedSha;
+            var source7  = dlg.SelectedSha.Length >= 7 ? dlg.SelectedSha[..7] : dlg.SelectedSha;
+            // BeforeSha is the pre-op HEAD (undo target), not the cherry-picked source.
+            var short7b  = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
             var short7a  = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
                 Timestamp:      DateTimeOffset.Now,
                 Kind:           dlg.OverrideDate.HasValue ? OperationKind.CherryPickTimestamp : OperationKind.CherryPick,
-                Description:    $"Cherry-pick {short7}",
+                Description:    $"Cherry-pick {source7}",
                 BranchName:     branch,
-                BeforeSha:      short7,
+                BeforeSha:      short7b,
                 AfterSha:       short7a,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
@@ -273,6 +296,115 @@ public partial class QuickActionsViewModel : BaseViewModel
     }
 
     private bool CanCherryPick() => true; // Always enabled — dialog guides user
+
+    // ── Commit to another branch (Phase 3, Step B) ────────────────────────
+
+    [RelayCommand]
+    private async Task CommitToBranch()
+    {
+        IReadOnlyList<BranchListItem> branches;
+        string current;
+        try
+        {
+            branches = await _git.GetBranchListAsync();
+            current  = (await _git.GetCurrentBranchAsync()).Name;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not load branches:\n{ex.Message}", "Gitster",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var localTargets = branches
+            .Where(b => !b.IsRemote && !string.Equals(b.Name, current, StringComparison.Ordinal))
+            .Select(b => b.Name)
+            .ToList();
+
+        var dlg = new CommitToBranchDialog(localTargets) { Owner = Application.Current.MainWindow };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            var beforeSha = await _git.GetHeadShaAsync();
+            _ = _snapshots.CaptureAsync(_git, $"Commit to branch {dlg.TargetBranch}");
+
+            // If the user typed a brand-new branch name, create it at the current HEAD first.
+            var exists = branches.Any(b => !b.IsRemote &&
+                string.Equals(b.Name, dlg.TargetBranch, StringComparison.Ordinal));
+            if (!exists)
+                await _git.CreateBranchAsync(dlg.TargetBranch, beforeSha);
+
+            var newSha = await _feedback.RunAsync("Commit to branch",
+                () => _git.CommitToBranchAsync(new CommitToBranchRequest(
+                    dlg.TargetBranch, dlg.Message, dlg.AuthorName, dlg.AuthorEmail,
+                    dlg.IncludeUnstaged, dlg.RemoveFromCurrent)),
+                sha => sha.Length > 7 ? sha[..7] : sha);
+
+            // The current branch HEAD does not move; record for the audit log with the
+            // current HEAD as before/after (the snapshot above is the recovery net).
+            var afterHead = await _git.GetHeadShaAsync();
+            var short7b   = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
+            var short7a   = afterHead.Length >= 7 ? afterHead[..7] : afterHead;
+            var target7   = newSha.Length >= 7 ? newSha[..7] : newSha;
+
+            await _opsLog.RecordAsync(new OperationRecord(
+                Id:             Guid.NewGuid().ToString(),
+                Timestamp:      DateTimeOffset.Now,
+                Kind:           OperationKind.CommitOnBranch,
+                Description:    $"Commit {target7} to {dlg.TargetBranch}",
+                BranchName:     current,
+                BeforeSha:      short7b,
+                AfterSha:       short7a,
+                ReflogSelector: null,
+                Status:         OperationStatus.Active));
+
+            await _onRefresh();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Commit to branch failed:\n{ex.Message}", "Gitster",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // ── Snapshot to branch (Phase 3, Step C) ──────────────────────────────
+
+    [RelayCommand]
+    private async Task SnapshotToBranch()
+    {
+        var dlg = new SnapshotBranchDialog { Owner = Application.Current.MainWindow };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            var beforeSha = await _git.GetHeadShaAsync();
+            _ = _snapshots.CaptureAsync(_git, $"Snapshot to branch {dlg.BranchName}");
+
+            var created = await _feedback.RunAsync("Snapshot",
+                () => _git.CreateSnapshotBranchAsync(dlg.BranchName, dlg.IncludeUncommitted),
+                name => name);
+
+            var short7 = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
+            await _opsLog.RecordAsync(new OperationRecord(
+                Id:             Guid.NewGuid().ToString(),
+                Timestamp:      DateTimeOffset.Now,
+                Kind:           OperationKind.Snapshot,
+                Description:    $"Snapshot → branch '{created}'",
+                BranchName:     (await _git.GetCurrentBranchAsync()).Name,
+                BeforeSha:      short7,
+                AfterSha:       short7,
+                ReflogSelector: null,
+                Status:         OperationStatus.Active));
+
+            await _onRefresh();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Snapshot failed:\n{ex.Message}", "Gitster",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
 
     // ── Change Author ─────────────────────────────────────────────────────
 

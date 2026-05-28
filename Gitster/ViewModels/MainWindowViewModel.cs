@@ -35,6 +35,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly AuthorDirectoryService _authorDirService;
     private readonly SnapshotService _snapshotService = new();
     private readonly StashNameService _stashNameService = new();
+    private readonly CustomToolsService _customToolsService = new();
     private bool _hasTrackingBranch = true;
 
     public TitleBarViewModel TitleBarVM { get; }
@@ -47,6 +48,8 @@ public partial class MainWindowViewModel : BaseViewModel
     public AuthorPanelViewModel AuthorPanelVM { get; }
     public SidebarViewModel SidebarVM { get; } = new();
     public StashesViewModel StashesVM { get; }
+    public BranchesViewModel BranchesVM { get; }
+    public WorktreesViewModel WorktreesVM { get; }
     public OperationsLogService OpsLogService => _opsLogService;
 
     public MainWindowViewModel()
@@ -92,6 +95,18 @@ public partial class MainWindowViewModel : BaseViewModel
             _snapshotService,
             _stashNameService,
             async () => await RefreshSidebarBadgesAsync());
+        BranchesVM = new BranchesViewModel(
+            _gitBackend,
+            _feedbackService,
+            _opsLogService,
+            _snapshotService,
+            async () => await RefreshSidebarBadgesAsync());
+        WorktreesVM = new WorktreesViewModel(
+            _gitBackend,
+            _feedbackService,
+            _snapshotService,
+            () => Path,
+            OpenRepoByPath);
 
         // Update ops log badge whenever the log changes
         _opsLogService.Changed += (_, _) =>
@@ -413,6 +428,88 @@ public partial class MainWindowViewModel : BaseViewModel
         catch (Exception ex)
         {
             MessageBox.Show($"Error rewriting timestamps: {ex.Message}");
+        }
+    }
+
+    // ── Custom tools (Phase 3, Step E) ────────────────────────────────────
+
+    /// <summary>All custom tools (repo-scoped first, then global) for the Tools menu.</summary>
+    public IReadOnlyList<Gitster.Models.CustomTool> GetCustomTools()
+    {
+        try { return _customToolsService.GetTools(); }
+        catch { return []; }
+    }
+
+    [RelayCommand]
+    private void ManageTools()
+    {
+        var vm = new ManageToolsViewModel(_customToolsService);
+        var window = new Views.ManageToolsDialog(vm) { Owner = Application.Current.MainWindow };
+        window.ShowDialog();
+    }
+
+    public async Task RunCustomToolAsync(Gitster.Models.CustomTool tool)
+    {
+        // Resolve a selected commit if the tool needs one.
+        string? revision = null;
+        if (tool.NeedsCommit)
+        {
+            var selected = CommitListVM.SelectedCommit;
+            if (selected is null || string.IsNullOrEmpty(selected.FullSha))
+            {
+                MessageBox.Show("Select a commit first — this tool needs one.",
+                    tool.Name, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            revision = selected.FullSha;
+        }
+
+        // Ask for $ARGS if the tool prompts.
+        string? args = null;
+        if (!string.IsNullOrEmpty(tool.Prompt))
+        {
+            var input = new Views.TextInputDialog
+            {
+                Title  = tool.Name,
+                Prompt = tool.Prompt!,
+                Owner  = Application.Current.MainWindow,
+            };
+            if (input.ShowDialog() != true) return;
+            args = input.Value;
+        }
+
+        var command = _customToolsService.Substitute(tool.Command, revision, args, TitleBarVM.CurrentBranch);
+
+        // Confirm, showing the exact command that will run.
+        if (!string.IsNullOrEmpty(tool.Confirm))
+        {
+            var prompt = $"{tool.Confirm}\n\nCommand:\n{command}";
+            if (MessageBox.Show(prompt, tool.Name, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+        }
+
+        // Snapshot before running ANY tool — Gitster can't know what a tool does.
+        _ = _snapshotService.CaptureAsync(_gitBackend, $"Before tool: {tool.Name}");
+
+        try
+        {
+            var result = await _feedbackService.RunAsync(tool.Name,
+                () => _customToolsService.RunAsync(command),
+                r => r.Success ? "completed" : $"exit {r.ExitCode}");
+
+            var dialog = new Views.ToolResultDialog(tool.Name, result.ExitCode, result.Output)
+            {
+                Owner = Application.Current.MainWindow,
+            };
+            dialog.ShowDialog();
+
+            // A tool may have changed the repository — refresh.
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Tool '{tool.Name}' failed:\n{ex.Message}", "Gitster",
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -774,12 +871,17 @@ public partial class MainWindowViewModel : BaseViewModel
             // Update status bar information
             UpdateStatusBar(repo);
 
-            // Load stashes
+            // Load stashes, branches and worktrees
             await StashesVM.LoadAsync();
+            await BranchesVM.LoadAsync();
+            await WorktreesVM.LoadAsync();
+            SidebarVM.BranchCount = BranchesVM.LocalCount;
         }
         catch (Exception)
         {
             StashesVM.Clear();
+            BranchesVM.Clear();
+            WorktreesVM.Clear();
             // Empty all the fields
             CurrentCommitDetail.Clear();
             SelectedCommitDetail.Clear();
@@ -875,6 +977,7 @@ public partial class MainWindowViewModel : BaseViewModel
             _ = _opsLogService.AttachAsync(Path);
             _ = _snapshotService.AttachAsync(Path);
             _ = _stashNameService.AttachAsync(Path);
+            _customToolsService.Attach(Path);
         }
         catch
         {

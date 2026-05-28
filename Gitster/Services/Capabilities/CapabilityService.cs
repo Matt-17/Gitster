@@ -41,7 +41,7 @@ public partial class CapabilityService : ObservableObject
         "FixupAutosquash"   => "Requires Git CLI (install Git to enable).",
         "PickaxeSearch"     => "Coming in phase 4.",
         "RangeDiff"         => "Coming in phase 4 (requires Git CLI).",
-        "Worktrees"         => "Coming in phase 3.",
+        "Worktrees"         => "Requires the Git command-line tool to be installed.",
         "CommitSigning"     => "Coming later (requires Git CLI and GPG/SSH setup).",
         _                   => "Unavailable.",
     };

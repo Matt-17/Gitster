@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using Gitster.Models;
 using Gitster.Services;
 using Gitster.ViewModels;
 
@@ -34,6 +36,53 @@ public partial class MainWindow : Window
     {
         base.OnClosing(e);
         SaveWindowSettings();
+    }
+
+    private void ToolsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        // Rebuild the dynamic tool entries each time the menu opens, keeping the
+        // fixed "Manage tools…" item at the bottom. Repo-scoped tools come first,
+        // then a separator, then global tools.
+        ToolsMenu.Items.Clear();
+
+        var tools = _viewModel.GetCustomTools();
+
+        bool anyRepo = false, anyGlobal = false;
+        foreach (var tool in tools.Where(t => t.Scope == CustomToolScope.Repository))
+        {
+            ToolsMenu.Items.Add(BuildToolMenuItem(tool));
+            anyRepo = true;
+        }
+
+        var globalTools = tools.Where(t => t.Scope == CustomToolScope.Global).ToList();
+        if (anyRepo && globalTools.Count > 0)
+            ToolsMenu.Items.Add(new Separator());
+
+        foreach (var tool in globalTools)
+        {
+            ToolsMenu.Items.Add(BuildToolMenuItem(tool));
+            anyGlobal = true;
+        }
+
+        if (anyRepo || anyGlobal)
+            ToolsMenu.Items.Add(new Separator());
+
+        ToolsMenu.Items.Add(new MenuItem
+        {
+            Header  = "Manage tools…",
+            Command = _viewModel.ManageToolsCommand,
+        });
+    }
+
+    private MenuItem BuildToolMenuItem(CustomTool tool)
+    {
+        var item = new MenuItem
+        {
+            Header   = tool.Name,
+            ToolTip  = tool.Command,
+        };
+        item.Click += async (_, _) => await _viewModel.RunCustomToolAsync(tool);
+        return item;
     }
 
     private void RestoreWindowSettings()
