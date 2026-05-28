@@ -124,6 +124,12 @@
                             </Style>
                         </Path.Style>
                     </Path>
+                    <!-- Badge dot -->
+                    <Border Width="6" Height="6" CornerRadius="3"
+                            Background="{StaticResource AccentBlue}"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,9,9,0"
+                            Visibility="{Binding HasBranchBadge, Converter={StaticResource BoolToVis}}"/>
                 </Grid>
             </Button>
 

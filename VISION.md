@@ -88,7 +88,7 @@ Das löst das Problem „selten gebrauchte Aktionen vergisst man, wo sie sind" �
 
 ## Aktueller Stand
 
-Stand: Phase 1 ist vollständig abgeschlossen ✅. Phase 2a (Modus-Sidebar) ist vollständig implementiert ✅. Phase 2b (Stash-Killer) ist als nächstes geplant. Die folgenden Sektionen markieren erledigte Features mit ✅, in Arbeit mit 🔧, und noch offen mit ⬜.
+Stand: Phase 1 ist vollständig abgeschlossen ✅. Phase 2a (Modus-Sidebar) ist vollständig implementiert ✅. Phase 2b (Stash-Killer & Fixup-Workflow) ist implementiert und auditiert ✅. Phase 3 (Branch-Operationen & Custom Tools) ist vollständig implementiert ✅. Die folgenden Sektionen markieren erledigte Features mit ✅, in Arbeit mit 🔧, und noch offen mit ⬜.
 
 ---
 
@@ -192,15 +192,16 @@ Die Recherche zu universellen Schmerzpunkten in Git-GUIs hat ergeben: anonyme St
 
 ---
 
-## Phase 3 – Branch-Operationen & Custom Tools
+## Phase 3 – Branch-Operationen & Custom Tools ✅
 
 Diese Phase eliminiert Kontextwechsel zwischen Branches und macht Gitster für jeden User individuell anpassbar.
 
-- **Commit auf anderen Branch** – Staged/unstaged Dateien direkt in einen anderen Branch committen, ohne `stash` oder `switch` – der aktuelle Workingstate bleibt unangetastet
-- **Branch-Snapshot** – Aktuellen Stand als neuen Branch sichern (leichtgewichtiger als Stash, benannter als Stash)
-- **Worktrees als First-Class-Citizen** – Worktrees anlegen, wechseln, im Dateisystem öffnen, verwaiste aufräumen. Die richtige Antwort auf „ich muss schnell auf einem anderen Branch arbeiten", aber heute praktisch unbenutzbar wegen CLI-Friktion.
-- **Branch-Liste nach Datum** – Branches sortiert nach letztem Commit-Datum statt alphabetisch (niemand will `feature/xyz-old` ganz oben sehen)
-- **Custom Tools Menu** – Ein Feature, das `git gui` seit 15 Jahren hat und das *kein* modernes GUI übernommen hat: User definieren in `.gitconfig` oder in den Gitster-Settings Custom-Commands (`[guitool "name"]`-Sektionen oder ein eigenes Gitster-Format), die als Menüeinträge erscheinen. Beispiel: ein User-defined-Command „Create feature branch" prompted nach einem Namen und führt `git checkout development && git checkout -b feature__$1 development` aus. Ideal für Teams mit eigenem Branching-Modell. Repository-spezifische Commands überschreiben globale.
+- ✅ **Branches-Modus** – Lokale und Remote-Branches als gruppierte Liste (Local/Remote), nach letzter Aktivität sortiert (alternativ A–Z), mit Ahead/Behind-Badges, aktuellem-Branch-Marker, Filter. Aktionen: Checkout (mit Stash-and-Checkout bei dirty Working-Tree), Rename, Delete (Warnung bei unmerged), „New from here".
+- ✅ **Commit auf anderen Branch** – Staged/unstaged Dateien direkt in einen anderen Branch committen, ohne `stash` oder `switch` – per Tree-Capture über die libgit2-Objektdatenbank, der aktuelle Workingstate bleibt byte-genau unangetastet. Copy ist Default, Move ist opt-in. Degenerierter Same-Branch-Fall wird abgefangen.
+- ✅ **Branch-Snapshot** – Aktuellen Stand als neuen Branch sichern (leichtgewichtiger als Stash, benannter als Stash), optional inkl. uncommitteter Änderungen, ohne den Working-Tree zu stören.
+- ✅ **Worktrees als First-Class-Citizen** – Worktrees anlegen, wechseln, im Dateisystem öffnen, in Gitster öffnen, verwaiste aufräumen (prune). Über die Git-CLI, hinter der `Worktrees`-Capability; ohne CLI klarer „Requires Git command-line tool"-Zustand.
+- ✅ **Branch-Liste nach Datum** – Branches sortiert nach letztem Commit-Datum statt alphabetisch (niemand will `feature/xyz-old` ganz oben sehen).
+- ✅ **Custom Tools Menu** – User definieren in `.gitconfig` (`[guitool "name"]`-Sektionen, read-only importiert) oder in Gitsters eigenem JSON-Format (`%AppData%/Gitster/custom-tools.json` global, `.git/gitster/custom-tools.json` pro Repo) Custom-Commands, die im Tools-Menü erscheinen. Platzhalter `$REVISION`/`$CUR`, `$ARGS`, `$BRANCH`, `$REPO`. Optionale Confirm- und Prompt-Dialoge, Output-Dialog. „Manage tools…"-Dialog zum Anlegen/Bearbeiten/Löschen mit Scope-Wahl. Repository-spezifische Commands überschreiben globale. Vor jedem Tool-Lauf wird ein Snapshot genommen.
 
 ---
 

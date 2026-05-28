@@ -25,6 +25,10 @@ public partial class SidebarViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasOpsLogBadge))]
     public partial int ActiveOpsCount { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBranchBadge))]
+    public partial int BranchCount { get; set; }
+
     public bool IsCommitsActive       => CurrentMode == AppMode.Commits;
     public bool IsStashesActive       => CurrentMode == AppMode.Stashes;
     public bool IsBranchesActive      => CurrentMode == AppMode.Branches;
@@ -33,6 +37,7 @@ public partial class SidebarViewModel : ObservableObject
     public bool IsOperationsLogActive => CurrentMode == AppMode.OperationsLog;
     public bool HasStashBadge         => StashCount > 0;
     public bool HasOpsLogBadge        => ActiveOpsCount > 0;
+    public bool HasBranchBadge        => BranchCount > 0;
 
     [RelayCommand]
     private void SelectMode(AppMode mode) => CurrentMode = mode;

@@ -48,6 +48,24 @@ public interface IGitBackend
     Task SquashCommitsAsync(IReadOnlyList<string> shas, string combinedMessage, DateTimeOffset? overrideDate);
     Task<IReadOnlyList<BranchSummary>> GetBranchesAsync();
     Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200);
+    Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas);
+
+    // ── Phase 3: Branch operations (libgit2) ──────────────────────────────
+    Task<IReadOnlyList<BranchListItem>> GetBranchListAsync();
+    Task CheckoutBranchAsync(string branchName);
+    Task<string> CreateBranchAsync(string name, string startPointSha);
+    Task DeleteBranchAsync(string name, bool force);
+    Task RenameBranchAsync(string oldName, string newName);
+
+    // ── Phase 3: Commit-to-branch & snapshot (libgit2) ────────────────────
+    Task<string> CommitToBranchAsync(CommitToBranchRequest request);
+    Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted);
+
+    // ── Phase 3: Worktrees (CLI) ──────────────────────────────────────────
+    Task<IReadOnlyList<WorktreeInfo>> GetWorktreesAsync();
+    Task<string> AddWorktreeAsync(string path, string branchName, bool createBranch);
+    Task RemoveWorktreeAsync(string path, bool force);
+    Task PruneWorktreesAsync();
 
     GitCapabilities Capabilities { get; }
 }

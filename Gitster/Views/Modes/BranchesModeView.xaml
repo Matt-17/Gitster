@@ -3,15 +3,238 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:converters="clr-namespace:Gitster.Converters"
+             d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
-    <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5">
-            <TextBlock Text="Branch management" FontSize="16"
-                       Foreground="{StaticResource TextPrimary}"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Coming in Phase 3" FontSize="13" Margin="0,6,0,0"
-                       Foreground="{StaticResource TextTertiary}"
-                       HorizontalAlignment="Center"/>
-        </StackPanel>
+
+    <UserControl.Resources>
+        <converters:RelativeDateConverter x:Key="RelativeDate"/>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+        <converters:InverseBoolVisibilityConverter x:Key="InverseBoolVis"/>
+    </UserControl.Resources>
+
+    <Grid DataContext="{Binding BranchesVM}"
+          d:DataContext="{d:DesignInstance Type=vm:BranchesViewModel}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="380"/>
+            <ColumnDefinition Width="4"/>
+            <ColumnDefinition Width="320" MinWidth="260"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ══════════════ Left column ══════════════ -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Filter + sort row -->
+            <Grid Grid.Row="0" Margin="10,10,10,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0"
+                         Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="12" Padding="6,4"
+                         Background="{StaticResource BackgroundSecondary}"
+                         Foreground="{StaticResource TextPrimary}"
+                         BorderBrush="{StaticResource BorderTertiary}"
+                         ToolTip="Filter branches by name"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="Recent"
+                            Command="{Binding SortByDateCommand}"
+                            Padding="10,4" Margin="0,0,4,0"
+                            ToolTip="Sort by most recent activity">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SortByDateActive}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="A–Z"
+                            Command="{Binding SortByNameToggleCommand}"
+                            Padding="10,4"
+                            ToolTip="Sort alphabetically">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SortByNameActive}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Empty state -->
+            <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5"
+                        Visibility="{Binding HasBranches, Converter={StaticResource InverseBoolVis}}">
+                <TextBlock Text="No branches" FontSize="15"
+                           Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Branch list -->
+            <ListView Grid.Row="1"
+                      ItemsSource="{Binding GroupedBranches}"
+                      SelectedItem="{Binding SelectedBranch}"
+                      Background="Transparent" BorderThickness="0"
+                      Visibility="{Binding HasBranches, Converter={StaticResource BoolVis}}"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListView.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"
+                                           FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           Margin="10,8,0,4"/>
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListView.GroupStyle>
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="6,5"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Current-branch accent dot -->
+                            <Ellipse Grid.Column="0" Width="6" Height="6" Margin="0,0,6,0"
+                                     VerticalAlignment="Center"
+                                     Fill="{StaticResource AccentBlue}"
+                                     Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
+
+                            <!-- Name + tip message -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}"
+                                           FontSize="13" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding TipMessage}"
+                                           FontSize="11" Foreground="{StaticResource TextTertiary}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+
+                            <!-- Ahead/behind badges -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                        VerticalAlignment="Center" Margin="6,0">
+                                <TextBlock Text="{Binding AheadText}" FontSize="11"
+                                           FontFamily="{StaticResource FontFamilyMono}"
+                                           Foreground="{StaticResource AccentSuccess}"
+                                           Margin="0,0,4,0"
+                                           Visibility="{Binding ShowAhead, Converter={StaticResource BoolVis}}"/>
+                                <TextBlock Text="{Binding BehindText}" FontSize="11"
+                                           FontFamily="{StaticResource FontFamilyMono}"
+                                           Foreground="{StaticResource AccentWarning}"
+                                           Visibility="{Binding ShowBehind, Converter={StaticResource BoolVis}}"/>
+                            </StackPanel>
+
+                            <!-- Last activity -->
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding LastActivityLocal, Converter={StaticResource RelativeDate}}"
+                                       FontSize="11" Foreground="{StaticResource TextSecondary}"
+                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+        <!-- Splitter -->
+        <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
+                      Background="{StaticResource BorderTertiary}"
+                      ResizeBehavior="PreviousAndNext"/>
+
+        <!-- ══════════════ Right column: action panel ══════════════ -->
+        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="10">
+            <StackPanel>
+                <TextBlock Text="Select a branch to manage it"
+                           FontSize="13" Foreground="{StaticResource TextTertiary}"
+                           HorizontalAlignment="Center" Margin="0,40,0,0"
+                           Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVis}}"/>
+
+                <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolVis}}">
+                    <!-- Selected-branch card -->
+                    <Border Style="{StaticResource PanelCard}" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedBranch.Name}"
+                                       FontSize="14" FontWeight="Medium"
+                                       Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                            <TextBlock FontSize="11" FontFamily="{StaticResource FontFamilyMono}"
+                                       Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0">
+                                <Run Text="{Binding SelectedBranch.ShortSha, Mode=OneWay}"/>
+                                <Run Text=" · "/>
+                                <Run Text="{Binding SelectedBranch.UpstreamDisplay, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Text="{Binding SelectedBranch.TipMessage}"
+                                       FontSize="11" Foreground="{StaticResource TextTertiary}"
+                                       TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Button Content="Checkout"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding CheckoutCommand}"
+                            HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Button Grid.Row="0" Grid.Column="0" Content="Rename…"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding RenameCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Grid.Row="0" Grid.Column="2" Content="New from here…"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding CreateFromHereCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Grid.Row="2" Grid.Column="0" Content="Delete"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding DeleteCommand}"
+                                Foreground="{StaticResource AccentDanger}" HorizontalAlignment="Stretch"/>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

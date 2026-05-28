@@ -64,6 +64,22 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<string> ConvertStashToBranchAsync(int stashIndex, string branchName)   => _lib.ConvertStashToBranchAsync(stashIndex, branchName);
     public Task<IReadOnlyList<BranchSummary>> GetBranchesAsync()               => _lib.GetBranchesAsync();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200) => _lib.GetCommitsForRefAsync(refName, maxCount);
+    public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)    => _lib.AreCommitsContiguousAsync(shas);
+
+    // ── Phase 3: branch ops, commit-to-branch, snapshot (libgit2) ─────────
+    public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync()            => _lib.GetBranchListAsync();
+    public Task CheckoutBranchAsync(string branchName)                        => _lib.CheckoutBranchAsync(branchName);
+    public Task<string> CreateBranchAsync(string name, string startPointSha)  => _lib.CreateBranchAsync(name, startPointSha);
+    public Task DeleteBranchAsync(string name, bool force)                    => _lib.DeleteBranchAsync(name, force);
+    public Task RenameBranchAsync(string oldName, string newName)             => _lib.RenameBranchAsync(oldName, newName);
+    public Task<string> CommitToBranchAsync(CommitToBranchRequest request)    => _lib.CommitToBranchAsync(request);
+    public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted) => _lib.CreateSnapshotBranchAsync(branchName, includeUncommitted);
+
+    // ── Phase 3: worktrees (CLI) ──────────────────────────────────────────
+    public Task<IReadOnlyList<WorktreeInfo>> GetWorktreesAsync()              => _cli.GetWorktreesAsync();
+    public Task<string> AddWorktreeAsync(string path, string branchName, bool createBranch) => _cli.AddWorktreeAsync(path, branchName, createBranch);
+    public Task RemoveWorktreeAsync(string path, bool force)                  => _cli.RemoveWorktreeAsync(path, force);
+    public Task PruneWorktreesAsync()                                         => _cli.PruneWorktreesAsync();
 
     // ── Routed methods (lib or cli depending on context) ──────────────────
 
