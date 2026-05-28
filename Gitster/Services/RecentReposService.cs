@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -8,6 +9,14 @@ namespace Gitster.Services;
 
 public record RecentRepoEntry(string FullPath, DateTime LastOpenedAt)
 {
+    public bool Pinned     { get; init; }
+    public int  PinnedOrder{ get; init; }
+
+    [JsonIgnore]
+    public string DisplayName
+        => Path.GetFileName(FullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+    [JsonIgnore]
     public string DisplayPath
     {
         get
@@ -41,11 +50,54 @@ public partial class RecentReposService : ObservableObject
     {
         var existing = Entries.FirstOrDefault(e =>
             string.Equals(e.FullPath, path, StringComparison.OrdinalIgnoreCase));
+        bool wasPinned = existing?.Pinned ?? false;
+        int pinnedOrder = existing?.PinnedOrder ?? 0;
+
         if (existing != null) Entries.Remove(existing);
-        Entries.Insert(0, new RecentRepoEntry(path, DateTime.Now));
-        while (Entries.Count > MaxEntries) Entries.RemoveAt(Entries.Count - 1);
+        Entries.Insert(0, new RecentRepoEntry(path, DateTime.Now)
+        {
+            Pinned      = wasPinned,
+            PinnedOrder = pinnedOrder,
+        });
+
+        // Keep at most MaxEntries non-pinned entries; pinned entries are never trimmed.
+        var nonPinnedToRemove = Entries.Where(e => !e.Pinned).Skip(MaxEntries).ToList();
+        foreach (var r in nonPinnedToRemove) Entries.Remove(r);
+
         Save();
     }
+
+    public void Pin(string path)
+    {
+        var existing = Entries.FirstOrDefault(e =>
+            string.Equals(e.FullPath, path, StringComparison.OrdinalIgnoreCase));
+        if (existing == null || existing.Pinned) return;
+
+        int nextOrder = Entries.Where(e => e.Pinned).Select(e => e.PinnedOrder).DefaultIfEmpty(-1).Max() + 1;
+        var idx = Entries.IndexOf(existing);
+        Entries[idx] = existing with { Pinned = true, PinnedOrder = nextOrder };
+        Save();
+    }
+
+    public void Unpin(string path)
+    {
+        var existing = Entries.FirstOrDefault(e =>
+            string.Equals(e.FullPath, path, StringComparison.OrdinalIgnoreCase));
+        if (existing == null || !existing.Pinned) return;
+
+        var idx = Entries.IndexOf(existing);
+        Entries[idx] = existing with { Pinned = false, PinnedOrder = 0 };
+        Save();
+    }
+
+    public bool IsPinned(string path)
+        => Entries.Any(e => string.Equals(e.FullPath, path, StringComparison.OrdinalIgnoreCase) && e.Pinned);
+
+    public IReadOnlyList<RecentRepoEntry> GetPinned()
+        => [.. Entries.Where(e => e.Pinned).OrderBy(e => e.PinnedOrder)];
+
+    public IReadOnlyList<RecentRepoEntry> GetRecent()
+        => [.. Entries.Where(e => !e.Pinned)];
 
     private void Load()
     {

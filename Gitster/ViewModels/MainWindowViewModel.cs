@@ -34,6 +34,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly RecentReposService _recentRepos;
     private readonly AuthorDirectoryService _authorDirService;
     private readonly SnapshotService _snapshotService = new();
+    private bool _hasTrackingBranch = true;
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -61,7 +62,7 @@ public partial class MainWindowViewModel : BaseViewModel
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
         StatusBarVM = new StatusBarViewModel(_stateService, _feedbackService);
-        TitleBarVM = new TitleBarViewModel(BrowseFolder, AutoFetch);
+        TitleBarVM = new TitleBarViewModel(BrowseFolder, OpenRepoByPath, AutoFetch, _recentRepos);
         TitleBarVM.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(TitleBarViewModel.RepositoryName) or nameof(TitleBarViewModel.CurrentBranch))
@@ -250,6 +251,13 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             MessageBox.Show($"Error opening folder dialog: {ex.Message}");
         }
+    }
+
+    /// <summary>Opens a repository by path directly (used by recent-repos dropdown).</summary>
+    private void OpenRepoByPath(string path)
+    {
+        FolderPath = path;
+        _recentRepos.Record(path);
     }
 
     [RelayCommand]
@@ -600,7 +608,7 @@ public partial class MainWindowViewModel : BaseViewModel
         UpdateFilterStatus();
 
         // Feed CommitListViewModel (handles auto-select and live text filter)
-        CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText);
+        CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText, _hasTrackingBranch);
     }
 
     private void AutoSelectCommit()
@@ -675,7 +683,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 IsGoButtonEnabled = false;
                 _allCommits.Clear();
                 Commits = [];
-                CommitListVM.SetBaseCommits([], false, string.Empty);
+                CommitListVM.SetBaseCommits([], false, string.Empty, hasTrackingBranch: false);
                 UpdateStatusBar(repo);
                 return;
             }
@@ -715,6 +723,9 @@ public partial class MainWindowViewModel : BaseViewModel
             // Refresh author directory from loaded commits
             _ = _authorDirService.RefreshAsync();
 
+            // Detect whether the current branch has an upstream tracking branch
+            _hasTrackingBranch = repo.Head?.TrackedBranch?.Tip != null;
+
             // Apply filters if any are active, otherwise show all commits
             if (Filter.HasActiveFilters())
             {
@@ -728,7 +739,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 UpdateFilterStatus();
 
                 // Feed CommitListViewModel (handles auto-select and live text filter)
-                CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText);
+                CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText, _hasTrackingBranch);
             }
 
             // Update remotes list
@@ -761,7 +772,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
             // Clear status bar
             TitleBarVM.Clear();
-            CommitListVM.SetBaseCommits([], false, string.Empty);
+            CommitListVM.SetBaseCommits([], false, string.Empty, hasTrackingBranch: false);
         }
 
         await RefreshSidebarBadgesAsync();
@@ -805,6 +816,7 @@ public partial class MainWindowViewModel : BaseViewModel
             // Get repository name from path
             var repoPath = repo.Info.WorkingDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar);
             var repoName = System.IO.Path.GetFileName(repoPath);
+            TitleBarVM.CurrentRepositoryPath = repoPath;
 
             // Calculate incoming and outgoing commits
             int incoming = 0;

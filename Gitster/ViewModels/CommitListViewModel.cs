@@ -13,9 +13,21 @@ public partial class CommitListViewModel : BaseViewModel
     private List<CommitItem> _baseCommits = [];
     private bool _dialogHasActiveFilters;
     private string _dialogFilterStatusText = string.Empty;
+    private bool _hasTrackingBranch = true;
 
     private readonly Action _openFilter;
     private readonly Action _clearDialogFilters;
+
+    // ── Section counts (real commits only, excluding placeholders) ───────────
+    public int  IncomingCount      { get; private set; }
+    public int  OutgoingCount      { get; private set; }
+    public int  SyncedCount        { get; private set; }
+    public bool HasTrackingBranch  { get; private set; } = true;
+
+    public string IncomingCountText        => HasTrackingBranch ? $"\u00B7 {IncomingCount}" : "\u00B7 unknown";
+    public string OutgoingCountText        => $"\u00B7 {OutgoingCount}";
+    public string SyncedCountText          => $"\u00B7 {SyncedCount}";
+    public string? IncomingNoTrackingTooltip => HasTrackingBranch ? null : "No tracking branch configured";
 
     public CommitListViewModel(Action openFilter, Action clearDialogFilters)
     {
@@ -90,8 +102,9 @@ public partial class CommitListViewModel : BaseViewModel
     /// Called by MainWindowViewModel whenever the dialog-filtered commit list changes.
     /// CommitListViewModel applies its own live text filter on top and handles auto-selection.
     /// </summary>
-    public void SetBaseCommits(List<CommitItem> commits, bool dialogHasActiveFilters = false, string dialogFilterStatusText = "")
+    public void SetBaseCommits(List<CommitItem> commits, bool dialogHasActiveFilters = false, string dialogFilterStatusText = "", bool hasTrackingBranch = true)
     {
+        _hasTrackingBranch = hasTrackingBranch;
         _baseCommits = commits;
         _dialogHasActiveFilters = dialogHasActiveFilters;
         _dialogFilterStatusText = dialogFilterStatusText;
@@ -117,17 +130,42 @@ public partial class CommitListViewModel : BaseViewModel
             }
         }
 
-        Commits = filtered.ToList();
+        var result = filtered.ToList();
+
+        // Compute real section counts (before adding placeholders)
+        IncomingCount = result.Count(c => c.GroupLabel == "Incoming");
+        OutgoingCount = result.Count(c => c.GroupLabel == "Outgoing");
+        SyncedCount   = result.Count(c => c.GroupLabel == "Synced");
+        HasTrackingBranch = _hasTrackingBranch;
+
+        OnPropertyChanged(nameof(IncomingCount));
+        OnPropertyChanged(nameof(OutgoingCount));
+        OnPropertyChanged(nameof(SyncedCount));
+        OnPropertyChanged(nameof(HasTrackingBranch));
+        OnPropertyChanged(nameof(IncomingCountText));
+        OnPropertyChanged(nameof(OutgoingCountText));
+        OnPropertyChanged(nameof(SyncedCountText));
+        OnPropertyChanged(nameof(IncomingNoTrackingTooltip));
+
+        // Inject one invisible placeholder per empty group so the group header always renders.
+        if (IncomingCount == 0) result.Add(new CommitItem("", DateTime.MinValue, "", "", "", Services.Git.CommitRemoteState.Incoming,      "") { IsPlaceholder = true });
+        if (OutgoingCount == 0) result.Add(new CommitItem("", DateTime.MinValue, "", "", "", Services.Git.CommitRemoteState.LocalOnly,     "") { IsPlaceholder = true });
+        if (SyncedCount   == 0) result.Add(new CommitItem("", DateTime.MinValue, "", "", "", Services.Git.CommitRemoteState.OnRemote,      "") { IsPlaceholder = true });
+
+        Commits = result;
         UpdateFilterStatus();
         AutoSelectCommit();
     }
 
     private void AutoSelectCommit()
     {
-        if (SelectedCommit != null && Commits.Contains(SelectedCommit))
+        // Never auto-select a placeholder sentinel.
+        var realCommits = Commits.Where(c => !c.IsPlaceholder).ToList();
+
+        if (SelectedCommit != null && realCommits.Contains(SelectedCommit))
             return;
 
-        SelectedCommit = Commits.Count > 0 ? Commits[0] : null;
+        SelectedCommit = realCommits.Count > 0 ? realCommits[0] : null;
     }
 
     private void UpdateFilterStatus()
