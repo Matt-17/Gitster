@@ -31,6 +31,7 @@ public interface IGitBackend
     Task CherryPickAsync(string sha);
 
     Task<Dictionary<string, string>> GetAllRefsAsync();
+    Task<int> GetStashCountAsync();
 
     GitCapabilities Capabilities { get; }
 }

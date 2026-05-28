@@ -406,6 +406,12 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.FromResult(refs);
     }
 
+    public Task<int> GetStashCountAsync()
+    {
+        using var repo = OpenRepository();
+        return Task.FromResult(repo.Stashes.Count());
+    }
+
     private Repository OpenRepository()
     {
         if (string.IsNullOrWhiteSpace(RepositoryPath))

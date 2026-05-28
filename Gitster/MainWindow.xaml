@@ -4,17 +4,25 @@
        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
        xmlns:vm="clr-namespace:Gitster.ViewModels"
+       xmlns:models="clr-namespace:Gitster.Models"
        xmlns:controls="clr-namespace:Gitster.Controls"
+       xmlns:modes="clr-namespace:Gitster.Views.Modes"
        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
        mc:Ignorable="d"          
        ResizeMode="CanResizeWithGrip"
        Title="{Binding WindowTitle}" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
     <Window.InputBindings>
-        <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding BrowseFolderCommand}"/>
-        <KeyBinding Key="F" Modifiers="Ctrl" Command="{Binding CommitListVM.FocusSearchCommand}"/>
-        <KeyBinding Key="Z" Modifiers="Ctrl" Command="{Binding UndoBarVM.UndoCommand}"/>
-        <KeyBinding Key="F5" Command="{Binding FetchCommand}"/>
+        <KeyBinding Key="O"  Modifiers="Ctrl" Command="{Binding BrowseFolderCommand}"/>
+        <KeyBinding Key="F"  Modifiers="Ctrl" Command="{Binding CommitListVM.FocusSearchCommand}"/>
+        <KeyBinding Key="Z"  Modifiers="Ctrl" Command="{Binding UndoBarVM.UndoCommand}"/>
+        <KeyBinding Key="F5"                  Command="{Binding FetchCommand}"/>
         <KeyBinding Key="Enter" Modifiers="Ctrl" Command="{Binding AmendCommitCommand}"/>
+        <KeyBinding Key="D1" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Commits}"/>
+        <KeyBinding Key="D2" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Stashes}"/>
+        <KeyBinding Key="D3" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Branches}"/>
+        <KeyBinding Key="D4" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Worktrees}"/>
+        <KeyBinding Key="D5" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Search}"/>
+        <KeyBinding Key="D6" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.OperationsLog}"/>
     </Window.InputBindings>
     <DockPanel>
         <Menu DockPanel.Dock="Top"
@@ -64,6 +72,13 @@
             <MenuItem Header="_View">
                 <MenuItem Header="Refresh" Command="{Binding RefreshCommand}" InputGestureText="F5"/>
                 <Separator/>
+                <MenuItem Header="_Commits"       Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Commits}"      InputGestureText="Ctrl+1"/>
+                <MenuItem Header="_Stashes"       Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Stashes}"      InputGestureText="Ctrl+2"/>
+                <MenuItem Header="B_ranches"      Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Branches}"     InputGestureText="Ctrl+3"/>
+                <MenuItem Header="_Worktrees"     Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Worktrees}"    InputGestureText="Ctrl+4"/>
+                <MenuItem Header="S_earch"        Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Search}"       InputGestureText="Ctrl+5"/>
+                <MenuItem Header="Operations _log" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.OperationsLog}" InputGestureText="Ctrl+6"/>
+                <Separator/>
                 <MenuItem Header="Dark mode" IsCheckable="True" IsChecked="{Binding IsDarkMode}"
                           IsEnabled="False" ToolTip="Coming in a future release"/>
             </MenuItem>
@@ -79,40 +94,32 @@
         <controls:TitleBar DockPanel.Dock="Top" DataContext="{Binding TitleBarVM}"/>
         <controls:UndoBar DockPanel.Dock="Top" DataContext="{Binding UndoBarVM}"/>
         <controls:StatusBar DockPanel.Dock="Bottom" DataContext="{Binding StatusBarVM}"/>
+
+        <!-- Main content: sidebar + mode content area -->
         <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="500"/>
-                <ColumnDefinition Width="4"/>
-                <ColumnDefinition Width="380" MinWidth="320"/>
+                <ColumnDefinition Width="44"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left: CommitListView -->
-            <controls:CommitListView Grid.Column="0" DataContext="{Binding CommitListVM}"/>
+            <!-- Left sidebar -->
+            <controls:Sidebar Grid.Column="0" DataContext="{Binding SidebarVM}"/>
 
-            <!-- Splitter -->
-            <GridSplitter Grid.Column="1"
-                          HorizontalAlignment="Stretch"
-                          Background="{StaticResource BorderTertiary}"
-                          ResizeBehavior="PreviousAndNext"/>
-
-            <!-- Right: action panel -->
-            <StackPanel Grid.Column="2" Margin="0,10,10,10">
-
-                <controls:CommitContextCard DataContext="{Binding CommitListVM}"/>
-
-                <controls:TimestampEditPanel DataContext="{Binding TimestampEditVM}" Margin="0,8,0,0"/>
-
-                <controls:AuthorPanel DataContext="{Binding AuthorPanelVM}" Margin="0,8,0,0"/>
-
-                <controls:QuickActionsPanel DataContext="{Binding QuickActionsVM}" Margin="0,8,0,0"/>
-
-            </StackPanel>
-        </Grid>
-
+            <!-- Mode content area — visibility-switched panels -->
+            <Grid Grid.Column="1">
+                <modes:CommitsModeView
+                    Visibility="{Binding SidebarVM.IsCommitsActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <modes:StashesModeView
+                    Visibility="{Binding SidebarVM.IsStashesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <modes:BranchesModeView
+                    Visibility="{Binding SidebarVM.IsBranchesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <modes:WorktreesModeView
+                    Visibility="{Binding SidebarVM.IsWorktreesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <modes:SearchModeView
+                    Visibility="{Binding SidebarVM.IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <modes:OperationsLogModeView
+                    Visibility="{Binding SidebarVM.IsOperationsLogActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

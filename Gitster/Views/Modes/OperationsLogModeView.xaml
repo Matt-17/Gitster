@@ -1,0 +1,142 @@
+<UserControl x:Class="Gitster.Views.Modes.OperationsLogModeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:conv="clr-namespace:Gitster.Converters"
+             d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <conv:RelativeTimeConverter x:Key="RelativeTime"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Filter bar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <TextBlock Text="Status:" FontSize="12" Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="StatusFilter" Width="120" FontSize="12"
+                      SelectionChanged="StatusFilter_SelectionChanged"
+                      SelectedIndex="0">
+                <ComboBoxItem Content="All"/>
+                <ComboBoxItem Content="Active"/>
+                <ComboBoxItem Content="Undone"/>
+                <ComboBoxItem Content="Expired"/>
+            </ComboBox>
+            <TextBlock Text="Kind:" FontSize="12" Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Center" Margin="16,0,8,0"/>
+            <ComboBox x:Name="KindFilter" Width="140" FontSize="12"
+                      SelectionChanged="KindFilter_SelectionChanged"
+                      SelectedIndex="0">
+                <ComboBoxItem Content="All"/>
+                <ComboBoxItem Content="Amend"/>
+                <ComboBoxItem Content="Reword"/>
+                <ComboBoxItem Content="Reset"/>
+                <ComboBoxItem Content="Rebase"/>
+                <ComboBoxItem Content="Cherry-pick"/>
+            </ComboBox>
+        </StackPanel>
+
+        <!-- Record list -->
+        <ListView Grid.Row="2" x:Name="RecordList"
+                  BorderThickness="0.5"
+                  BorderBrush="{DynamicResource BorderTertiary}"
+                  Background="{DynamicResource BackgroundSecondary}"
+                  SelectionMode="Single">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="When" Width="100">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelativeTime}}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           ToolTip="{Binding Timestamp}"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Kind" Width="90">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Kind}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Description" Width="220">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Description}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Branch" Width="120">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding BranchName}"
+                                           FontSize="11"
+                                           FontFamily="{DynamicResource FontFamilyMono}"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Before → After" Width="130">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock FontSize="11" FontFamily="{DynamicResource FontFamilyMono}"
+                                           Foreground="{DynamicResource TextSecondary}">
+                                    <Run Text="{Binding BeforeSha, Mode=OneWay}"/>
+                                    <Run Text=" → "/>
+                                    <Run Text="{Binding AfterSha, Mode=OneWay}"/>
+                                </TextBlock>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
+                    <GridViewColumn Header="Status" Width="80">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Status}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           x:Name="StatusText"/>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Active">
+                                        <Setter TargetName="StatusText" Property="Foreground"
+                                                Value="{DynamicResource AccentSuccess}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Undone">
+                                        <Setter TargetName="StatusText" Property="Foreground"
+                                                Value="{DynamicResource AccentWarning}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Expired">
+                                        <Setter TargetName="StatusText" Property="Foreground"
+                                                Value="{DynamicResource TextTertiary}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </Grid>
+</UserControl>

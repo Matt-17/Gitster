@@ -43,6 +43,8 @@ public partial class MainWindowViewModel : BaseViewModel
     public StatusBarViewModel StatusBarVM { get; }
     public AutoFetchService AutoFetch { get; }
     public AuthorPanelViewModel AuthorPanelVM { get; }
+    public SidebarViewModel SidebarVM { get; } = new();
+    public OperationsLogService OpsLogService => _opsLogService;
 
     public MainWindowViewModel()
     {
@@ -73,6 +75,10 @@ public partial class MainWindowViewModel : BaseViewModel
         QuickActionsVM = new QuickActionsViewModel();
         UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
         AuthorPanelVM = new AuthorPanelViewModel(_gitBackend, _authorDirService);
+
+        // Update ops log badge whenever the log changes
+        _opsLogService.Changed += (_, _) =>
+            SidebarVM.ActiveOpsCount = _opsLogService.Records.Count(r => r.Status == OperationStatus.Active);
 
         // A.3 — refresh commit list after any backend HEAD mutation (e.g. Undo via ResetHard)
         _gitBackend.HeadChanged += (_, _) =>
@@ -732,6 +738,21 @@ public partial class MainWindowViewModel : BaseViewModel
             TitleBarVM.Clear();
             CommitListVM.SetBaseCommits([], false, string.Empty);
         }
+
+        await RefreshSidebarBadgesAsync();
+    }
+
+    private async Task RefreshSidebarBadgesAsync()
+    {
+        try
+        {
+            SidebarVM.StashCount = await _gitBackend.GetStashCountAsync();
+        }
+        catch
+        {
+            SidebarVM.StashCount = 0;
+        }
+        SidebarVM.ActiveOpsCount = _opsLogService.Records.Count(r => r.Status == OperationStatus.Active);
     }
 
     /// <summary>

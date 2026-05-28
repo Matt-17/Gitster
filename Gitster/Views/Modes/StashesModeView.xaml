@@ -1,0 +1,17 @@
+<UserControl x:Class="Gitster.Views.Modes.StashesModeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5">
+            <TextBlock Text="Stash management" FontSize="16"
+                       Foreground="{StaticResource TextPrimary}"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Coming in Phase 2b" FontSize="13" Margin="0,6,0,0"
+                       Foreground="{StaticResource TextTertiary}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
