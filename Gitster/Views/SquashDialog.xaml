@@ -1,0 +1,78 @@
+<Window x:Class="Gitster.Views.SquashDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Gitster.Controls"
+        Title="Squash Commits"
+        Width="520" Height="340"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False"
+        Background="{DynamicResource BackgroundPrimary}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Themes/Gitster.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Combined commit message:"
+                   Margin="0 0 0 6"
+                   FontSize="13"
+                   Foreground="{DynamicResource ForegroundPrimary}" />
+
+        <TextBox x:Name="MessageBox"
+                 Grid.Row="1"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 FontFamily="Consolas"
+                 FontSize="13"
+                 Padding="6"
+                 Margin="0 0 0 10"
+                 Background="{DynamicResource BackgroundSecondary}"
+                 Foreground="{DynamicResource ForegroundPrimary}"
+                 BorderBrush="{DynamicResource BorderTertiary}" />
+
+        <CheckBox x:Name="OverrideDateCheck"
+                  Grid.Row="2"
+                  Content="Override result date"
+                  Margin="0 0 0 6"
+                  Foreground="{DynamicResource ForegroundPrimary}"
+                  Checked="OverrideDateCheck_Changed"
+                  Unchecked="OverrideDateCheck_Changed" />
+
+        <controls:DateControl x:Name="DatePicker"
+                              Grid.Row="3"
+                              EditMode="DateTime"
+                              IsEnabled="{Binding IsChecked, ElementName=OverrideDateCheck}"
+                              Margin="0 0 0 12" />
+
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Style="{StaticResource GhostButton}"
+                    Click="Cancel_Click"
+                    IsCancel="True"
+                    Width="80"
+                    Margin="0,0,8,0" />
+            <Button Content="Squash"
+                    Style="{StaticResource PrimaryButton}"
+                    Click="OK_Click"
+                    IsDefault="True"
+                    Width="80" />
+        </StackPanel>
+    </Grid>
+</Window>

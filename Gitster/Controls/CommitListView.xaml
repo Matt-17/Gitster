@@ -166,9 +166,12 @@
         </Border>
 
         <!-- ── Commit list ─────────────────────────────────────────────── -->
-        <ListView Grid.Row="1"
+        <ListView x:Name="CommitListBox"
+                  Grid.Row="1"
                   ItemsSource="{Binding GroupedCommits}"
-                  SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
+                  SelectedItem="{Binding SelectedCommit, Mode=TwoWay}"
+                  SelectionMode="Extended"
+                  SelectionChanged="CommitListBox_SelectionChanged">
 
             <ListView.GroupStyle>
                 <GroupStyle>

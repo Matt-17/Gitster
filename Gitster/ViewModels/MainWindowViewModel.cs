@@ -51,7 +51,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public MainWindowViewModel()
     {
-        _gitBackend = new LibGit2Backend();
+        _gitBackend = new HybridGitBackend();
         _stateService = new RepositoryStateService(_gitBackend);
         _feedbackService = new OperationFeedbackService();
         _recentRepos = new RecentReposService();
@@ -75,7 +75,14 @@ public partial class MainWindowViewModel : BaseViewModel
         TimestampEditVM = new TimestampEditViewModel(
             () => CommitListVM.SelectedCommit,
             () => CurrentCommitDetail.CommitDate);
-        QuickActionsVM = new QuickActionsViewModel();
+        QuickActionsVM = new QuickActionsViewModel(
+            _gitBackend,
+            _feedbackService,
+            _opsLogService,
+            _snapshotService,
+            () => CommitListVM.SelectedCommit,
+            () => CommitListVM.SelectedCommits,
+            async () => await UpdateElementsAsync());
         UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
         AuthorPanelVM = new AuthorPanelViewModel(_gitBackend, _authorDirService);
         StashesVM = new StashesViewModel(

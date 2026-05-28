@@ -64,6 +64,9 @@ public partial class CommitListViewModel : BaseViewModel
     [ObservableProperty]
     public partial CommitItem? SelectedCommit { get; set; }
 
+    /// <summary>All currently selected commits (populated by the view's SelectionChanged handler).</summary>
+    public List<CommitItem> SelectedCommits { get; set; } = [];
+
     [ObservableProperty]
     public partial string FilterText { get; set; } = string.Empty;
 

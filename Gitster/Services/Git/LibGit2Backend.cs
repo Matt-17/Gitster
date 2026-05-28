@@ -688,6 +688,115 @@ public sealed class LibGit2Backend : IGitBackend
         return new Repository(RepositoryPath);
     }
 
+    // ── Fixup-workflow methods (Steps F-H) ─────────────────────────────────
+
+    /// <summary>
+    /// Not supported directly — <see cref="HybridGitBackend"/> routes fixup to CLI.
+    /// </summary>
+    public Task FixupIntoCommitAsync(string targetSha) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+
+    /// <summary>
+    /// Rewords HEAD (amend message only) — non-HEAD routing done in HybridGitBackend.
+    /// </summary>
+    public Task RewordCommitAsync(string sha, string newMessage)
+    {
+        using var repo = OpenRepository();
+        var head = repo.Head.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+
+        // Ensure caller is actually asking for HEAD
+        if (!head.Id.Sha.StartsWith(sha, StringComparison.OrdinalIgnoreCase) &&
+            !sha.StartsWith(head.Id.Sha, StringComparison.OrdinalIgnoreCase))
+            throw new NotSupportedException("Non-HEAD reword requires CLI. Route through HybridGitBackend.");
+
+        var newAuthor    = new Signature(head.Author.Name,    head.Author.Email,    head.Author.When);
+        var newCommitter = new Signature(head.Committer.Name, head.Committer.Email, DateTimeOffset.Now);
+        repo.Commit(newMessage, newAuthor, newCommitter, new CommitOptions { AmendPreviousCommit = true });
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Squashes a contiguous range of commits that ends at HEAD using a soft reset.
+    /// shas are in newest-first order (commit-list order).
+    /// </summary>
+    public Task SquashCommitsHeadAsync(
+        IReadOnlyList<string> shas,
+        string combinedMessage,
+        DateTimeOffset? overrideDate)
+    {
+        using var repo = OpenRepository();
+
+        // shas[0] is newest (HEAD), shas[last] is oldest in selection
+        var orderedOldestFirst = shas.Reverse().ToList();
+        var oldestSha = orderedOldestFirst[0];
+
+        // Find the base commit (parent of the oldest selected commit)
+        var oldestCommit = repo.Lookup<Commit>(oldestSha)
+            ?? throw new InvalidOperationException($"Commit not found: {oldestSha}");
+        var baseCommit = oldestCommit.Parents.FirstOrDefault()
+            ?? throw new InvalidOperationException("Cannot squash — the oldest selected commit has no parent.");
+
+        // Soft reset to the base commit (stages all changes)
+        repo.Reset(ResetMode.Soft, baseCommit);
+
+        // Commit the staged changes with the combined message
+        var sig = repo.Config.BuildSignature(overrideDate ?? DateTimeOffset.Now)
+                  ?? new Signature("Gitster", "gitster@local", overrideDate ?? DateTimeOffset.Now);
+
+        var when = overrideDate ?? DateTimeOffset.Now;
+        var author    = new Signature(sig.Name, sig.Email, when);
+        var committer = new Signature(sig.Name, sig.Email, DateTimeOffset.Now);
+
+        repo.Commit(combinedMessage, author, committer);
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    // Non-HEAD squash requires CLI — HybridGitBackend routes there.
+    public Task SquashCommitsAsync(IReadOnlyList<string> shas, string combinedMessage, DateTimeOffset? overrideDate) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+
+    /// <summary>Lists all local and remote branches.</summary>
+    public Task<IReadOnlyList<BranchSummary>> GetBranchesAsync()
+    {
+        using var repo = OpenRepository();
+        var currentName = repo.Head.FriendlyName;
+        var result = repo.Branches
+            .Select(b => new BranchSummary(
+                b.FriendlyName,
+                b.Tip?.Sha ?? string.Empty,
+                b.IsRemote,
+                b.FriendlyName == currentName))
+            .OrderBy(b => b.IsRemote)
+            .ThenBy(b => b.Name)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<BranchSummary>>(result);
+    }
+
+    /// <summary>Returns up to <paramref name="maxCount"/> commits reachable from <paramref name="refName"/>.</summary>
+    public Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200)
+    {
+        using var repo = OpenRepository();
+        var filter = new LibGit2Sharp.CommitFilter
+        {
+            SortBy             = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+            IncludeReachableFrom = refName,
+        };
+        var result = repo.Commits.QueryBy(filter)
+            .Take(maxCount)
+            .Select(c => new CommitInfo(
+                c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha,
+                c.MessageShort,
+                c.Author.When.DateTime,
+                c.Author.Name ?? string.Empty,
+                c.Author.Email ?? string.Empty,
+                CommitRemoteState.LocalOnly,
+                c.Id.Sha))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
+    }
+
     private static Remote ResolveRemote(Repository repo, string remoteName)
     {
         var remote = string.IsNullOrWhiteSpace(remoteName)
