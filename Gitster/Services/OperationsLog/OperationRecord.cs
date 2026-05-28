@@ -1,6 +1,6 @@
 namespace Gitster.Services.OperationsLog;
 
-public enum OperationKind { Amend, Reword, Reset, Rebase, CherryPick, CommitOnBranch, AuthorRepair, AuthorAmend, RangeRewrite, StashDrop, StashPop, StashConvert }
+public enum OperationKind { Amend, Reword, Reset, Rebase, CherryPick, CommitOnBranch, AuthorRepair, AuthorAmend, RangeRewrite, StashDrop, StashPop, StashConvert, Fixup, Squash, CherryPickTimestamp }
 public enum OperationStatus { Active, Undone, Replaced, Expired }
 
 public record OperationRecord(

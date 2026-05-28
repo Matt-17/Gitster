@@ -25,6 +25,15 @@ public partial class CommitListView : UserControl
     }
 
     private void OnFocusSearchRequested() => SearchBox.Focus();
+
+    private void CommitListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_vm == null) return;
+        _vm.SelectedCommits = CommitListBox.SelectedItems
+            .OfType<CommitItem>()
+            .Where(c => !c.IsPlaceholder)
+            .ToList();
+    }
 }
 
 /// <summary>

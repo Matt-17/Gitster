@@ -24,24 +24,24 @@
                            VerticalAlignment="Center"/>
             </StackPanel>
 
-            <!-- 2×2 action grid -->
-            <UniformGrid Rows="2" Columns="2">
+            <!-- 2×2 action grid (expanded to 2×3 for Squash) -->
+            <UniformGrid Rows="3" Columns="2">
                 <Button Content="Reword"
-                        helper:Capability.Requires="FixupAutosquash"
                         Command="{Binding RewordCommand}"
                         ToolTipService.ShowOnDisabled="True"
                         Style="{StaticResource GhostButton}"
                         Height="32" Margin="0,0,4,4"
                         HorizontalAlignment="Stretch">
-                    <Button.ToolTip>Reword a commit message (requires Git CLI)</Button.ToolTip>
+                    <Button.ToolTip>Reword the selected commit's message</Button.ToolTip>
                 </Button>
                 <Button Content="Cherry-pick"
                         Command="{Binding CherryPickCommand}"
-                        ToolTip="Coming in Phase 2"
                         ToolTipService.ShowOnDisabled="True"
                         Style="{StaticResource GhostButton}"
                         Height="32" Margin="0,0,4,4"
-                        HorizontalAlignment="Stretch"/>
+                        HorizontalAlignment="Stretch">
+                    <Button.ToolTip>Cherry-pick a commit from another branch</Button.ToolTip>
+                </Button>
                 <Button Content="Author"
                         Command="{Binding ChangeAuthorCommand}"
                         ToolTip="Coming in Phase 2"
@@ -56,7 +56,15 @@
                         Style="{StaticResource GhostButton}"
                         Height="32" Margin="0,0,4,4"
                         HorizontalAlignment="Stretch">
-                    <Button.ToolTip>Apply fixup commits (requires Git CLI)</Button.ToolTip>
+                    <Button.ToolTip>Stage fixup into the selected commit (requires Git CLI)</Button.ToolTip>
+                </Button>
+                <Button Content="Squash"
+                        Command="{Binding SquashSelectedCommand}"
+                        ToolTipService.ShowOnDisabled="True"
+                        Style="{StaticResource GhostButton}"
+                        Height="32" Margin="0,0,4,4"
+                        HorizontalAlignment="Stretch">
+                    <Button.ToolTip>Squash selected commits into one (select 2+ in the list)</Button.ToolTip>
                 </Button>
             </UniformGrid>
 

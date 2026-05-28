@@ -42,5 +42,12 @@ public interface IGitBackend
     Task<string> CreateStashAsync(string message, bool includeUntracked = true);
     Task<string> ConvertStashToBranchAsync(int stashIndex, string branchName);
 
+    // ── Fixup-workflow operations (Steps F–H) ─────────────────────
+    Task FixupIntoCommitAsync(string targetSha);
+    Task RewordCommitAsync(string sha, string newMessage);
+    Task SquashCommitsAsync(IReadOnlyList<string> shas, string combinedMessage, DateTimeOffset? overrideDate);
+    Task<IReadOnlyList<BranchSummary>> GetBranchesAsync();
+    Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200);
+
     GitCapabilities Capabilities { get; }
 }
