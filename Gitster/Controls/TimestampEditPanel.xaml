@@ -57,44 +57,65 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- Before / After preview -->
+            <!-- Before / After preview — timestamp row always shown; author row shown when author changes -->
             <Border Background="{StaticResource BackgroundSecondary}"
                     CornerRadius="{StaticResource CornerRadiusMd}"
                     Padding="8,6"
                     Margin="0,0,0,10">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition/>
-                        <RowDefinition/>
-                    </Grid.RowDefinitions>
+                <StackPanel>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0"
-                               Text="before"
-                               Foreground="{StaticResource TextTertiary}"
-                               FontSize="11"
-                               Margin="0,0,10,3"/>
-                    <TextBlock Grid.Row="0" Grid.Column="1"
-                               Text="{Binding PreviewBefore}"
-                               FontFamily="{StaticResource FontFamilyMono}"
-                               FontSize="11"
-                               Foreground="{StaticResource TextPrimary}"/>
+                    <!-- Timestamp row -->
+                    <Grid Margin="0,0,0,3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="54"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="timestamp"
+                                   Foreground="{StaticResource TextTertiary}"
+                                   FontSize="10"/>
+                        <TextBlock Grid.Column="1"
+                                   FontFamily="{StaticResource FontFamilyMono}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   Text="{Binding PreviewBefore}"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="54"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="→ new"
+                                   Foreground="{StaticResource AccentWarning}"
+                                   FontSize="10"/>
+                        <TextBlock Grid.Column="1"
+                                   FontFamily="{StaticResource FontFamilyMono}"
+                                   FontSize="11">
+                            <Run Text="{Binding PreviewAfter, Mode=OneWay}" Foreground="{StaticResource TextPrimary}"/>
+                        </TextBlock>
+                    </Grid>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0"
-                               Text="after"
-                               Foreground="{StaticResource TextTertiary}"
-                               FontSize="11"
-                               Margin="0,0,10,0"/>
-                    <TextBlock Grid.Row="1" Grid.Column="1"
-                               FontFamily="{StaticResource FontFamilyMono}"
-                               FontSize="11">
-                        <Run Text="{Binding PreviewAfter, Mode=OneWay}"/>
-                        <Run Text=" · → new" Foreground="{StaticResource AccentWarning}"/>
-                    </TextBlock>
-                </Grid>
+                    <!-- Author/committer row (only shown when there is a pending change) -->
+                    <Grid Margin="0,0,0,0"
+                          Visibility="{Binding DataContext.AuthorPanelVM.IsApplyEnabled,
+                                               RelativeSource={RelativeSource AncestorType=Window},
+                                               Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="54"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="→ author"
+                                   Foreground="{StaticResource AccentWarning}"
+                                   FontSize="10"/>
+                        <TextBlock Grid.Column="1"
+                                   FontFamily="{StaticResource FontFamilyMono}"
+                                   FontSize="11"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource TextPrimary}"
+                                   Text="{Binding DataContext.AuthorPanelVM.AuthorText,
+                                                  RelativeSource={RelativeSource AncestorType=Window}}"/>
+                    </Grid>
+
+                </StackPanel>
             </Border>
 
             <!-- Safety warning (shown when selected commit is already on remote) -->

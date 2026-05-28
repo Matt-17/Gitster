@@ -14,7 +14,7 @@ namespace Gitster.ViewModels;
 
 public partial class AuthorPanelViewModel : BaseViewModel
 {
-    private readonly IGitBackend _git;
+    private readonly IGitBackend? _git;
     private readonly AuthorDirectoryService _authorDir;
 
     [ObservableProperty]
@@ -34,7 +34,7 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool IsApplyEnabled { get; set; }
 
-    public AuthorPanelViewModel(IGitBackend git, AuthorDirectoryService authorDir)
+    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir)
     {
         _git = git;
         _authorDir = authorDir;
@@ -61,7 +61,7 @@ public partial class AuthorPanelViewModel : BaseViewModel
     public async Task LoadFromCommitAsync(CommitItem? item)
     {
         IsApplyEnabled = false;
-        if (item == null)
+        if (item == null || _git == null)
         {
             AuthorText = string.Empty;
             CommitterText = string.Empty;
@@ -85,6 +85,8 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [RelayCommand]
     private async Task Apply()
     {
+        if (_git == null) return;
+
         var (authorName, authorEmail)       = ParseAuthor(AuthorText);
         var (committerName, committerEmail) = ParseAuthor(CommitterText);
 
@@ -114,6 +116,42 @@ public partial class AuthorPanelViewModel : BaseViewModel
             _authorDir.Authors.Add(entry);
             AuthorText = entry.DisplayName;
         }
+    }
+
+    [RelayCommand]
+    private void OpenEditAuthors()
+    {
+        var dialog = new Views.EditAuthorsDialog(_authorDir)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            AuthorText    = dialog.SelectedAuthorText;
+            CommitterText = dialog.SelectedCommitterText;
+        }
+    }
+
+    /// <summary>
+    /// Returns (name, email) for the pending author, or (null, null) if no change.
+    /// Used by the combined Amend command.
+    /// </summary>
+    public (string? name, string? email) GetPendingAuthor()
+    {
+        if (!IsApplyEnabled || string.IsNullOrWhiteSpace(AuthorText)) return (null, null);
+        var (n, e) = ParseAuthor(AuthorText);
+        return (string.IsNullOrEmpty(n) ? null : n, string.IsNullOrEmpty(e) ? null : e);
+    }
+
+    /// <summary>
+    /// Returns (name, email) for the pending committer, or (null, null) if no change.
+    /// Used by the combined Amend command.
+    /// </summary>
+    public (string? name, string? email) GetPendingCommitter()
+    {
+        if (!IsApplyEnabled || string.IsNullOrWhiteSpace(CommitterText)) return (null, null);
+        var (n, e) = ParseAuthor(CommitterText);
+        return (string.IsNullOrEmpty(n) ? null : n, string.IsNullOrEmpty(e) ? null : e);
     }
 
     private static string FormatAuthor(string name, string email) =>

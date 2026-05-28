@@ -38,8 +38,13 @@ public partial class CommitListViewModel : BaseViewModel
     partial void OnCommitsChanged(List<CommitItem> value)
     {
         var view = CollectionViewSource.GetDefaultView(value);
-        if (!view.GroupDescriptions.Any())
-            view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CommitItem.GroupLabel)));
+        view.GroupDescriptions.Clear();
+        view.SortDescriptions.Clear();
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(CommitItem.GroupLabel)));
+        // Sort by group order so sections appear Incoming → Outgoing → Synced.
+        // Within each section the backend's topological order is preserved
+        // because SortDescription is stable for items with equal GroupOrder.
+        view.SortDescriptions.Add(new SortDescription(nameof(CommitItem.GroupOrder), ListSortDirection.Ascending));
         GroupedCommits = view;
         OnPropertyChanged(nameof(GroupedCommits));
     }
@@ -68,10 +73,15 @@ public partial class CommitListViewModel : BaseViewModel
     partial void OnDiffHeaderChanged(string value) =>
         OnPropertyChanged(nameof(DiffHeaderDisplay));
 
-    public void UpdateDiff(string header, List<DiffFileEntry> files)
+    [ObservableProperty]
+    public partial Gitster.Services.Git.CommitRemoteState DiffRemoteState { get; set; }
+
+    public void UpdateDiff(string header, List<DiffFileEntry> files,
+        Gitster.Services.Git.CommitRemoteState remoteState = Gitster.Services.Git.CommitRemoteState.LocalOnly)
     {
         DiffHeader = header;
         DiffFiles = files;
+        DiffRemoteState = remoteState;
     }
 
     partial void OnFilterTextChanged(string value) => ApplyLiveFilter();

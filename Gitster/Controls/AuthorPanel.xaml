@@ -8,90 +8,39 @@
              d:DataContext="{d:DesignInstance Type=vm:AuthorPanelViewModel}">
 
     <Border Style="{StaticResource PanelCard}">
-        <StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="52"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-            <!-- Header -->
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                <TextBlock Text="✍" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBlock Text="Author"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource TextPrimary}"
-                           VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="✍"  FontSize="11" Foreground="{StaticResource TextTertiary}"/>
+                <TextBlock Text="Author" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,1,0,0"/>
             </StackPanel>
 
-            <!-- Author row -->
-            <Grid Margin="0,0,0,6">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="30"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Author"
-                           Foreground="{StaticResource TextSecondary}"
-                           FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox Grid.Column="1"
-                          IsEditable="True"
-                          ItemsSource="{Binding Authors}"
-                          DisplayMemberPath="DisplayName"
-                          Text="{Binding AuthorText, UpdateSourceTrigger=PropertyChanged}"
-                          Height="28"
-                          FontSize="12"
-                          Foreground="{StaticResource TextPrimary}"
-                          BorderBrush="{StaticResource BorderTertiary}"/>
-                <Button Grid.Column="2"
-                        Content="+"
-                        Command="{Binding AddAuthorCommand}"
-                        Width="26" Height="28"
-                        Margin="4,0,0,0"
-                        ToolTip="Add new author"
-                        Style="{StaticResource GhostButton}"/>
-            </Grid>
-
-            <!-- Committer row -->
-            <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="30"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Committer"
-                           Foreground="{StaticResource TextSecondary}"
-                           FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox Grid.Column="1"
-                          IsEditable="True"
-                          ItemsSource="{Binding Authors}"
-                          DisplayMemberPath="DisplayName"
-                          Text="{Binding CommitterText, UpdateSourceTrigger=PropertyChanged}"
-                          IsEnabled="{Binding IsCommitterEnabled}"
-                          Height="28"
-                          FontSize="12"
-                          Foreground="{StaticResource TextPrimary}"
-                          BorderBrush="{StaticResource BorderTertiary}"/>
-                <Button Grid.Column="2"
-                        Content="+"
-                        Command="{Binding AddAuthorCommand}"
-                        Width="26" Height="28"
-                        Margin="4,0,0,0"
-                        IsEnabled="{Binding IsCommitterEnabled}"
-                        ToolTip="Add new author"
-                        Style="{StaticResource GhostButton}"/>
-            </Grid>
-
-            <!-- Sync checkbox -->
-            <CheckBox Content="Sync author and committer"
-                      IsChecked="{Binding SyncAuthorCommitter}"
-                      Foreground="{StaticResource TextSecondary}"
+            <!-- Quick-switch author dropdown -->
+            <ComboBox Grid.Column="1"
+                      IsEditable="True"
+                      ItemsSource="{Binding Authors}"
+                      DisplayMemberPath="DisplayName"
+                      Text="{Binding AuthorText, UpdateSourceTrigger=PropertyChanged}"
+                      Height="28"
                       FontSize="12"
-                      Margin="0,0,0,10"/>
+                      Foreground="{StaticResource TextPrimary}"
+                      BorderBrush="{StaticResource BorderTertiary}"
+                      ToolTip="Quick-switch author for next amend. Amend button applies the change."/>
 
-            <!-- Apply button -->
-            <Button Content="Apply"
-                    Command="{Binding ApplyCommand}"
-                    IsEnabled="{Binding IsApplyEnabled}"
-                    Style="{StaticResource GhostButton}"
-                    HorizontalAlignment="Stretch"
-                    Height="30"/>
-
-        </StackPanel>
+            <!-- Edit authors dialog button -->
+            <Button Grid.Column="2"
+                    Content="Edit..."
+                    Command="{Binding OpenEditAuthorsCommand}"
+                    Width="48" Height="28"
+                    Margin="4,0,0,0"
+                    FontSize="11"
+                    ToolTip="Open author editor dialog"
+                    Style="{StaticResource GhostButton}"/>
+        </Grid>
     </Border>
 </UserControl>

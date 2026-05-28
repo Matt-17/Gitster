@@ -56,7 +56,19 @@ public sealed class LibGit2Backend : IGitBackend
     {
         using var repo = OpenRepository();
 
-        var branch = repo.Head.FriendlyName;
+        string branch;
+        if (repo.Info.IsHeadDetached)
+        {
+            var sha = repo.Head.Tip?.Sha;
+            branch = sha != null
+                ? $"detached @ {sha[..Math.Min(7, sha.Length)]}"
+                : "(no branch)";
+        }
+        else
+        {
+            branch = repo.Head.FriendlyName;
+        }
+
         var incoming = 0;
         var outgoing = 0;
 
@@ -75,7 +87,6 @@ public sealed class LibGit2Backend : IGitBackend
     {
         using var repo = OpenRepository();
 
-        // Determine which SHAs are outgoing (local-only) vs already on the remote
         var trackingBranch = repo.Head.TrackedBranch;
         HashSet<string>? localOnlyShas = null;
         CommitRemoteState defaultState;
@@ -94,6 +105,33 @@ public sealed class LibGit2Backend : IGitBackend
                     ExcludeReachableFrom = trackingBranch.Tip,
                 }).Select(c => c.Id.Sha),
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Incoming commits: on tracking branch but not on local HEAD
+        List<CommitInfo> incomingCommits = [];
+        if (trackingBranch?.Tip != null && repo.Head.Tip != null)
+        {
+            IEnumerable<Commit> incoming = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = trackingBranch.Tip,
+                ExcludeReachableFrom = repo.Head.Tip,
+            });
+
+            if (filter != null)
+            {
+                if (!string.IsNullOrEmpty(filter.SelectedAuthorName) && filter.SelectedAuthorName != "All")
+                    incoming = incoming.Where(c => string.Equals(c.Author.Name, filter.SelectedAuthorName, StringComparison.Ordinal));
+                if (filter.FromDate.HasValue)
+                    incoming = incoming.Where(c => c.Author.When.Date >= filter.FromDate.Value.Date);
+                if (filter.ToDate.HasValue)
+                    incoming = incoming.Where(c => c.Author.When.DateTime < filter.ToDate.Value.Date.AddDays(1));
+            }
+
+            incomingCommits = incoming.Select(c => new CommitInfo(
+                c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
+                c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
+                CommitRemoteState.Incoming, c.Id.Sha)).ToList();
         }
 
         IEnumerable<Commit> commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
@@ -120,7 +158,7 @@ public sealed class LibGit2Backend : IGitBackend
             }
         }
 
-        var result = commits
+        var localResult = commits
             .Select(c =>
             {
                 var remoteState = localOnlyShas == null
@@ -133,10 +171,60 @@ public sealed class LibGit2Backend : IGitBackend
                     c.Author.When.DateTime,
                     c.Author.Name ?? string.Empty,
                     c.Author.Email ?? string.Empty,
-                    remoteState);
+                    remoteState,
+                    c.Id.Sha);
             })
             .ToList();
 
+        // Detect orphaned hash-pairs: incoming commit with same tree as an outgoing commit.
+        // This happens when a synced commit is amended locally — old SHA is still on remote
+        // (appears as Incoming), new SHA is local (Outgoing). Mark both with the partner's SHA.
+        if (incomingCommits.Count > 0 && localOnlyShas != null)
+        {
+            // Build tree → outgoing-sha map to detect pairs efficiently
+            var outgoingTreeMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var commit in repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                IncludeReachableFrom = repo.Head.Tip,
+                ExcludeReachableFrom = trackingBranch?.Tip,
+            }))
+            {
+                if (commit.Tree?.Sha != null)
+                    outgoingTreeMap.TryAdd(commit.Tree.Sha, commit.Id.Sha[..7]);
+            }
+
+            // Find incoming commits whose tree matches an outgoing commit
+            var incomingPairsBySha = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var inc in incomingCommits)
+            {
+                var incCommit = repo.Lookup<Commit>(inc.Sha);
+                if (incCommit?.Tree?.Sha != null &&
+                    outgoingTreeMap.TryGetValue(incCommit.Tree.Sha, out var outSha))
+                {
+                    incomingPairsBySha[inc.Sha] = outSha;
+                }
+            }
+
+            if (incomingPairsBySha.Count > 0)
+            {
+                // Rebuild lists with orphaned-pair annotations
+                var outgoingPairBySha = incomingPairsBySha
+                    .ToDictionary(kv => kv.Value, kv => kv.Key, StringComparer.OrdinalIgnoreCase);
+
+                incomingCommits = incomingCommits.Select(c =>
+                    incomingPairsBySha.TryGetValue(c.Sha, out var partner)
+                        ? c with { OrphanedPairSha = partner }
+                        : c).ToList();
+
+                localResult = localResult.Select(c =>
+                    outgoingPairBySha.TryGetValue(c.Sha, out var partner)
+                        ? c with { OrphanedPairSha = partner }
+                        : c).ToList();
+            }
+        }
+
+        // Incoming first, then local (outgoing + synced)
+        var result = incomingCommits.Concat(localResult).ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
     }
 
@@ -262,21 +350,24 @@ public sealed class LibGit2Backend : IGitBackend
         using var repo = OpenRepository();
 
         var commit = repo.Head.Tip ?? throw new InvalidOperationException("No HEAD commit.");
-        var author = commit.Author;
-        var committer = commit.Committer;
         var offset = DateTimeOffset.Now.Offset;
 
         var newAuthor = new Signature(
-            author.Name,
-            author.Email,
-            new DateTimeOffset(request.NewDate.Year, request.NewDate.Month, request.NewDate.Day, request.NewDate.Hour, request.NewDate.Minute, author.When.Second, offset));
+            request.AuthorName    ?? commit.Author.Name,
+            request.AuthorEmail   ?? commit.Author.Email,
+            new DateTimeOffset(request.NewDate.Year, request.NewDate.Month, request.NewDate.Day,
+                request.NewDate.Hour, request.NewDate.Minute, commit.Author.When.Second, offset));
 
         var newCommitter = new Signature(
-            committer.Name,
-            committer.Email,
-            new DateTimeOffset(request.NewDate.Year, request.NewDate.Month, request.NewDate.Day, request.NewDate.Hour, request.NewDate.Minute, committer.When.Second, offset));
+            request.CommitterName  ?? commit.Committer.Name,
+            request.CommitterEmail ?? commit.Committer.Email,
+            new DateTimeOffset(request.NewDate.Year, request.NewDate.Month, request.NewDate.Day,
+                request.NewDate.Hour, request.NewDate.Minute, commit.Committer.When.Second, offset));
 
-        var amended = repo.Commit(commit.Message, newAuthor, newCommitter, new CommitOptions { AmendPreviousCommit = true });
+        var amended = repo.Commit(
+            request.NewMessage ?? commit.Message,
+            newAuthor, newCommitter,
+            new CommitOptions { AmendPreviousCommit = true });
         return Task.FromResult(amended.Id.Sha);
     }
 

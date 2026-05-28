@@ -131,15 +131,59 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="GroupItem">
                                         <StackPanel>
-                                            <Border Background="{StaticResource BackgroundSecondary}"
-                                                    BorderBrush="{StaticResource BorderTertiary}"
+                                            <Border BorderBrush="{StaticResource BorderTertiary}"
                                                     BorderThickness="0,0,0,0.5"
                                                     Padding="8,4">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Name}" Value="Incoming">
+                                                                <Setter Property="Background" Value="{StaticResource AccentInfoBackground}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Name}" Value="Outgoing">
+                                                                <Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
                                                 <StackPanel Orientation="Horizontal">
+                                                    <!-- Section icon -->
+                                                    <TextBlock FontSize="11" VerticalAlignment="Center" Margin="0,0,5,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="✓"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Name}" Value="Incoming">
+                                                                        <Setter Property="Text" Value="↓"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Name}" Value="Outgoing">
+                                                                        <Setter Property="Text" Value="↑"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                     <TextBlock Text="{Binding Name}"
                                                                FontWeight="Medium" FontSize="11"
-                                                               Foreground="{StaticResource TextSecondary}"
-                                                               VerticalAlignment="Center"/>
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Name}" Value="Incoming">
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Name}" Value="Outgoing">
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                     <TextBlock Text=" · "
                                                                FontSize="11"
                                                                Foreground="{StaticResource TextTertiary}"
@@ -217,10 +261,10 @@
             <ListView.View>
                 <GridView>
                     <!-- Branch graph spine + remote state indicator -->
-                    <GridViewColumn Width="24">
+                    <GridViewColumn Width="30">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <Grid Width="24">
+                                <Grid Width="30">
                                     <!-- Spine line -->
                                     <Rectangle Width="1.5"
                                                HorizontalAlignment="Center"
@@ -230,16 +274,38 @@
                                                 <Setter Property="Fill" Value="{StaticResource TextTertiary}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
-                                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding RemoteState}" Value="NoTrackingBranch">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="Incoming">
                                                         <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Rectangle.Style>
                                     </Rectangle>
-                                    <!-- Circle indicator (remote state) -->
+                                    <!-- Orphaned-pair indicator: ↔ shown when this commit was rewritten and its pair is visible -->
+                                    <TextBlock Text="↔" FontSize="8"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Top"
+                                               Margin="0,2,0,0"
+                                               Foreground="{StaticResource AccentWarning}"
+                                               ToolTip="Same commit, rewritten. Push (force-with-lease) to replace the remote copy.">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOrphanedPair}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <!-- Circle indicator (remote state dot) -->
                                     <Ellipse Width="8" Height="8"
                                              HorizontalAlignment="Center"
                                              VerticalAlignment="Center">
@@ -249,16 +315,22 @@
                                                 <Setter Property="Stroke"          Value="Transparent"/>
                                                 <Setter Property="StrokeThickness" Value="0"/>
                                                 <Style.Triggers>
+                                                    <!-- Incoming: filled blue dot -->
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="Incoming">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                                    </DataTrigger>
+                                                    <!-- Outgoing: filled amber dot -->
                                                     <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
                                                         <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
                                                     </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RemoteState}" Value="NoTrackingBranch">
+                                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                                    </DataTrigger>
+                                                    <!-- Synced: outlined ring -->
                                                     <DataTrigger Binding="{Binding RemoteState}" Value="OnRemote">
                                                         <Setter Property="Fill"            Value="{StaticResource BackgroundPrimary}"/>
                                                         <Setter Property="Stroke"          Value="{StaticResource TextTertiary}"/>
-                                                        <Setter Property="StrokeThickness" Value="1"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding RemoteState}" Value="NotAhead">
-                                                        <Setter Property="Fill" Value="{StaticResource AccentDanger}"/>
+                                                        <Setter Property="StrokeThickness" Value="1.5"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -337,6 +409,37 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
+                    <!-- Remote-state indicator for selected commit (redundant safety indicator per spec) -->
+                    <Ellipse Width="7" Height="7"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="Transparent"/>
+                                <Setter Property="Stroke" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="Incoming">
+                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="ToolTip" Value="Incoming — on remote, not yet merged locally"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="LocalOnly">
+                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                        <Setter Property="ToolTip" Value="Outgoing — local only, not yet pushed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="NoTrackingBranch">
+                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                        <Setter Property="ToolTip" Value="Outgoing — no tracking branch configured"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="OnRemote">
+                                        <Setter Property="Fill" Value="Transparent"/>
+                                        <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                                        <Setter Property="StrokeThickness" Value="1.5"/>
+                                        <Setter Property="ToolTip" Value="Synced — on both local and remote"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
                 </StackPanel>
             </Border>
 
@@ -352,6 +455,46 @@
                                            Margin="12,0,0,0">
                                     <Run Text="+" Foreground="{StaticResource AccentSuccess}"/><Run Text="{Binding Added, Mode=OneWay}" Foreground="{StaticResource AccentSuccess}"/><Run Text="  −" Foreground="{StaticResource AccentDanger}"/><Run Text="{Binding Deleted, Mode=OneWay}" Foreground="{StaticResource AccentDanger}"/>
                                 </TextBlock>
+                                <!-- Status badge: A/M/D/R -->
+                                <Border DockPanel.Dock="Left"
+                                        Margin="0,0,5,0"
+                                        Width="14" Height="14"
+                                        CornerRadius="2"
+                                        VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Status}" Value="A">
+                                                    <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="D">
+                                                    <Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Status}"
+                                               FontFamily="{StaticResource FontFamilyMono}"
+                                               FontSize="9"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="A">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentSuccess}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="D">
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentDanger}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Border>
                                 <TextBlock Text="{Binding Path}"
                                            FontFamily="{StaticResource FontFamilyMono}"
                                            FontSize="11"
