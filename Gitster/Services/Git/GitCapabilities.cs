@@ -13,4 +13,5 @@ public enum GitCapabilities
     RangeDiff = 1 << 6,
     Worktrees = 1 << 7,
     CommitSigning = 1 << 8,
+    StashManagement = 1 << 9,
 }

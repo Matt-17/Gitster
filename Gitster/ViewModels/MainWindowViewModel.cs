@@ -34,6 +34,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly RecentReposService _recentRepos;
     private readonly AuthorDirectoryService _authorDirService;
     private readonly SnapshotService _snapshotService = new();
+    private readonly StashNameService _stashNameService = new();
     private bool _hasTrackingBranch = true;
 
     public TitleBarViewModel TitleBarVM { get; }
@@ -45,6 +46,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public AutoFetchService AutoFetch { get; }
     public AuthorPanelViewModel AuthorPanelVM { get; }
     public SidebarViewModel SidebarVM { get; } = new();
+    public StashesViewModel StashesVM { get; }
     public OperationsLogService OpsLogService => _opsLogService;
 
     public MainWindowViewModel()
@@ -76,6 +78,13 @@ public partial class MainWindowViewModel : BaseViewModel
         QuickActionsVM = new QuickActionsViewModel();
         UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
         AuthorPanelVM = new AuthorPanelViewModel(_gitBackend, _authorDirService);
+        StashesVM = new StashesViewModel(
+            _gitBackend,
+            _feedbackService,
+            _opsLogService,
+            _snapshotService,
+            _stashNameService,
+            async () => await RefreshSidebarBadgesAsync());
 
         // Update ops log badge whenever the log changes
         _opsLogService.Changed += (_, _) =>
@@ -757,9 +766,13 @@ public partial class MainWindowViewModel : BaseViewModel
 
             // Update status bar information
             UpdateStatusBar(repo);
+
+            // Load stashes
+            await StashesVM.LoadAsync();
         }
         catch (Exception)
         {
+            StashesVM.Clear();
             // Empty all the fields
             CurrentCommitDetail.Clear();
             SelectedCommitDetail.Clear();
@@ -854,6 +867,7 @@ public partial class MainWindowViewModel : BaseViewModel
             _ = _stateService.AttachAsync(Path);
             _ = _opsLogService.AttachAsync(Path);
             _ = _snapshotService.AttachAsync(Path);
+            _ = _stashNameService.AttachAsync(Path);
         }
         catch
         {
