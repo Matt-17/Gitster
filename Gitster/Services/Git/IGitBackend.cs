@@ -33,5 +33,14 @@ public interface IGitBackend
     Task<Dictionary<string, string>> GetAllRefsAsync();
     Task<int> GetStashCountAsync();
 
+    // ── Stash operations (Step A) ───────────────────────────────────────
+    Task<IReadOnlyList<StashInfo>> GetStashesAsync();
+    Task<string> GetStashDiffAsync(int stashIndex);
+    Task ApplyStashAsync(int stashIndex, bool reinstateIndex = true);
+    Task PopStashAsync(int stashIndex, bool reinstateIndex = true);
+    Task DropStashAsync(int stashIndex);
+    Task<string> CreateStashAsync(string message, bool includeUntracked = true);
+    Task<string> ConvertStashToBranchAsync(int stashIndex, string branchName);
+
     GitCapabilities Capabilities { get; }
 }
