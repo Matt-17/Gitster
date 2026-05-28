@@ -1,0 +1,99 @@
+<Window x:Class="Gitster.Views.EditAuthorsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Edit authors – Gitster"
+        Width="420" SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{StaticResource BackgroundPrimary}">
+
+    <Window.Resources>
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="0,0,0,3"/>
+        </Style>
+    </Window.Resources>
+
+    <Border Padding="16" Background="{StaticResource BackgroundPrimary}">
+        <StackPanel>
+
+            <!-- Author row -->
+            <Label Content="Author"/>
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0"
+                          x:Name="AuthorCombo"
+                          IsEditable="True"
+                          ItemsSource="{Binding Authors}"
+                          DisplayMemberPath="DisplayName"
+                          Text="{Binding AuthorText, UpdateSourceTrigger=PropertyChanged}"
+                          Height="28"
+                          FontSize="12"
+                          Foreground="{StaticResource TextPrimary}"
+                          BorderBrush="{StaticResource BorderTertiary}"/>
+                <Button Grid.Column="1"
+                        Content="+"
+                        Command="{Binding AddAuthorCommand}"
+                        Width="28" Height="28"
+                        Margin="4,0,0,0"
+                        ToolTip="Add new identity"
+                        Style="{StaticResource GhostButton}"/>
+            </Grid>
+
+            <!-- Committer row -->
+            <Label Content="Committer"/>
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0"
+                          x:Name="CommitterCombo"
+                          IsEditable="True"
+                          IsEnabled="{Binding IsCommitterEnabled}"
+                          ItemsSource="{Binding Authors}"
+                          DisplayMemberPath="DisplayName"
+                          Text="{Binding CommitterText, UpdateSourceTrigger=PropertyChanged}"
+                          Height="28"
+                          FontSize="12"
+                          Foreground="{StaticResource TextPrimary}"
+                          BorderBrush="{StaticResource BorderTertiary}"/>
+                <Button Grid.Column="1"
+                        Content="+"
+                        Command="{Binding AddAuthorCommand}"
+                        Width="28" Height="28"
+                        Margin="4,0,0,0"
+                        IsEnabled="{Binding IsCommitterEnabled}"
+                        ToolTip="Add new identity"
+                        Style="{StaticResource GhostButton}"/>
+            </Grid>
+
+            <!-- Sync checkbox -->
+            <CheckBox Content="Sync author and committer"
+                      IsChecked="{Binding SyncAuthorCommitter}"
+                      Foreground="{StaticResource TextSecondary}"
+                      FontSize="12"
+                      Margin="0,0,0,16"/>
+
+            <!-- Action buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" Width="80" Height="30" Margin="0,0,8,0"
+                        IsCancel="True"
+                        Style="{StaticResource GhostButton}"/>
+                <Button Content="Select" Width="80" Height="30"
+                        IsDefault="True"
+                        Click="OnSelect"
+                        Style="{StaticResource PrimaryButton}"/>
+            </StackPanel>
+
+        </StackPanel>
+    </Border>
+</Window>

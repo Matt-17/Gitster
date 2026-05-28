@@ -198,12 +198,26 @@ public partial class MainWindowViewModel : BaseViewModel
                 return;
             }
             var parent = gitCommit.Parents.FirstOrDefault();
-            var patch = repo.Diff.Compare<Patch>(parent?.Tree, gitCommit.Tree);
+            // For the initial commit (no parent), compare against empty tree.
+            // LibGit2Sharp handles null oldTree as the empty tree.
+            Patch patch;
+            if (parent == null)
+                patch = repo.Diff.Compare<Patch>(null, gitCommit.Tree);
+            else
+                patch = repo.Diff.Compare<Patch>(parent.Tree, gitCommit.Tree);
+
             var files = patch
-                .Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted))
+                .Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted,
+                    e.Status switch
+                    {
+                        ChangeKind.Added    => "A",
+                        ChangeKind.Deleted  => "D",
+                        ChangeKind.Renamed  => "R",
+                        _                   => "M"
+                    }))
                 .ToList();
             var header = $"{files.Count} {(files.Count == 1 ? "file" : "files")} · +{patch.LinesAdded} −{patch.LinesDeleted}";
-            CommitListVM.UpdateDiff(header, files);
+            CommitListVM.UpdateDiff(header, files, commit.RemoteState);
         }
         catch
         {
@@ -401,9 +415,18 @@ public partial class MainWindowViewModel : BaseViewModel
 
             var beforeSha = await _gitBackend.GetHeadShaAsync();
 
+            // Collect author/committer changes from AuthorPanelVM
+            var (authorName, authorEmail) = AuthorPanelVM.GetPendingAuthor();
+            var (committerName, committerEmail) = AuthorPanelVM.GetPendingCommitter();
+
             var afterSha = await _feedbackService.RunAsync(
                 "Amend",
-                () => _gitBackend.AmendAsync(new AmendRequest(editDate.Value)),
+                () => _gitBackend.AmendAsync(new AmendRequest(
+                    editDate.Value,
+                    AuthorName:    authorName,
+                    AuthorEmail:   authorEmail,
+                    CommitterName:  committerName,
+                    CommitterEmail: committerEmail)),
                 sha => sha.Length > 7 ? sha[..7] : sha);
 
             var reflogSelector = await _gitBackend.GetReflogSelectorForHeadAsync();
@@ -684,7 +707,9 @@ public partial class MainWindowViewModel : BaseViewModel
                     c.Sha,
                     c.AuthorName,
                     c.AuthorEmail,
-                    c.RemoteState));
+                    c.RemoteState,
+                    c.FullSha,
+                    c.OrphanedPairSha));
             }
 
             // Refresh author directory from loaded commits
@@ -764,8 +789,18 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         try
         {
-            // Get current branch
-            var branch = repo.Head.FriendlyName;
+            string branch;
+            if (repo.Info.IsHeadDetached)
+            {
+                var sha = repo.Head.Tip?.Sha;
+                branch = sha != null
+                    ? $"detached @ {sha[..Math.Min(7, sha.Length)]}"
+                    : "(no branch)";
+            }
+            else
+            {
+                branch = repo.Head.FriendlyName;
+            }
 
             // Get repository name from path
             var repoPath = repo.Info.WorkingDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar);
