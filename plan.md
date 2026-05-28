@@ -1,243 +1,362 @@
-# Gitster – Phase 2b Plan: Stash-Killer & Fixup-Workflow
+# Gitster – Review pass: audit the Fixup-workflow CLI half (Phase 2b, Steps E–H)
 
-You are implementing Phase 2b of **Gitster**, a WPF Git surgery tool. Phase 2a (mode sidebar) and Phase 1 (safety net, indicators, combined amend) are complete. The mode sidebar already has a **Stashes** placeholder mode and the action column is mode-aware.
+You are reviewing code in **Gitster**, a WPF Git surgery tool. Phase 2b Steps E–H (the Git-CLI-dependent fixup workflow) were implemented in a previous session by a less thorough model. Your job is to **audit this implementation rigorously and fix what's wrong**, because the rebase-class operations are the highest-risk code in the entire project — a subtle bug here corrupts users' history.
 
-UI language: **English**. The project uses CommunityToolkit.Mvvm, LibGit2Sharp, a custom theme (`Themes/Gitster.xaml`), an `IGitBackend` abstraction, a `Capability` attached-property system, and an `OperationsLogService` with snapshot capture.
+This is a review-and-fix task, not a rewrite. Don't replace working code. Find real defects.
 
-## Key architectural decision for this phase
+## Scope of review
 
-Phase 2b splits cleanly into two halves with different backend requirements:
+The features under audit:
+- `HybridGitBackend` (routes rebase-class ops to CLI, everything else to libgit2)
+- `GitCliBackend` + the `GitCli` process runner
+- Fixup-into-commit (non-interactive autosquash)
+- Reword any commit (HEAD via libgit2, older via CLI)
+- Squash with date control
+- Cherry-pick with timestamp
 
-- **Stash-Killer (Steps A–D)** runs entirely on **LibGit2Sharp**. No Git CLI needed. Ship this first — it's the universal, high-impact feature.
-- **Fixup workflow (Steps E–H)** requires **interactive rebase / autosquash**, which LibGit2Sharp cannot do. This is where the second `IGitBackend` implementation — `GitCliBackend` — gets built for real. Features here are gated behind the `FixupAutosquash` capability and disabled (with the existing Capability adorner) when Git CLI isn't available.
+## Audit checklist — verify each, fix if broken
 
-Work the stash half completely before starting the CLI half. The stash half is shippable on its own.
+### 1. The non-interactive editor trap
+
+This is the single most common way to get autosquash rebase wrong. Verify:
+
+- Does the rebase invocation actually prevent git from opening an interactive editor? Check that `GIT_SEQUENCE_EDITOR` (or `-c sequence.editor=...`) is set to a no-op, AND `GIT_EDITOR`/`core.editor` is also handled where a commit message editor could open.
+- Test mentally: a fixup autosquash needs the *sequence* editor suppressed (for the todo list). A reword needs the *commit message* editor controlled (to supply the new message). These are two different editors. Confirm both are handled in their respective operations, not conflated.
+- On Windows specifically: `:` (shell no-op) does not exist as a command. Verify the no-op works on Windows — `true` may not exist either depending on environment. The safe choice is often a `cmd /c exit 0` equivalent or git's `-c sequence.editor=true` only if `true.exe` is on PATH (it usually isn't on Windows). **This is a likely bug.** Check what was actually used and whether it works on Windows.
+
+### 2. Conflict rollback integrity
+
+The spec requires: on any conflict, abort and restore to BeforeSha, never leave a half-finished rebase. Verify:
+
+- Is `git rebase --abort` actually called on conflict? Is its success checked?
+- After abort, is the repo verified to be back at BeforeSha? An abort restores to the pre-rebase state, but if the implementation also did a `reset` the order matters.
+- Is there any code path where a conflict leaves the repo mid-rebase (a `.git/rebase-merge` or `.git/rebase-apply` directory present)? If the app crashes or the user closes mid-operation, is there cleanup on next open? At minimum, on repo attach, detect an in-progress rebase state and surface it ("Repository has an unfinished rebase — Gitster does not resolve conflicts; run `git rebase --abort` or resolve in your terminal").
+- Cherry-pick conflict: same questions. Is `git cherry-pick --abort` (or libgit2 equivalent) called and verified?
+
+### 3. BeforeSha / AfterSha correctness for undo
+
+The OperationsLog undo relies on accurate BeforeSha. Verify:
+
+- Is BeforeSha captured **before** the operation starts, as the actual HEAD commit SHA (not a reflog index)?
+- After a fixup/reword/squash, the rewritten commits have **new SHAs**. Is AfterSha the new HEAD? Is the OperationsLog entry's undo target the BeforeSha?
+- Does undo of a fixup correctly restore? Test mentally: fixup commit X into Y, undo, do you get back exactly the pre-fixup HEAD with the staged changes restored? (Note: the staged changes that were fixup'd — are they lost or restored on undo? Document the behavior. Ideally undo restores the working state, but at minimum it must restore HEAD and not silently lose work.)
+
+### 4. The HEAD-reword fast path
+
+Spec: reword of HEAD uses libgit2 amend (no CLI), reword of older commits uses CLI. Verify:
+
+- Is the HEAD case actually detected and routed to the fast path?
+- Does HEAD reword work when Git CLI is NOT installed? (It must — it's a non-CLI operation.)
+- Is the capability gating correct: HEAD reword available always, older-commit reword gated behind `FixupAutosquash`?
+
+### 5. Squash path selection
+
+Spec: selection-includes-HEAD uses `git reset --soft` + recommit; selection-not-including-HEAD uses rebase. Verify:
+
+- Is the path selection logic correct? Does it correctly detect whether the selection includes HEAD?
+- The soft-reset path: `git reset --soft <base>` then one commit. Is `<base>` the parent of the *oldest* selected commit? Off-by-one here squashes the wrong range.
+- Is the chosen date actually applied to the resulting commit (both author and committer date as intended)?
+- Is the combined message correct (all original messages available to the user, not silently dropped)?
+- Are the selected commits required to be **contiguous**? Non-contiguous squash is ill-defined. Is that validated, with a clear message if the user selects a gap?
+
+### 6. Cherry-pick + timestamp
+
+Verify:
+- Is the libgit2 cherry-pick path used for the conflict-free case, with CLI fallback only on conflict?
+- After cherry-pick, is the timestamp override a separate amend (reusing the Phase-1 combined-amend), producing the user's chosen date?
+- Does the resulting commit have a NEW sha (cherry-pick always creates a new commit)? Is that reflected in the OperationsLog?
+
+### 7. HybridGitBackend routing
+
+Verify:
+- Are exactly the rebase-class operations (fixup, older-reward, rebase-path squash) routed to CLI, and everything else (status, log, amend-HEAD, stash, fetch/pull/push, cherry-pick-no-conflict) to libgit2?
+- Is `Capabilities` computed correctly — `FixupAutosquash | InteractiveRebase` only added when `_cli.IsAvailable`?
+- When CLI is unavailable, do the CLI-routed methods throw a clear, catchable exception (not a raw `Win32Exception` from a failed process spawn)?
+- Is `HybridGitBackend` the registered `IGitBackend` in DI? Are there any lingering direct `LibGit2Backend` registrations that bypass it?
+
+### 8. Process runner hygiene
+
+Verify the `GitCli` runner:
+- Sets the working directory to the repo path.
+- Captures both stdout and stderr.
+- Has a timeout (a hung git process must not freeze the app).
+- Supports cancellation.
+- Does not deadlock on large output (reading stdout and stderr must not block each other — use async reads or separate threads; the classic deadlock is reading stdout to end while stderr's buffer fills).
+- Handles paths with spaces correctly (Windows paths like `D:\Development\My Repo`).
+- Runs with `CreateNoWindow` so no console flashes.
+
+### 9. Synced-commit force-push warning
+
+Verify the warning fires for fixup/reword/squash on synced commits, consistent with the Phase-1 pattern. A rewrite of a pushed commit without warning is a serious UX safety failure.
+
+### 10. Snapshot + log + refresh on every op
+
+Verify each of the four operations: snapshots before, logs after, fires `HeadChanged`. A missing `HeadChanged` means the list shows stale state after the operation (the exact class of bug seen in Phase 1's undo).
+
+## Deliverable
+
+For each checklist item: state whether it's correct as-is, or describe the defect and fix it. Produce a short audit summary at the end listing what was wrong and what you changed. If everything in a section is correct, say so explicitly — don't pad.
+
+Pay special attention to items 1 (Windows editor no-op) and 2 (conflict rollback), as those are the most likely to be subtly broken and the most damaging if they are.
+
+Build: 0 errors, 0 warnings after fixes.
+
+# Gitster – Phase 3 Plan: Branch Operations & Custom Tools
+
+You are implementing Phase 3 of **Gitster**, a WPF Git surgery tool. Phases 1, 2a, and 2b are complete: safety net, mode sidebar, Stash-Killer, and the fixup workflow (with a HybridGitBackend that routes rebase-class operations to Git CLI). The Branches and Worktrees modes currently exist as placeholders in the sidebar.
+
+UI language: **English**. Stack: CommunityToolkit.Mvvm, LibGit2Sharp + HybridGitBackend, custom theme, Capability attached-property system, OperationsLogService with snapshots.
+
+## Goal of this phase
+
+Eliminate context-switching between branches and make Gitster customizable per user. Five features:
+- Commit to another branch without stash/switch
+- Branch snapshot (named lightweight branch from current state)
+- Worktrees as first-class
+- Branch list sorted by activity
+- Custom Tools menu
+
+## What stays out of scope
+
+- No conflict-resolution UI (permanent non-goal — abort and report on conflict).
+- No commit reordering/splitting (Phase 5).
+- No full multi-branch graph (backlog).
 
 ---
 
-## STASH-KILLER HALF (LibGit2Sharp)
+## Step A — Branches mode: the list
 
-### Step A — Backend: stash model and operations
+Replace the Branches placeholder with a real mode. This is the foundation the other branch features build on.
 
-Extend `IGitBackend` with stash operations. All implementable in `LibGit2Backend` via `repo.Stashes`.
-
-```csharp
-// IGitBackend additions
-Task<IReadOnlyList<StashInfo>> GetStashesAsync();
-Task<StashDiff> GetStashDiffAsync(int stashIndex);
-Task ApplyStashAsync(int stashIndex, bool reinstateIndex = true);
-Task PopStashAsync(int stashIndex, bool reinstateIndex = true);
-Task DropStashAsync(int stashIndex);
-Task<string> CreateStashAsync(string message, bool includeUntracked = true);
-Task<string> ConvertStashToBranchAsync(int stashIndex, string branchName);
-```
-
-**StashInfo model:**
+**Backend additions to `IGitBackend`:**
 
 ```csharp
-public record StashInfo(
-    int Index,                       // stash@{N}
-    string RawMessage,               // git's own message "WIP on branch: sha subject"
-    string BranchName,               // branch the stash was created on (parsed from raw message)
-    DateTimeOffset CreatedAt,
-    IReadOnlyList<StashFileChange> Files,  // for auto-naming and preview
-    string AutoName);                // derived display name, see Step B
-
-public record StashFileChange(string Path, ChangeKind Kind, int Added, int Removed);
-public enum ChangeKind { Added, Modified, Deleted, Renamed }
+Task<IReadOnlyList<BranchListItem>> GetBranchesAsync();
+Task CheckoutBranchAsync(string branchName);
+Task<string> CreateBranchAsync(string name, string startPointSha);
+Task DeleteBranchAsync(string name, bool force);
+Task RenameBranchAsync(string oldName, string newName);
 ```
 
-**Parsing the branch from the stash:** LibGit2Sharp's `Stash.Message` is git's raw message like `"WIP on master: 5204ea4 Cleanup and Design"` or `"On feature/oauth: ..."`. Parse the branch name out of it. The created-at timestamp comes from the stash commit's committer date.
+**BranchListItem model:**
 
-**ConvertStashToBranchAsync:** this is the signature feature. Git's native equivalent is `git stash branch <name> stash@{N}`, which: creates a new branch from the commit where the stash was made, checks it out, applies the stash, and drops the stash if applied cleanly. LibGit2Sharp doesn't have a single call for this — implement it as: create branch at the stash's base commit, checkout, apply the stash, drop the stash on success. If apply produces conflicts, leave the branch created and the stash intact, and report the conflict.
+```csharp
+public record BranchListItem(
+    string Name,
+    string? UpstreamName,        // tracking branch, null if none
+    string TipSha,
+    string TipMessage,
+    DateTimeOffset LastActivity, // tip commit committer date — for sorting
+    int Ahead,                   // commits ahead of upstream
+    int Behind,                  // commits behind upstream
+    bool IsCurrent,
+    bool IsRemote,               // local vs remote-tracking branch
+    bool IsMerged);              // merged into current branch (safe to delete)
+```
 
-Add `GitCapabilities.StashManagement` flag, set on `LibGit2Backend`. (Stashes don't need CLI, so this is always available with the libgit2 backend.)
+**UI (Branches mode):**
 
-### Step B — Auto-naming heuristic
+- Two groups (fixed headers, like the commit-list sections): **Local** and **Remote**.
+- **Sorted by `LastActivity` descending by default** — most recently active branch on top. This is the Phase-3 vision item "Branch-Liste nach Datum"; nobody wants `feature/xyz-old` alphabetically first. Offer an alternate alphabetical sort via column header.
+- Columns: branch name (current branch in accent/bold with a marker), ahead/behind badges (`↑3 ↓1`), last-activity (relative), tip message (trimmed).
+- The current branch is visually distinct (accent dot or bold + accent text).
+- Filter box at top: filter by branch name substring.
 
-The whole point of the Stash-Killer is that `stash@{0}` is meaningless. Generate a human name from the stash content.
+**Action panel (right, mode-specific):**
 
-**Algorithm:**
-1. If the user gave the stash an explicit message (not git's auto "WIP on..."), use that verbatim.
-2. Otherwise, derive from the file changes:
-   - Take up to 3 file names (just the filename, not full path) sorted by change size descending.
-   - Prefix with a verb guess based on the dominant change kind: mostly-added → "add", mostly-deleted → "remove", mixed → "wip".
-   - Append "+N" if more than 3 files.
-   - Include the most common top-level directory if it's informative.
-   - Example outputs: `"wip: 3 files in src/auth · login.tsx, auth.ts, +1"`, `"add: NewService.cs"`, `"wip: 12 files"`.
+- Selected-branch card: name, upstream, ahead/behind, last-activity.
+- Primary action: **Checkout** (disabled if already current, or if working tree is dirty — see note).
+- Secondary: Rename, Delete (Delete in danger color; disabled for current branch; warn if not merged), Create branch from here.
+- **Dirty-working-tree handling on checkout:** if the working tree has uncommitted changes that would conflict, don't silently fail. Offer: "Stash changes and checkout" / "Cancel". (Reuse the stash backend from Phase 2b.) This ties the features together nicely.
 
-Keep the auto-name generation in a small pure helper (`StashNamer`) so it's unit-testable.
-
-### Step C — Stashes mode UI
-
-Replace the `StashesModeView` placeholder with the real UI. Layout mirrors the Commits mode: main list + right action panel. (No diff bottom-panel needed — the diff preview goes in the action panel for stashes.)
-
-**Main area:**
-
-- Filter row at top: a search box that filters stashes by auto-name, file path, or branch. Plus a "New stash..." button on the right.
-- A list/grid with columns: stash ref (`stash@{N}`, mono), auto-name (the derived description), branch (mono), age (relative).
-- Selecting a stash drives the right action panel.
-
-**Right action panel (mode-specific):**
-
-- Selected-stash card: auto-name (prominent), then `stash@{N} · branch · age · +X −Y` meta line.
-- **"Convert to branch"** as the primary (accent) button. Clicking prompts for a branch name (pre-filled with a slug derived from the auto-name, e.g. `wip-auth-login`), then runs `ConvertStashToBranchAsync`.
-- Secondary buttons in a 2×2 grid: Apply, Pop, Rename, Drop (Drop in danger color).
-- Diff preview block below: file list with `A`/`M`/`D` badges and `+X −Y` counts, plus an inline unified-diff preview of the first file (or the selected file).
-
-**Empty state:** when there are no stashes, show a centered message "No stashes. Create one from your working tree to save changes without committing." with a "New stash..." button.
-
-### Step D — Stash operations wiring
-
-- **New stash:** dialog asking for an optional message and a checkbox "include untracked files" (default on). Calls `CreateStashAsync`.
-- **Apply / Pop:** straightforward. After pop, the stash disappears from the list (live-watch + explicit refresh). After apply, it stays.
-- **Rename:** git has no native stash rename. Implement it the way the ecosystem does: drop and recreate is destructive and changes the SHA, so instead store user-assigned names in `.git/gitster/stash-names.json` keyed by stash commit SHA (the stash's own commit hash, which is stable until dropped). The auto-name is the fallback; a user-assigned name overrides it. This keeps git's stash stack untouched.
-- **Drop:** confirmation dialog (stashes can't be undone via reflog as easily — warn clearly). Record an OperationsLog entry so it appears in history.
-- **Convert to branch:** as in Step A. On success, switch to Branches mode or show a toast "Created branch <name> from stash." On conflict, keep both and explain.
-- Every operation that changes stash state updates the sidebar badge count (the Stashes icon badge) and refreshes the list.
-- Snapshot capture fires before destructive stash operations (Drop, Pop, Convert) since they change repo state.
-
-The stash badge on the sidebar already exists from Phase 2a — verify it updates after these operations.
+**Sidebar badge:** optionally show the count of local branches, but low priority — skip if not trivial.
 
 ---
 
-## FIXUP-WORKFLOW HALF (requires Git CLI)
+## Step B — Commit to another branch without switching
 
-### Step E — GitCliBackend foundation
+The signature Phase-3 feature: you're working on branch A, realize your staged changes belong on branch B, and you want them committed to B **without** stashing, switching, committing, switching back.
 
-This is the first real use of the CLI backend. Build it as a focused implementation, not a full mirror of LibGit2Backend.
-
-**Create `Services/Git/GitCliBackend.cs`** implementing the parts of `IGitBackend` that require CLI. Strategy: this is NOT a replacement for `LibGit2Backend`. Instead, introduce a **composite/router backend** so most calls go to libgit2 (fast, no process spawn) and only the rebase-class operations go to CLI.
-
-**Recommended structure:**
-
-```csharp
-public class HybridGitBackend : IGitBackend
-{
-    private readonly LibGit2Backend _lib;
-    private readonly GitCliBackend _cli;
-    private readonly CapabilityService _caps;
-
-    // Most methods delegate to _lib.
-    // Rebase-class methods delegate to _cli, throwing a clear
-    // "Requires Git CLI" exception if _cli.IsAvailable is false.
-
-    public GitCapabilities Capabilities =>
-        _lib.Capabilities | (_cli.IsAvailable
-            ? GitCapabilities.FixupAutosquash | GitCapabilities.InteractiveRebase
-            : GitCapabilities.None);
-}
-```
-
-Register `HybridGitBackend` as the `IGitBackend` in DI instead of `LibGit2Backend` directly. Existing callers are unaffected — they still get an `IGitBackend`.
-
-**CLI invocation helper:** a small `GitCli` runner that spawns `git` with given args in the repo working directory, captures stdout/stderr, returns exit code + output, with a timeout and proper cancellation. Set `GIT_EDITOR=true` and `GIT_SEQUENCE_EDITOR` appropriately so rebases don't try to open an interactive editor (see Step F).
-
-**CLI detection:** the `CapabilityService` already detects `git --version` from Phase 1. Reuse it. `GitCliBackend.IsAvailable` reflects that.
-
-### Step F — Fixup per click
-
-The core feature: assign staged changes to any existing commit without typing SHAs.
+**This is subtle. Get the mechanics right.**
 
 **User flow:**
-1. User has staged changes (the status bar shows "N staged").
-2. User selects a target commit in the Commits-mode list.
-3. A "Fixup into this commit" action becomes available (in the action panel, gated behind `Capability.Requires="FixupAutosquash"`).
-4. Gitster runs the equivalent of: `git commit --fixup=<target-sha>` then `git -c sequence.editor=true rebase --autosquash --interactive <target-sha>^`.
+1. User has staged (and/or unstaged) changes on the current branch.
+2. User picks "Commit to another branch..." (from the Commits-mode action panel or a menu).
+3. A dialog: target branch (existing dropdown or new-branch name), commit message, author/committer (reuse combined-amend author UI), and a choice of *which* changes (staged only / staged + unstaged).
+4. Gitster commits those changes onto the **tip of the target branch**, advancing the target branch ref, while **leaving the current branch and working tree exactly as they were** (minus the changes that were moved, if the user chose to move rather than copy).
 
-**Implementation detail — avoiding the interactive editor:**
-Autosquash normally opens an editor showing the rebase todo. To run it non-interactively, set the sequence editor to a no-op that accepts the pre-arranged todo:
-- Run with environment `GIT_SEQUENCE_EDITOR=:` (the shell no-op) or `GIT_SEQUENCE_EDITOR=true`. On Windows, use `--exec`-free invocation with `-c sequence.editor=...`. The cleanest cross-platform approach: `git -c core.editor=true -c sequence.editor=true rebase --autosquash --interactive <base>`.
-- Since `--autosquash` pre-orders the fixup commit correctly, the no-op editor just accepts the todo as-is.
+**Mechanics (the careful part):**
 
-**Safety:**
-- If the target commit is synced (on remote), show the force-push warning (reuse the Phase-1 banner pattern) before proceeding.
-- Record an OperationsLog entry (kind `Fixup`) with BeforeSha = pre-rebase HEAD, AfterSha = post-rebase HEAD. Undo works through the standard reset-to-BeforeSha path.
-- Snapshot before the operation.
-- If the rebase hits a conflict, abort it (`git rebase --abort`), restore to BeforeSha, and report: "Fixup produced a conflict and was rolled back. Resolve manually or fixup a more recent commit."
+The clean way to do this without disturbing the working tree:
+1. Capture the selected changes as a tree. With libgit2: build a tree from the index (for staged) or from index+worktree (for staged+unstaged) — effectively the tree you'd get if you committed right now.
+2. Create a commit object with that tree, parented on the **target branch tip**, with the chosen message/author. This commit is created directly via the object database — no checkout, no index manipulation of the current branch.
+3. Update the target branch ref to point at the new commit.
+4. **Decide copy vs. move:**
+   - **Copy** (default, safest): the current branch and working tree are untouched; the changes now also exist as a commit on the target branch. The user still has the changes locally to do with as they please.
+   - **Move:** after creating the commit on the target, reset the current branch's index/worktree to remove the moved changes (e.g. `git restore --staged` + discard, or reset the index). This is more dangerous — only offer it with a clear checkbox "Remove these changes from the current branch" and a snapshot beforehand.
 
-### Step G — Reword any commit
+Default to **copy**. Moving is opt-in.
 
-Change the message of any commit in history, not just HEAD.
+**Why this is better than stash-switch-commit-switch:** no checkout means no risk of the working tree being disturbed, no risk of a dirty-tree checkout failure, instant operation.
 
-**For HEAD:** simple amend (already possible via LibGit2 — no CLI needed). Detect this case and use the fast path.
+**Edge cases to handle:**
+- Target branch is the current branch → degenerate; just a normal commit. Detect and simplify.
+- Target branch is checked out in another worktree → committing to it is fine (ref update), but warn that the other worktree's HEAD will be behind.
+- No changes selected → disable the action.
+- Snapshot before, OperationsLog entry after (kind `CommitToBranch`), `HeadChanged` (and a refresh of the target branch's state).
 
-**For older commits:** use the CLI autosquash reword mechanism:
-- `git commit --allow-empty --fixup=reword:<target-sha>` then autosquash rebase, OR
-- the more portable approach: create the rebase todo with the target line changed to `reword`, supply the new message via `GIT_EDITOR`.
+This feature does NOT require Git CLI — it's all object-database work in libgit2. Keep it on the libgit2 path.
 
-The simplest robust implementation: a small dialog where the user edits the message, then Gitster performs `git -c core.editor='<script that writes the new message>' rebase --autosquash --interactive <target>^`. On Windows, write the new message to a temp file and set `GIT_EDITOR` to a command that copies that file into the commit-message file. Provide a tiny helper executable or use `git`'s ability to read from a file. (A clean trick: `git rebase` with `--exec` isn't right here; instead set `core.editor` to a `cmd /c copy` that overwrites the message file.)
+---
 
-Gate behind `FixupAutosquash` capability. HEAD reword stays available even without CLI (uses libgit2 amend).
+## Step C — Branch snapshot
 
-Record OperationsLog entry (kind `Reword`). Same conflict-rollback and force-push-warning rules as fixup.
+A lightweight, named alternative to stashing: "save my current state as a branch I can come back to."
 
-### Step H — Squash with date control, Cherry-pick with timestamp
+**User flow:**
+1. "Snapshot to branch..." action.
+2. Dialog: branch name (pre-filled with a timestamp-based suggestion like `snapshot/2026-05-28-1430`), and whether to include uncommitted changes.
+3. Gitster creates a branch at the current HEAD. If "include uncommitted changes" is checked, it also creates a commit on that new branch capturing the working state (so the snapshot is complete), without disturbing the current working tree.
 
-**Squash with date control:**
-- User multi-selects contiguous commits in the list.
-- "Squash selected" action (gated `FixupAutosquash`).
-- A dialog shows the combined result: lets the user pick which commit's date to keep (or set a custom date), and edit the combined message (pre-filled with all messages concatenated).
-- Runs via autosquash rebase or `git reset --soft` + recommit, whichever is cleaner. For a contiguous selection ending at HEAD, `git reset --soft <base>` then a single commit with the chosen date/message is simplest and avoids rebase entirely — prefer this when the selection includes HEAD.
-- For a selection not including HEAD, use the rebase path.
+**Mechanics:** similar to Step B's tree-capture technique. Create the branch ref at HEAD; if including uncommitted changes, create a commit (tree from index+worktree) on the new branch with a message like "snapshot: uncommitted changes". The current branch and working tree stay exactly as they are.
 
-**Cherry-pick with timestamp:**
-- In a context where the user picks a commit from another branch (this needs a source-branch picker — a modal that lists branches, then their commits).
-- `git cherry-pick <sha>` (or libgit2's cherry-pick, which works for the no-conflict case), then immediately amend the resulting commit's date to the user-specified value (reuse the Phase-1 combined-amend path).
-- Cherry-pick itself can use libgit2 (`repo.CherryPick`) for the conflict-free case; fall back to CLI on conflicts with a clear message. The timestamp override is a plain amend afterward — no CLI needed for that part.
+**Difference from stash:** a branch snapshot is named, browsable in the Branches mode, survives clearly, and doesn't live in the opaque stash stack. This is the "benannter als Stash, leichtgewichtiger als Stash" vision item.
 
-Squash and cherry-pick both record OperationsLog entries and capture snapshots.
+Snapshot + log + refresh as usual. No CLI needed.
+
+---
+
+## Step D — Worktrees as first-class
+
+Worktrees let you have multiple working directories from one repo, each on a different branch — the *correct* answer to "I need to quickly work on another branch" but unusable today due to CLI friction.
+
+**Capability:** worktree operations are most reliable via Git CLI. LibGit2Sharp's worktree support exists but is incomplete/version-dependent. Route worktree operations through the CLI backend and gate the mode's actions behind a new `GitCapabilities.Worktrees` flag (set when CLI is available). When CLI is unavailable, the Worktrees mode shows a clear "Requires Git command-line tool" state.
+
+**Backend (CLI-based) additions:**
+
+```csharp
+Task<IReadOnlyList<WorktreeInfo>> GetWorktreesAsync();       // git worktree list --porcelain
+Task<string> AddWorktreeAsync(string path, string branchName, bool createBranch);
+Task RemoveWorktreeAsync(string path, bool force);
+Task PruneWorktreesAsync();                                   // git worktree prune
+```
+
+**WorktreeInfo model:**
+
+```csharp
+public record WorktreeInfo(
+    string Path,
+    string BranchName,
+    string HeadSha,
+    bool IsMain,          // the primary worktree
+    bool IsLocked,
+    bool IsPrunable,      // directory missing → can be pruned
+    bool IsCurrent);      // the worktree Gitster currently has open
+```
+
+Parse `git worktree list --porcelain` for reliable structured output.
+
+**UI (Worktrees mode):**
+
+- List of worktrees: path, branch, head sha, status badges (main / locked / prunable / current).
+- Actions:
+  - **Add worktree...** — dialog: directory path (with browse button), branch (existing or new). Runs `git worktree add`.
+  - **Open in file explorer** — opens the worktree path.
+  - **Open in Gitster** — switches Gitster to that worktree path (it's a valid repo working dir). This is the killer convenience: jump between worktrees within Gitster.
+  - **Remove** — `git worktree remove` (force option if dirty, with warning).
+  - **Prune** — `git worktree prune` for stale entries, with a preview of what will be pruned.
+- Highlight the current worktree.
+
+**Edge cases:**
+- Adding a worktree for a branch already checked out elsewhere → git refuses; surface the error clearly.
+- Removing the main worktree → not allowed; disable.
+- Prunable worktrees (directory deleted manually) → offer prune.
+
+---
+
+## Step E — Custom Tools menu
+
+The `git gui` feature nobody else copied: user-defined commands as menu items. This is what makes Gitster *yours*.
+
+**Configuration model:**
+
+Support two sources, merged (repo-specific overrides global):
+1. **Git's native `[guitool "name"]` sections** in gitconfig — read these for compatibility with existing `git gui` users.
+2. **Gitster's own format** in `%AppData%/Gitster/custom-tools.json` (global) and `.git/gitster/custom-tools.json` (repo-specific).
+
+**CustomTool model:**
+
+```csharp
+public record CustomTool(
+    string Name,              // menu label
+    string Command,          // shell command, may contain placeholders
+    string? Confirm,         // optional confirmation prompt text
+    bool NeedsCommit,        // requires a selected commit (passes its sha)
+    string? Prompt,          // optional: ask user for a value, substituted as $ARGS
+    CustomToolScope Scope);  // Global or Repository
+
+public enum CustomToolScope { Global, Repository }
+```
+
+**Placeholder substitution in the command:**
+- `$REVISION` / `$CUR` → selected commit SHA (if `NeedsCommit`)
+- `$ARGS` → value from the prompt dialog (if `Prompt` set)
+- `$BRANCH` → current branch name
+- `$REPO` → repository path
+
+These mirror `git gui`'s guitool variables where sensible.
+
+**UI:**
+- A **Tools** menu (new top-level menu, or a section in an existing menu) lists all custom tools, repo-specific first then global, with a separator.
+- Each tool runs its command via the GitCli runner (or a general shell runner — these may be arbitrary commands, not just git), in the repo working directory, with placeholders substituted.
+- If `Confirm` is set, show the confirmation dialog first.
+- If `Prompt` is set, show an input dialog and substitute `$ARGS`.
+- Output: show stdout/stderr in a simple result dialog (or the status bar for quick commands). Non-zero exit shows an error.
+- **A "Manage tools..." dialog** to add/edit/remove custom tools, choose scope (global vs this repo), and set the placeholders. This is how users without gitconfig-editing skills create tools.
+
+**Safety:** custom tools run arbitrary shell commands — that's their purpose. Don't sandbox, but: show the exact command in the confirmation dialog when `Confirm` is set, and never auto-run anything on repo open. Tools only run on explicit user click.
+
+**Example tools to ship as suggestions (not auto-installed, just offered as templates in the Manage dialog):**
+- "Create feature branch" — prompt for name, run `git checkout -b feature/$ARGS develop`
+- "Open commit on GitHub" — needs commit, run a browser-open to the remote URL + sha (best-effort URL construction)
+- "Run tests" — `dotnet test` or similar
 
 ---
 
 ## Cross-cutting requirements
 
-- **Every** mutating operation: snapshot before, OperationsLog entry after, `HeadChanged` event fired so the commit list refreshes.
-- **Force-push warning** appears whenever an operation rewrites a synced commit.
-- **Capability gating:** fixup, reword-of-older, squash-of-older all carry `Capability.Requires="FixupAutosquash"`. With no Git CLI, they're disabled with the adorner + tooltip "Requires Git command-line tool". HEAD-only reword and stash operations work without CLI.
-- **Conflict handling is uniform:** on any rebase/cherry-pick conflict, abort + restore to BeforeSha + report a clear message. Gitster does NOT enter a half-finished rebase state in this phase (no conflict-resolution UI — that's explicitly out of scope per the vision).
-- **Performance:** the commit list must stay responsive. CLI operations run async with the ring-spinner feedback in the status bar (reuse `OperationFeedbackService`).
+- Mutating operations (commit-to-branch, snapshot, worktree add/remove, branch create/delete/rename): snapshot before, OperationsLog entry after, `HeadChanged` / branch-list refresh.
+- Capability gating: worktree actions behind `Worktrees` capability (CLI). Branch ops and commit-to-branch and snapshot are libgit2 — no gating.
+- Custom tools that happen to invoke destructive git commands are the user's responsibility — but still snapshot before running any custom tool (cheap insurance), since Gitster can't know what a tool does.
+- Force-push warnings still apply if any branch operation rewrites synced history (rare in this phase, but branch delete of an un-pushed branch warns about losing commits).
 
 ---
 
 ## Acceptance criteria
 
-Stash-Killer:
-1. Stashes mode lists all stashes with auto-generated names, branch context, age.
-2. Auto-naming produces readable names from file content; user-assigned names persist in `.git/gitster/stash-names.json` and override the auto-name.
-3. Filter works over name, file path, branch.
-4. Diff preview shows files with A/M/D badges and a unified-diff of the selected file.
-5. Convert-to-branch creates a branch from the stash, applies it, drops the stash; conflicts leave both intact with a clear message.
-6. Apply, Pop, Drop, New stash, Rename all work; sidebar badge updates; drops are confirmed and logged.
-7. Stash operations need no Git CLI.
-
-Fixup workflow:
-8. `HybridGitBackend` routes rebase-class operations to CLI, everything else to libgit2; registered in DI as `IGitBackend`.
-9. Fixup-into-commit works without typing SHAs, via non-interactive autosquash; conflicts roll back cleanly.
-10. Reword works for any commit (HEAD via libgit2, older via CLI autosquash); gated by capability for the CLI path.
-11. Squash with date control works (soft-reset path when selection includes HEAD, rebase path otherwise).
-12. Cherry-pick with timestamp works (libgit2 cherry-pick + amend; CLI fallback on conflict).
-13. All CLI-dependent features are disabled with the capability adorner when Git CLI is unavailable; non-CLI features remain usable.
-14. Every operation snapshots, logs, warns on synced commits, and refreshes the list.
-
-Build: 0 errors, 0 warnings. `VISION.md` updated — Phase 2b items marked.
+1. Branches mode lists local + remote branches, sorted by last activity, with ahead/behind, current-branch marker, filter.
+2. Checkout, create, rename, delete branches work; delete warns if unmerged; checkout offers stash-and-checkout on dirty tree.
+3. Commit-to-another-branch works without disturbing the current working tree; copy is default, move is opt-in with a snapshot; degenerate same-branch case simplified.
+4. Branch snapshot creates a named branch (optionally capturing uncommitted changes) without disturbing the working tree.
+5. Worktrees mode lists worktrees with status, supports add/remove/prune/open-in-explorer/open-in-Gitster; gated behind Worktrees capability when no CLI.
+6. Custom Tools menu reads `[guitool]` sections + Gitster's own JSON; repo overrides global; placeholders substitute correctly; Manage dialog adds/edits/removes tools with scope.
+7. Every mutating op snapshots, logs, refreshes; custom tools snapshot before running.
+8. Build: 0 errors, 0 warnings. VISION.md updated — Phase 3 items marked.
 
 ---
 
-## Out of scope for Phase 2b (do not implement)
-
-- Conflict-resolution UI (Gitster aborts and rolls back on conflict; no merge editor — this is a permanent non-goal).
-- Commit reordering, splitting (Phase 5).
-- Full multi-branch graph.
-- Branch management beyond what convert-to-branch and the cherry-pick source-picker need (Phase 3).
-
 ## Suggested commit boundaries
 
-1. Stash backend + auto-namer (Steps A–B)
-2. Stashes mode UI + operations (Steps C–D) — **shippable milestone**
-3. HybridGitBackend + GitCliBackend foundation (Step E)
-4. Fixup (Step F)
-5. Reword anywhere (Step G)
-6. Squash + cherry-pick (Step H)
+1. Branches mode list + basic ops (Step A) — shippable
+2. Commit-to-another-branch (Step B) — the signature feature
+3. Branch snapshot (Step C)
+4. Worktrees mode (Step D)
+5. Custom Tools menu + manage dialog (Step E)
 
-Each boundary should build clean and leave the app usable.
+Each boundary builds clean and leaves the app usable.
+
+## Notes for the implementer
+
+- Step B is the trickiest. The tree-capture-and-commit-without-checkout technique is the heart of it — get that right and tested before moving on. Verify the working tree is byte-for-byte unchanged after a copy-mode commit-to-branch.
+- Reuse everything: the stash backend (for dirty-checkout), the combined-amend author UI (for commit-to-branch authoring), the OperationsLog and snapshot infrastructure, the Capability adorner.
+- Worktrees and Custom Tools both lean on the GitCli runner from Phase 2b — reuse it, don't build a second process runner.
