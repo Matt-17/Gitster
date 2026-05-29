@@ -494,10 +494,43 @@ public sealed class LibGit2Backend : IGitBackend
                     ChangeKind.Deleted => "D",
                     ChangeKind.Renamed => "R",
                     _                  => "M",
-                }))
+                },
+                ParseUnifiedDiff(e.Patch)))
             .ToList();
 
         return Task.FromResult(new CommitDiff(files, patch.LinesAdded, patch.LinesDeleted));
+    }
+
+    /// <summary>Parses a per-file unified-diff patch body into typed lines for inline rendering (B7).</summary>
+    internal static List<DiffLine> ParseUnifiedDiff(string? patchText)
+    {
+        var lines = new List<DiffLine>();
+        if (string.IsNullOrEmpty(patchText)) return lines;
+
+        foreach (var raw in patchText.Replace("\r\n", "\n").Split('\n'))
+        {
+            if (raw.Length == 0) { lines.Add(new DiffLine(DiffLineKind.Context, string.Empty)); continue; }
+            // Skip the file headers libgit2 includes in the per-entry patch; keep hunks + body.
+            if (raw.StartsWith("diff ", StringComparison.Ordinal) ||
+                raw.StartsWith("index ", StringComparison.Ordinal) ||
+                raw.StartsWith("--- ", StringComparison.Ordinal) ||
+                raw.StartsWith("+++ ", StringComparison.Ordinal) ||
+                raw.StartsWith("new file", StringComparison.Ordinal) ||
+                raw.StartsWith("deleted file", StringComparison.Ordinal) ||
+                raw.StartsWith("similarity", StringComparison.Ordinal) ||
+                raw.StartsWith("rename ", StringComparison.Ordinal))
+                continue;
+
+            var kind = raw[0] switch
+            {
+                '@' => DiffLineKind.Hunk,
+                '+' => DiffLineKind.Added,
+                '-' => DiffLineKind.Removed,
+                _   => DiffLineKind.Context,
+            };
+            lines.Add(new DiffLine(kind, raw));
+        }
+        return lines;
     }
 
     public Task<CommitDetails> GetCommitAsync(string sha)
@@ -1442,6 +1475,112 @@ public sealed class LibGit2Backend : IGitBackend
             repo.CheckoutPaths(headTip.Sha, inHead,
                 new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
         }
+    }
+
+    // ── Phase 4: Search & Analysis (Part B) ────────────────────────────────
+
+    // Pickaxe (-S), diff-regex (-G) and range-diff are CLI-only — routed via Hybrid.
+    public Task<IReadOnlyList<CommitInfo>> PickaxeSearchAsync(string term, string? path, CancellationToken ct = default) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+    public Task<IReadOnlyList<CommitInfo>> DiffRegexSearchAsync(string pattern, string? path, CancellationToken ct = default) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+    public Task<IReadOnlyList<RangeDiffEntry>> RangeDiffAsync(string range1, string range2, CancellationToken ct = default) =>
+        throw new NotSupportedException("Route through HybridGitBackend.");
+
+    /// <summary>Basic libgit2 blame fallback (no whitespace/move following — that needs the CLI).</summary>
+    public Task<IReadOnlyList<BlameLine>> BlameAsync(string filePath, bool ignoreWhitespace, bool followMoves, CancellationToken ct = default)
+    {
+        using var repo = OpenRepository();
+        var result = new List<BlameLine>();
+
+        var fullPath = Path.Combine(repo.Info.WorkingDirectory, filePath);
+        var contentLines = File.Exists(fullPath) ? File.ReadAllLines(fullPath) : Array.Empty<string>();
+
+        var blame = repo.Blame(filePath);
+        int line = 0;
+        foreach (var hunk in blame)
+        {
+            var commit = hunk.FinalCommit;
+            var author = commit?.Author.Name ?? string.Empty;
+            var when = commit?.Author.When ?? DateTimeOffset.MinValue;
+            var sha = commit?.Sha ?? string.Empty;
+            for (int i = 0; i < hunk.LineCount; i++)
+            {
+                var content = line < contentLines.Length ? contentLines[line] : string.Empty;
+                result.Add(new BlameLine(line + 1, sha, author, when, content));
+                line++;
+            }
+        }
+        return Task.FromResult<IReadOnlyList<BlameLine>>(result);
+    }
+
+    public Task<string?> GetPriorTipFromReflogAsync()
+    {
+        using var repo = OpenRepository();
+        var recent = repo.Refs.Log("HEAD").FirstOrDefault();
+        return Task.FromResult(recent?.From?.Sha);
+    }
+
+    public Task<CompareResult> CompareRefsAsync(string baseRef, string compareRef, bool threeDot, CancellationToken ct = default)
+    {
+        using var repo = OpenRepository();
+        var a = ResolveCommittish(repo, baseRef)
+            ?? throw new InvalidOperationException($"Could not resolve '{baseRef}'.");
+        var b = ResolveCommittish(repo, compareRef)
+            ?? throw new InvalidOperationException($"Could not resolve '{compareRef}'.");
+
+        Tree? fromTree;
+        List<CommitInfo> commits;
+        string explanation;
+
+        if (threeDot)
+        {
+            var mergeBase = repo.ObjectDatabase.FindMergeBase(a, b);
+            fromTree = mergeBase?.Tree;
+            var filter = new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = new[] { a, b },
+            };
+            if (mergeBase != null) filter.ExcludeReachableFrom = mergeBase;
+            commits = repo.Commits.QueryBy(filter).Select(ToInfo).ToList();
+            explanation = $"A…B (three-dot): everything that differs since '{baseRef}' and '{compareRef}' diverged (their merge-base).";
+        }
+        else
+        {
+            fromTree = a.Tree;
+            commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = b,
+                ExcludeReachableFrom = a,
+            }).Select(ToInfo).ToList();
+            explanation = $"A..B (two-dot): commits on '{compareRef}' that are not on '{baseRef}'.";
+        }
+
+        var patch = repo.Diff.Compare<Patch>(fromTree, b.Tree);
+        var files = patch.Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted,
+            e.Status switch { ChangeKind.Added => "A", ChangeKind.Deleted => "D", ChangeKind.Renamed => "R", _ => "M" },
+            ParseUnifiedDiff(e.Patch))).ToList();
+        var diff = new CommitDiff(files, patch.LinesAdded, patch.LinesDeleted);
+
+        return Task.FromResult(new CompareResult(commits, diff, explanation));
+
+        static CommitInfo ToInfo(Commit c) => new(
+            c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha, c.MessageShort, c.Author.When.DateTime,
+            c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty, CommitRemoteState.LocalOnly, c.Id.Sha);
+    }
+
+    /// <summary>Resolves a SHA, local branch, tag or origin/&lt;branch&gt; to a commit.</summary>
+    private static Commit? ResolveCommittish(Repository repo, string r)
+    {
+        if (string.IsNullOrWhiteSpace(r)) return null;
+        var c = repo.Lookup<Commit>(r);
+        if (c != null) return c;
+        if (repo.Branches[r]?.Tip is { } bt) return bt;
+        if (repo.Tags[r]?.Target is Commit tc) return tc;
+        if (repo.Branches[$"origin/{r}"]?.Tip is { } rt) return rt;
+        return null;
     }
 
     // ── Phase 3: Worktrees — routed to CLI via HybridGitBackend ─────────────

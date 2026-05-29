@@ -14,4 +14,6 @@ public enum GitCapabilities
     Worktrees = 1 << 7,
     CommitSigning = 1 << 8,
     StashManagement = 1 << 9,
+    DiffRegexSearch = 1 << 10,
+    BlameFollow = 1 << 11,
 }

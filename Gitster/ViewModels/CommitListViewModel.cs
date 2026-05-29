@@ -21,8 +21,6 @@ public partial class CommitListViewModel : BaseViewModel
     private const int FilterDebounceMs = 150;
 
     private readonly IGitBackend _git;
-    private readonly Action _openFilter;
-    private readonly Action _clearDialogFilters;
 
     /// <summary>Shared UI preferences (date display mode, gravatar) for row bindings.</summary>
     public Gitster.Services.UiPreferencesService Ui { get; }
@@ -32,20 +30,14 @@ public partial class CommitListViewModel : BaseViewModel
     private RemoteSets? _remoteSets;
     private CommitQuery _query = CommitQuery.Parse(null);
 
-    private bool _dialogHasActiveFilters;
-    private string _dialogFilterStatusText = string.Empty;
-
     private CancellationTokenSource? _loadCts;
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _diffCts;
 
-    public CommitListViewModel(IGitBackend git, Gitster.Services.UiPreferencesService ui,
-        Action openFilter, Action clearDialogFilters)
+    public CommitListViewModel(IGitBackend git, Gitster.Services.UiPreferencesService ui)
     {
         _git = git;
         Ui = ui;
-        _openFilter = openFilter;
-        _clearDialogFilters = clearDialogFilters;
     }
 
     /// <summary>Flat list of <see cref="CommitSectionHeader"/> and <see cref="CommitItem"/> rows.</summary>
@@ -104,15 +96,9 @@ public partial class CommitListViewModel : BaseViewModel
 
     // ── Loading ────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Loads the commit list for the current repository. The dialog filter (author/date)
-    /// is applied at the git level; the inline query filter is applied in-memory on top.
-    /// </summary>
-    public async Task LoadAsync(CommitFilter? dialogFilter, bool dialogHasActiveFilters, string dialogFilterStatusText)
+    /// <summary>Loads the commit list for the current repository (progressive, A0).</summary>
+    public async Task LoadAsync()
     {
-        _dialogHasActiveFilters = dialogHasActiveFilters;
-        _dialogFilterStatusText = dialogFilterStatusText;
-
         _loadCts?.Cancel();
         var cts = new CancellationTokenSource();
         _loadCts = cts;
@@ -134,7 +120,7 @@ public partial class CommitListViewModel : BaseViewModel
                 var batch = new List<CommitItem>(BatchSize);
                 bool firstBatch = true;
 
-                await foreach (var info in _git.EnumerateCommitsAsync(dialogFilter, ct).ConfigureAwait(false))
+                await foreach (var info in _git.EnumerateCommitsAsync(null, ct).ConfigureAwait(false))
                 {
                     batch.Add(new CommitItem(
                         info.Message, info.Date, info.Sha, info.AuthorName,
@@ -250,7 +236,7 @@ public partial class CommitListViewModel : BaseViewModel
     }
 
     private static bool Match(CommitQuery query, CommitItem c) =>
-        query.Matches(c.Message, c.AuthorName, c.AuthorEmail, c.FullSha);
+        query.Matches(c.Message, c.AuthorName, c.AuthorEmail, c.FullSha, c.Date);
 
     private List<CommitItem> FilteredLocal() =>
         _query.IsEmpty ? _allRows : _allRows.Where(c => Match(_query, c)).ToList();
@@ -298,22 +284,8 @@ public partial class CommitListViewModel : BaseViewModel
 
     private void UpdateFilterStatus()
     {
-        var hasLiveFilter = !_query.IsEmpty;
-        HasActiveFilters = hasLiveFilter || _dialogHasActiveFilters;
-
-        if (!HasActiveFilters)
-        {
-            FilterStatusText = string.Empty;
-            return;
-        }
-
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(_dialogFilterStatusText))
-            parts.Add(_dialogFilterStatusText);
-        if (hasLiveFilter)
-            parts.Add($"\"{FilterText.Trim()}\"");
-
-        FilterStatusText = string.Join(", ", parts);
+        HasActiveFilters = !_query.IsEmpty;
+        FilterStatusText = HasActiveFilters ? $"\"{FilterText.Trim()}\"" : string.Empty;
     }
 
     // ── Diff loading (A0.3) ──────────────────────────────────────────────────
@@ -360,12 +332,5 @@ public partial class CommitListViewModel : BaseViewModel
     // ── Commands ─────────────────────────────────────────────────────────────
 
     [RelayCommand]
-    private void OpenFilter() => _openFilter();
-
-    [RelayCommand]
-    private void ClearAllFilters()
-    {
-        FilterText = string.Empty;
-        _clearDialogFilters();
-    }
+    private void ClearAllFilters() => FilterText = string.Empty;
 }

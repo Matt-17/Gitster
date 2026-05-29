@@ -25,7 +25,6 @@ namespace Gitster.ViewModels;
 /// </summary>
 public partial class MainWindowViewModel : BaseViewModel
 {
-    private FilterWindow? _filterWindow;
     private readonly OperationsLogService _opsLogService = new();
     private readonly IGitBackend _gitBackend;
     private readonly RepositoryStateService _stateService;
@@ -50,6 +49,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public BranchesViewModel BranchesVM { get; }
     public WorktreesViewModel WorktreesVM { get; }
     public CommitPanelViewModel CommitPanelVM { get; }
+    public SearchViewModel SearchVM { get; }
     public OperationsLogService OpsLogService => _opsLogService;
     public UiPreferencesService Ui => _uiPreferences;
 
@@ -74,7 +74,7 @@ public partial class MainWindowViewModel : BaseViewModel
             if (e.PropertyName is nameof(TitleBarViewModel.RepositoryName) or nameof(TitleBarViewModel.CurrentBranch))
                 OnPropertyChanged(nameof(WindowTitle));
         };
-        CommitListVM = new CommitListViewModel(_gitBackend, _uiPreferences, OpenFilter, ClearAllFilters);
+        CommitListVM = new CommitListViewModel(_gitBackend, _uiPreferences);
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
         TimestampEditVM = new TimestampEditViewModel(
             () => CommitListVM.SelectedCommit,
@@ -118,6 +118,7 @@ public partial class MainWindowViewModel : BaseViewModel
             async () => await UpdateElementsAsync(),
             () => TitleBarVM.CurrentBranch,
             () => string.IsNullOrEmpty(SelectedRemote) ? Remotes.FirstOrDefault() : SelectedRemote);
+        SearchVM = new SearchViewModel(_gitBackend, () => CommitListVM.AllCommits);
 
         // Update ops log badge whenever the log changes
         _opsLogService.Changed += (_, _) =>
@@ -126,13 +127,6 @@ public partial class MainWindowViewModel : BaseViewModel
         // A.3 — refresh commit list after any backend HEAD mutation (e.g. Undo via ResetHard)
         _gitBackend.HeadChanged += (_, _) =>
             Application.Current.Dispatcher.BeginInvoke(async () => await UpdateElementsAsync());
-
-        // Dialog (author/date) filter changes trigger a reload — the inline query
-        // filter is handled in-memory by CommitListViewModel without re-querying git.
-        Filter.PropertyChanged += (s, e) =>
-        {
-            _ = UpdateElementsAsync();
-        };
 
         // Load saved path or use default
         Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -182,8 +176,6 @@ public partial class MainWindowViewModel : BaseViewModel
     public partial string SelectedRemote { get; set; } = string.Empty;
 
     public ObservableCollection<string> Remotes { get; } = [];
-
-    public CommitFilter Filter { get; } = new();
 
     /// <summary>True when the selected commit is already on the remote — amending it requires a force-push.</summary>
     public bool IsAmendUnsafe => SelectedCommit?.RemoteState == Gitster.Services.Git.CommitRemoteState.OnRemote;
@@ -247,64 +239,6 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         FolderPath = path;
         _recentRepos.Record(path);
-    }
-
-    [RelayCommand]
-    private void OpenFilter()
-    {
-        try
-        {
-            // If filter window is already open, just activate it
-            if (_filterWindow != null)
-            {
-                _filterWindow.Activate();
-                return;
-            }
-
-            // Create FilterWindowViewModel with the main filter
-            var filterViewModel = new FilterWindowViewModel(Filter);
-
-            // Populate author names from all commits
-            filterViewModel.AuthorNames.Clear();
-            filterViewModel.AuthorNames.Add("All");
-
-            var distinctAuthors = CommitListVM.AllCommits
-                .Select(c => c.AuthorName)
-                .Where(name => !string.IsNullOrEmpty(name))
-                .Distinct()
-                .OrderBy(name => name);
-
-            foreach (var author in distinctAuthors)
-            {
-                filterViewModel.AuthorNames.Add(author);
-            }
-
-            _filterWindow = new FilterWindow(filterViewModel)
-            {
-                Owner = Application.Current.MainWindow
-            };
-
-            // Subscribe to FiltersApplied event
-            _filterWindow.FiltersApplied += (sender, e) =>
-            {
-                filterViewModel.ApplyToMainFilter();
-            };
-
-            // Clean up when window is closed
-            _filterWindow.Closed += (sender, e) => _filterWindow = null;
-
-            _filterWindow.Show();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Error opening filter window: {ex.Message}");
-        }
-    }
-
-    [RelayCommand]
-    private void ClearAllFilters()
-    {
-        Filter.ClearAllFilters();
     }
 
     [RelayCommand]
@@ -695,18 +629,6 @@ public partial class MainWindowViewModel : BaseViewModel
         settings.Save();
     }
 
-    /// <summary>Computes the dialog (author/date) filter summary for the search-status line.</summary>
-    private (bool Active, string Text) DialogFilterStatus()
-    {
-        int count = 0;
-        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) && Filter.SelectedAuthorName != "All") count++;
-        if (Filter.FromDate.HasValue) count++;
-        if (Filter.ToDate.HasValue) count++;
-        return count > 0
-            ? (true, $"{count} Filter{(count > 1 ? "s" : "")} applied")
-            : (false, string.Empty);
-    }
-
     public async Task UpdateElementsAsync()
     {
         try
@@ -761,11 +683,9 @@ public partial class MainWindowViewModel : BaseViewModel
             SidebarVM.BranchCount = BranchesVM.LocalCount;
             await RefreshSidebarBadgesAsync();
 
-            // Progressive commit-list load (A0). The dialog author/date filter is applied
-            // at the git level; the inline query filter runs in-memory on top.
-            var (dialogActive, dialogText) = DialogFilterStatus();
-            var dialogFilter = Filter.HasActiveFilters() ? Filter : null;
-            await CommitListVM.LoadAsync(dialogFilter, dialogActive, dialogText);
+            // Progressive commit-list load (A0). Author/date filtering now lives in the
+            // inline query (author:/before:/after:) and the Search mode — no dialog.
+            await CommitListVM.LoadAsync();
 
             // Refresh author directory from the loaded commits.
             _ = _authorDirService.RefreshAsync();
