@@ -3,15 +3,301 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:controls="clr-namespace:Gitster.Controls"
+             xmlns:helper="clr-namespace:Gitster.Views.Helper"
+             d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
-    <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5">
-            <TextBlock Text="History search" FontSize="16"
-                       Foreground="{StaticResource TextPrimary}"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Coming in Phase 4" FontSize="13" Margin="0,6,0,0"
-                       Foreground="{StaticResource TextTertiary}"
-                       HorizontalAlignment="Center"/>
-        </StackPanel>
+    <UserControl.Resources>
+        <!-- Type-selector tab button base -->
+        <Style x:Key="SearchTab" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid DataContext="{Binding SearchVM}" d:DataContext="{d:DesignInstance Type=vm:SearchViewModel}"
+          Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="3"/>
+            <RowDefinition Height="200" MinHeight="80"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Type selector ─────────────────────────────────────────────── -->
+        <WrapPanel Grid.Row="0" Margin="0,0,0,8">
+            <Button Content="Commits" Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.Commits}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCommits}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Pickaxe (-S)" helper:Capability.Requires="PickaxeSearch"
+                    Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.Pickaxe}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsPickaxe}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Diff regex (-G)" helper:Capability.Requires="DiffRegexSearch"
+                    Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.DiffRegex}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDiffRegex}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Blame" Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.Blame}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsBlame}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Range-diff" helper:Capability.Requires="RangeDiff"
+                    Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.RangeDiff}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRangeDiff}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Compare refs" Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.CompareRefs}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCompareRefs}" Value="True">
+                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </WrapPanel>
+
+        <!-- ── Per-type inputs ───────────────────────────────────────────── -->
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <!-- Commits / Pickaxe / Diff regex: query + optional path -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsBlame}" Value="False">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <!-- shown for Commits/Pickaxe/DiffRegex only -->
+                <StackPanel Visibility="{Binding IsCommitResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid Visibility="{Binding IsCompareRefs, Converter={StaticResource InverseBoolVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:SearchBox Grid.Column="0" Text="{Binding QueryText, UpdateSourceTrigger=PropertyChanged}"
+                                            Placeholder="{Binding QueryHint}"/>
+                        <controls:SearchBox Grid.Column="1" Width="160" Margin="6,0,0,0"
+                                            Text="{Binding PathFilter, UpdateSourceTrigger=PropertyChanged}"
+                                            Placeholder="path filter (optional)"
+                                            Visibility="{Binding IsCommits, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
+                        <Button Grid.Column="2" Content="Search" Style="{StaticResource PrimaryButton}" Margin="6,0,0,0"
+                                Command="{Binding RunCommand}"/>
+                    </Grid>
+
+                    <!-- Compare refs -->
+                    <Grid Visibility="{Binding IsCompareRefs, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:SearchBox Grid.Column="0" Text="{Binding BaseRef, UpdateSourceTrigger=PropertyChanged}" Placeholder="base ref (A)"/>
+                        <TextBlock Grid.Column="1" Text="↔" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource TextSecondary}"/>
+                        <controls:SearchBox Grid.Column="2" Text="{Binding CompareRef, UpdateSourceTrigger=PropertyChanged}" Placeholder="compare ref (B)"/>
+                        <CheckBox Grid.Column="3" Content="three-dot (A...B)" IsChecked="{Binding ThreeDot}" Margin="10,0"
+                                  VerticalAlignment="Center" ToolTip="On: changes since A and B diverged. Off: commits on B not on A."/>
+                        <Button Grid.Column="4" Content="Compare" Style="{StaticResource PrimaryButton}" Command="{Binding RunCommand}"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Range-diff -->
+                <Grid Visibility="{Binding IsRangeDiff, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <controls:SearchBox Grid.Column="0" Text="{Binding Range1, UpdateSourceTrigger=PropertyChanged}" Placeholder="range 1 (e.g. @{u})"/>
+                    <TextBlock Grid.Column="1" Text="vs" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource TextSecondary}"/>
+                    <controls:SearchBox Grid.Column="2" Text="{Binding Range2, UpdateSourceTrigger=PropertyChanged}" Placeholder="range 2 (e.g. HEAD)"/>
+                    <Button Grid.Column="3" Content="Before/after rebase" Style="{StaticResource GhostButton}" Margin="6,0"
+                            Command="{Binding UseRebasePresetCommand}" ToolTip="Use the prior HEAD tip (reflog) as range 1"/>
+                    <Button Grid.Column="4" Content="Compare" Style="{StaticResource PrimaryButton}" Command="{Binding RunCommand}"/>
+                </Grid>
+            </Grid>
+
+            <!-- Blame inputs -->
+            <Grid Visibility="{Binding IsBlame, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <controls:SearchBox Grid.Column="0" Text="{Binding BlameFilePath, UpdateSourceTrigger=PropertyChanged}" Placeholder="file path (relative to repo)"/>
+                <Button Grid.Column="1" Content="Pick file…" Style="{StaticResource GhostButton}" Margin="6,0,0,0" Command="{Binding PickBlameFileCommand}"/>
+                <CheckBox Grid.Column="2" Content="ignore whitespace" IsChecked="{Binding BlameIgnoreWhitespace}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                <CheckBox Grid.Column="3" Content="follow moved code" IsChecked="{Binding BlameFollowMoves}" Margin="10,0,8,0" VerticalAlignment="Center"
+                          ToolTip="git blame -C -C -C — slower, but follows code across moves/renames"/>
+                <Button Grid.Column="4" Content="Blame" Style="{StaticResource PrimaryButton}" Command="{Binding RunCommand}"/>
+            </Grid>
+        </Grid>
+
+        <!-- ── Results ───────────────────────────────────────────────────── -->
+        <Grid Grid.Row="2">
+            <!-- Commit list results (Commits/Pickaxe/Regex/Compare) -->
+            <Grid Visibility="{Binding IsCommitResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="{Binding Explanation}" Foreground="{StaticResource TextSecondary}"
+                           TextWrapping="Wrap" Margin="2,0,2,6"
+                           Visibility="{Binding IsCompareRefs, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <ListView Grid.Row="1" ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResult}"
+                          BorderThickness="0,0.5,0,0" BorderBrush="{StaticResource BorderTertiary}"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Height="22">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="64"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Message}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="1" Text="{Binding AuthorName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock Grid.Column="2" Text="{Binding CommitId}" VerticalAlignment="Center" FontFamily="{StaticResource FontFamilyMono}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
+
+            <!-- Blame results -->
+            <ListView Visibility="{Binding IsBlame, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding BlameLines}" SelectedItem="{Binding SelectedBlameLine}"
+                      BorderThickness="0,0.5,0,0" BorderBrush="{StaticResource BorderTertiary}"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/></Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="58"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="40"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding ShortSha}" FontFamily="{StaticResource FontFamilyMono}" FontSize="10" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Author}" FontSize="10" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="{Binding DateText}" FontSize="10" Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="{Binding LineNumber}" FontFamily="{StaticResource FontFamilyMono}" FontSize="10" Foreground="{StaticResource TextTertiary}" TextAlignment="Right" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="4" Text="{Binding Content}" FontFamily="{StaticResource FontFamilyMono}" FontSize="11" VerticalAlignment="Center" TextWrapping="NoWrap"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Range-diff results -->
+            <ListView Visibility="{Binding IsRangeDiff, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding RangeResults}"
+                      BorderThickness="0,0.5,0,0" BorderBrush="{StaticResource BorderTertiary}">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="22">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" CornerRadius="3" Padding="6,0" Margin="0,2,8,2" HorizontalAlignment="Left">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Status}" Value="Added"><Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Removed"><Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Modified"><Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding Status}" FontSize="10" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Summary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource FontFamilyMono}" FontSize="11"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Empty hint -->
+            <TextBlock Text="{Binding QueryHint}" Foreground="{StaticResource TextTertiary}" FontStyle="Italic"
+                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,40,0,0" TextWrapping="Wrap" MaxWidth="420"
+                       Visibility="{Binding IsBlame, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
+        </Grid>
+
+        <GridSplitter Grid.Row="3" HorizontalAlignment="Stretch" Background="{StaticResource BorderTertiary}"/>
+
+        <!-- ── Shared diff view (B7), for commit-list / compare / blame selection ── -->
+        <controls:DiffView Grid.Row="4" Header="{Binding DiffHeader}" Files="{Binding DiffFiles}"
+                           Visibility="{Binding IsRangeDiff, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
     </Grid>
 </UserControl>

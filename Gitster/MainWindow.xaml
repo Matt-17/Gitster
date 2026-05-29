@@ -119,7 +119,8 @@
                     <MenuItem Header="_Edit" Style="{StaticResource ChromeMenuItem}">
                         <MenuItem Header="Undo"    Command="{Binding UndoBarVM.UndoCommand}" InputGestureText="Ctrl+Z"/>
                         <Separator/>
-                        <MenuItem Header="Filter..." Command="{Binding CommitListVM.OpenFilterCommand}" InputGestureText="Ctrl+F"/>
+                        <MenuItem Header="Find in commits" Command="{Binding CommitListVM.FocusSearchCommand}" InputGestureText="Ctrl+F"/>
+                        <MenuItem Header="Search mode" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Search}" InputGestureText="Ctrl+5"/>
                     </MenuItem>
 
                     <MenuItem Header="_View" Style="{StaticResource ChromeMenuItem}">

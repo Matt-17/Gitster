@@ -228,35 +228,23 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <local:SearchBox Grid.Column="0"
                                  x:Name="SearchBoxControl"
                                  Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                                 Placeholder="Search  (author:Name  message:&quot;fix bug&quot;  sha:abc)"/>
+                                 Placeholder="Search  (author:Name  message:&quot;fix bug&quot;  sha:abc  after:2026-01-01)"/>
 
                 <Button Grid.Column="1"
                         Width="28" Height="28" Margin="4,0,0,0"
                         Command="{Binding ClearAllFiltersCommand}"
-                        ToolTip="Reset filters"
+                        ToolTip="Reset filter"
                         Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"
                         Style="{StaticResource GhostButton}">
                     <Path Stretch="Uniform" Width="12" Height="12"
                           Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
                           Fill="Transparent"
                           Data="M4,4 L16,16 M16,4 L4,16"/>
-                </Button>
-
-                <Button Grid.Column="2"
-                        Width="28" Height="28" Margin="4,0,0,0"
-                        Command="{Binding OpenFilterCommand}"
-                        ToolTip="Advanced filter"
-                        Style="{StaticResource GhostButton}">
-                    <Path Stretch="Uniform" Width="12" Height="12"
-                          Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
-                          Fill="Transparent"
-                          Data="M2,4 L18,4 M5,10 L15,10 M8,16 L12,16"/>
                 </Button>
             </Grid>
         </Border>
@@ -305,121 +293,7 @@
                       Background="{StaticResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"/>
 
-        <!-- ── Diff preview ────────────────────────────────────────────── -->
-        <Grid Grid.Row="3">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Border Grid.Row="0"
-                    Background="{StaticResource BackgroundSecondary}"
-                    BorderBrush="{StaticResource BorderTertiary}"
-                    BorderThickness="0,0,0,1"
-                    Padding="8,5">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="📄 " VerticalAlignment="Center"/>
-                    <TextBlock Text="Diff" FontWeight="Medium"
-                               Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                    <TextBlock Text=" · " Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding DiffHeaderDisplay}"
-                               FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
-                               VerticalAlignment="Center">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DiffHeader}" Value="">
-                                        <Setter Property="FontStyle" Value="Italic"/>
-                                        <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                    <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="8,0,0,0">
-                        <Ellipse.Style>
-                            <Style TargetType="Ellipse">
-                                <Setter Property="Fill" Value="Transparent"/>
-                                <Setter Property="Stroke" Value="Transparent"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="Incoming">
-                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
-                                        <Setter Property="ToolTip" Value="Incoming — on remote, not yet merged locally"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="LocalOnly">
-                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                        <Setter Property="ToolTip" Value="Outgoing — local only, not yet pushed"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="NoTrackingBranch">
-                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                        <Setter Property="ToolTip" Value="Outgoing — no tracking branch configured"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding DiffRemoteState}" Value="OnRemote">
-                                        <Setter Property="Fill" Value="Transparent"/>
-                                        <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
-                                        <Setter Property="StrokeThickness" Value="1.5"/>
-                                        <Setter Property="ToolTip" Value="Synced — on both local and remote"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Ellipse.Style>
-                    </Ellipse>
-                </StackPanel>
-            </Border>
-
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding DiffFiles}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <DockPanel Margin="8,3">
-                                <TextBlock DockPanel.Dock="Right"
-                                           FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
-                                           Margin="12,0,0,0">
-                                    <Run Text="+" Foreground="{StaticResource AccentSuccess}"/><Run Text="{Binding Added, Mode=OneWay}" Foreground="{StaticResource AccentSuccess}"/><Run Text="  −" Foreground="{StaticResource AccentDanger}"/><Run Text="{Binding Deleted, Mode=OneWay}" Foreground="{StaticResource AccentDanger}"/>
-                                </TextBlock>
-                                <Border DockPanel.Dock="Left" Margin="0,0,5,0"
-                                        Width="14" Height="14" CornerRadius="2" VerticalAlignment="Center">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Status}" Value="A">
-                                                    <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Status}" Value="D">
-                                                    <Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding Status}"
-                                               FontFamily="{StaticResource FontFamilyMono}" FontSize="9"
-                                               FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Status}" Value="A">
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentSuccess}"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="D">
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentDanger}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Border>
-                                <TextBlock Text="{Binding Path}"
-                                           FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
-                                           Foreground="{StaticResource TextPrimary}"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Grid>
+        <!-- ── Diff preview (consolidated DiffView, B7) ────────────────── -->
+        <local:DiffView Grid.Row="3" Header="{Binding DiffHeaderDisplay}" Files="{Binding DiffFiles}"/>
     </Grid>
 </UserControl>

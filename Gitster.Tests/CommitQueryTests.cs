@@ -102,4 +102,20 @@ public sealed class CommitQueryTests
         Assert.IsTrue(Match("FIX", "fix bug"));
         Assert.IsTrue(Match("author:ALICE", "m", "alice"));
     }
+
+    [TestMethod]
+    public void BeforeAfter_FilterByDate()
+    {
+        var q = CommitQuery.Parse("after:2026-01-01 before:2026-12-31");
+        Assert.IsTrue(q.Matches("m", "a", "", "", new DateTime(2026, 6, 1)));
+        Assert.IsFalse(q.Matches("m", "a", "", "", new DateTime(2025, 6, 1)));
+        Assert.IsFalse(q.Matches("m", "a", "", "", new DateTime(2027, 1, 1)));
+    }
+
+    [TestMethod]
+    public void BeforeAfter_IgnoredWhenNoDateProvided()
+    {
+        // With no commit date supplied, date terms don't exclude (used by callers without dates).
+        Assert.IsTrue(Match("after:2026-01-01", "m", "a"));
+    }
 }

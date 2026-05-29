@@ -88,6 +88,18 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)    => _lib.CommitToBranchAsync(request);
     public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted) => _lib.CreateSnapshotBranchAsync(branchName, includeUncommitted);
 
+    // ── Phase 4: Search & Analysis (CLI for pickaxe/regex/range-diff/blame) ─
+    public Task<IReadOnlyList<CommitInfo>> PickaxeSearchAsync(string term, string? path, CancellationToken ct = default) => _cli.PickaxeSearchAsync(term, path, ct);
+    public Task<IReadOnlyList<CommitInfo>> DiffRegexSearchAsync(string pattern, string? path, CancellationToken ct = default) => _cli.DiffRegexSearchAsync(pattern, path, ct);
+    public Task<IReadOnlyList<RangeDiffEntry>> RangeDiffAsync(string range1, string range2, CancellationToken ct = default) => _cli.RangeDiffAsync(range1, range2, ct);
+    public Task<IReadOnlyList<BlameLine>> BlameAsync(string filePath, bool ignoreWhitespace, bool followMoves, CancellationToken ct = default)
+        // The robust whitespace/move-following blame needs the CLI; without it fall back to libgit2.
+        => (followMoves || ignoreWhitespace) && GitCli.IsAvailable
+            ? _cli.BlameAsync(filePath, ignoreWhitespace, followMoves, ct)
+            : _lib.BlameAsync(filePath, ignoreWhitespace, followMoves, ct);
+    public Task<string?> GetPriorTipFromReflogAsync() => _lib.GetPriorTipFromReflogAsync();
+    public Task<CompareResult> CompareRefsAsync(string baseRef, string compareRef, bool threeDot, CancellationToken ct = default) => _lib.CompareRefsAsync(baseRef, compareRef, threeDot, ct);
+
     // ── Phase 3: worktrees (CLI) ──────────────────────────────────────────
     public Task<IReadOnlyList<WorktreeInfo>> GetWorktreesAsync()              => _cli.GetWorktreesAsync();
     public Task<string> AddWorktreeAsync(string path, string branchName, bool createBranch) => _cli.AddWorktreeAsync(path, branchName, createBranch);

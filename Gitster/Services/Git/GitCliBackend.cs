@@ -16,6 +16,8 @@ public sealed class GitCliBackend : IGitBackend
     public GitCapabilities Capabilities =>
         GitCli.IsAvailable
             ? GitCapabilities.FixupAutosquash | GitCapabilities.InteractiveRebase | GitCapabilities.Worktrees
+              | GitCapabilities.PickaxeSearch | GitCapabilities.DiffRegexSearch
+              | GitCapabilities.RangeDiff | GitCapabilities.BlameFollow
             : GitCapabilities.None;
 
     public Task OpenAsync(string path)
@@ -221,6 +223,143 @@ public sealed class GitCliBackend : IGitBackend
             GitCli.CleanupTemp(msgPath, seqEdPath, edPath);
         }
     }
+
+    // ── Phase 4: Search & Analysis (Part B) ───────────────────────────────
+
+    private const string LogFormat = "%H%x1f%an%x1f%ae%x1f%aI%x1f%s";
+
+    public async Task<IReadOnlyList<CommitInfo>> PickaxeSearchAsync(string term, string? path, CancellationToken ct = default)
+    {
+        EnsurePath(); EnsureCli();
+        var pathArg = string.IsNullOrWhiteSpace(path) ? string.Empty : $" -- {QuoteArg(path)}";
+        var r = await GitCli.RunAsync(RepositoryPath, $"log -S{QuoteArg(term)} --pretty=format:{LogFormat}{pathArg}", null, ct);
+        if (!r.Success && string.IsNullOrEmpty(r.Stdout))
+            throw new InvalidOperationException($"Pickaxe search failed:\n{r.Output}");
+        return ParseLog(r.Stdout);
+    }
+
+    public async Task<IReadOnlyList<CommitInfo>> DiffRegexSearchAsync(string pattern, string? path, CancellationToken ct = default)
+    {
+        EnsurePath(); EnsureCli();
+        var pathArg = string.IsNullOrWhiteSpace(path) ? string.Empty : $" -- {QuoteArg(path)}";
+        var r = await GitCli.RunAsync(RepositoryPath, $"log -G{QuoteArg(pattern)} --pretty=format:{LogFormat}{pathArg}", null, ct);
+        if (!r.Success && string.IsNullOrEmpty(r.Stdout))
+            throw new InvalidOperationException($"Diff-regex search failed:\n{r.Output}");
+        return ParseLog(r.Stdout);
+    }
+
+    public async Task<IReadOnlyList<BlameLine>> BlameAsync(string filePath, bool ignoreWhitespace, bool followMoves, CancellationToken ct = default)
+    {
+        EnsurePath(); EnsureCli();
+        var ws = ignoreWhitespace ? "-w " : string.Empty;
+        var moves = followMoves ? "-C -C -C " : string.Empty;
+        var r = await GitCli.RunAsync(RepositoryPath, $"blame {ws}{moves}--line-porcelain {QuoteArg(filePath)}", null, ct);
+        if (!r.Success)
+            throw new InvalidOperationException($"Blame failed:\n{r.Output}");
+        return ParseBlamePorcelain(r.Stdout);
+    }
+
+    public async Task<IReadOnlyList<RangeDiffEntry>> RangeDiffAsync(string range1, string range2, CancellationToken ct = default)
+    {
+        EnsurePath(); EnsureCli();
+        var r = await GitCli.RunAsync(RepositoryPath, $"range-diff {range1} {range2}", null, ct);
+        if (!r.Success)
+            throw new InvalidOperationException($"Range-diff failed:\n{r.Output}");
+        return ParseRangeDiff(r.Stdout);
+    }
+
+    public async Task<string?> GetPriorTipFromReflogAsync()
+    {
+        EnsurePath(); EnsureCli();
+        var r = await GitCli.RunAsync(RepositoryPath, "rev-parse HEAD@{1}");
+        return r.Success ? r.Stdout.Trim() : null;
+    }
+
+    public Task<CompareResult> CompareRefsAsync(string baseRef, string compareRef, bool threeDot, CancellationToken ct = default)
+        => NS<CompareResult>();
+
+    private static List<CommitInfo> ParseLog(string stdout)
+    {
+        var result = new List<CommitInfo>();
+        foreach (var line in stdout.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var p = line.Split('\x1f');
+            if (p.Length < 5) continue;
+            var date = DateTimeOffset.TryParse(p[3], out var dt) ? dt.LocalDateTime : DateTime.MinValue;
+            var sha = p[0];
+            result.Add(new CommitInfo(sha.Length >= 7 ? sha[..7] : sha, p[4], date, p[1], p[2], CommitRemoteState.LocalOnly, sha));
+        }
+        return result;
+    }
+
+    private static List<BlameLine> ParseBlamePorcelain(string stdout)
+    {
+        var result = new List<BlameLine>();
+        string sha = string.Empty, author = string.Empty;
+        int lineNum = 0;
+        DateTimeOffset when = DateTimeOffset.MinValue;
+
+        foreach (var raw in stdout.Replace("\r\n", "\n").Split('\n'))
+        {
+            if (raw.Length == 0) continue;
+            if (raw[0] == '\t')
+            {
+                result.Add(new BlameLine(lineNum, sha, author, when, raw[1..]));
+                continue;
+            }
+            if (raw.Length >= 40 && IsHex(raw.AsSpan(0, 40)))
+            {
+                var parts = raw.Split(' ');
+                sha = parts[0];
+                if (parts.Length >= 3 && int.TryParse(parts[2], out var n)) lineNum = n;
+            }
+            else if (raw.StartsWith("author ", StringComparison.Ordinal))
+                author = raw["author ".Length..];
+            else if (raw.StartsWith("author-time ", StringComparison.Ordinal)
+                     && long.TryParse(raw["author-time ".Length..], out var unix))
+                when = DateTimeOffset.FromUnixTimeSeconds(unix);
+        }
+        return result;
+    }
+
+    private static bool IsHex(ReadOnlySpan<char> s)
+    {
+        foreach (var c in s)
+            if (!Uri.IsHexDigit(c)) return false;
+        return true;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex RangeDiffLine =
+        new(@"^\s*(\S+):\s+(\S+)\s+([=!<>])\s+(\S+):\s+(\S+)\s+(.*)$",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static List<RangeDiffEntry> ParseRangeDiff(string stdout)
+    {
+        var result = new List<RangeDiffEntry>();
+        foreach (var raw in stdout.Replace("\r\n", "\n").Split('\n'))
+        {
+            var m = RangeDiffLine.Match(raw);
+            if (!m.Success) continue;
+            var op = m.Groups[3].Value;
+            var leftSha = NullIfDashes(m.Groups[2].Value);
+            var rightSha = NullIfDashes(m.Groups[5].Value);
+            var status = op switch
+            {
+                "=" => RangeDiffStatus.Unchanged,
+                "!" => RangeDiffStatus.Modified,
+                "<" => RangeDiffStatus.Removed,
+                ">" => RangeDiffStatus.Added,
+                _   => RangeDiffStatus.Modified,
+            };
+            result.Add(new RangeDiffEntry(status, leftSha, rightSha, m.Groups[6].Value.Trim()));
+        }
+        return result;
+    }
+
+    private static string? NullIfDashes(string s) =>
+        s.All(c => c == '-') ? null : s;
+
+    private static string QuoteArg(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
 
     // ── Unsupported pass-through stubs ────────────────────────────────────
     // These are here only to satisfy the interface; HybridGitBackend never

@@ -86,5 +86,13 @@ public interface IGitBackend
     Task RemoveWorktreeAsync(string path, bool force);
     Task PruneWorktreesAsync();
 
+    // ── Phase 4: Search & Analysis (Part B) ───────────────────────────────
+    Task<IReadOnlyList<CommitInfo>> PickaxeSearchAsync(string term, string? path, CancellationToken ct = default);
+    Task<IReadOnlyList<CommitInfo>> DiffRegexSearchAsync(string pattern, string? path, CancellationToken ct = default);
+    Task<IReadOnlyList<BlameLine>> BlameAsync(string filePath, bool ignoreWhitespace, bool followMoves, CancellationToken ct = default);
+    Task<IReadOnlyList<RangeDiffEntry>> RangeDiffAsync(string range1, string range2, CancellationToken ct = default);
+    Task<string?> GetPriorTipFromReflogAsync();
+    Task<CompareResult> CompareRefsAsync(string baseRef, string compareRef, bool threeDot, CancellationToken ct = default);
+
     GitCapabilities Capabilities { get; }
 }

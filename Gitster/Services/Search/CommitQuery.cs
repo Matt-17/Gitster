@@ -1,7 +1,9 @@
+using System.Globalization;
+
 namespace Gitster.Services.Search;
 
 /// <summary>The field a query term is restricted to (or <see cref="Any"/> for a bare token).</summary>
-public enum QueryField { Any, Author, Message, Sha }
+public enum QueryField { Any, Author, Message, Sha, Before, After }
 
 /// <summary>A single parsed query term: a value plus the field it is restricted to.</summary>
 public sealed record QueryTerm(QueryField Field, string Value);
@@ -61,6 +63,8 @@ public sealed class CommitQuery
                         "message" => QueryField.Message,
                         "msg" => QueryField.Message,
                         "sha" => QueryField.Sha,
+                        "before" or "until" => QueryField.Before,
+                        "after" or "since" => QueryField.After,
                         _ => null,
                     };
                     if (parsed.HasValue)
@@ -96,18 +100,18 @@ public sealed class CommitQuery
     }
 
     /// <summary>True when every term matches the given commit projection (AND semantics).</summary>
-    public bool Matches(string message, string authorName, string authorEmail, string sha)
+    public bool Matches(string message, string authorName, string authorEmail, string sha, DateTime? date = null)
     {
         // Iterate by index to avoid enumerator allocation on the hot filtering path.
         for (int t = 0; t < Terms.Count; t++)
         {
-            if (!MatchesTerm(Terms[t], message, authorName, authorEmail, sha))
+            if (!MatchesTerm(Terms[t], message, authorName, authorEmail, sha, date))
                 return false;
         }
         return true;
     }
 
-    private static bool MatchesTerm(QueryTerm term, string message, string authorName, string authorEmail, string sha)
+    private static bool MatchesTerm(QueryTerm term, string message, string authorName, string authorEmail, string sha, DateTime? date)
     {
         var v = term.Value;
         return term.Field switch
@@ -115,10 +119,16 @@ public sealed class CommitQuery
             QueryField.Author => Contains(authorName, v) || Contains(authorEmail, v),
             QueryField.Message => Contains(message, v),
             QueryField.Sha => StartsWith(sha, v),
+            QueryField.Before => !date.HasValue || (TryDate(v, out var bd) ? date.Value.Date <= bd.Date : true),
+            QueryField.After => !date.HasValue || (TryDate(v, out var ad) ? date.Value.Date >= ad.Date : true),
             _ => Contains(message, v) || Contains(authorName, v)
                  || Contains(authorEmail, v) || StartsWith(sha, v),
         };
     }
+
+    private static bool TryDate(string s, out DateTime date) =>
+        DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
+        || DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out date);
 
     private static bool Contains(string haystack, string needle) =>
         haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);

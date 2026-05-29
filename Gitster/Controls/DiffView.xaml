@@ -1,0 +1,106 @@
+<UserControl x:Class="Gitster.Controls.DiffView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:models="clr-namespace:Gitster.Models"
+             x:Name="Root"
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <!-- One unified-diff line, coloured by kind -->
+        <DataTemplate x:Key="DiffLineTemplate" DataType="{x:Type models:DiffLine}">
+            <Border>
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Kind}" Value="Added">
+                                <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Kind}" Value="Removed">
+                                <Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Kind}" Value="Hunk">
+                                <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Text="{Binding Text}" FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
+                           TextWrapping="NoWrap" Padding="6,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Kind}" Value="Hunk">
+                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Border>
+        </DataTemplate>
+
+        <!-- One file: collapsible header (badge + path + counts) over its diff lines -->
+        <DataTemplate x:Key="DiffFileTemplate" DataType="{x:Type models:DiffFileEntry}">
+            <Expander Margin="0,1" IsExpanded="False" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <DockPanel LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Right" FontFamily="{StaticResource FontFamilyMono}" FontSize="11" Margin="12,0,0,0">
+                            <Run Text="+" Foreground="{StaticResource AccentSuccess}"/><Run Text="{Binding Added, Mode=OneWay}" Foreground="{StaticResource AccentSuccess}"/><Run Text="  −" Foreground="{StaticResource AccentDanger}"/><Run Text="{Binding Deleted, Mode=OneWay}" Foreground="{StaticResource AccentDanger}"/>
+                        </TextBlock>
+                        <Border DockPanel.Dock="Left" Margin="0,0,5,0" Width="14" Height="14" CornerRadius="2" VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="A"><Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/></DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="D"><Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding Status}" FontFamily="{StaticResource FontFamilyMono}" FontSize="9"
+                                       FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondary}"/>
+                        </Border>
+                        <TextBlock Text="{Binding Path}" FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
+                                   Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                    </DockPanel>
+                </Expander.Header>
+                <Border Background="{StaticResource BackgroundPrimary}" BorderBrush="{StaticResource BorderTertiary}"
+                        BorderThickness="0,0,0,1">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="320">
+                        <ItemsControl ItemsSource="{Binding Lines}" ItemTemplate="{StaticResource DiffLineTemplate}"/>
+                    </ScrollViewer>
+                </Border>
+            </Expander>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header bar -->
+        <Border Grid.Row="0" Background="{StaticResource BackgroundSecondary}"
+                BorderBrush="{StaticResource BorderTertiary}" BorderThickness="0,0,0,1" Padding="8,5">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="📄 " VerticalAlignment="Center"/>
+                <TextBlock Text="Diff" FontWeight="Medium" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                <TextBlock Text=" · " Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Header, ElementName=Root}" FontFamily="{StaticResource FontFamilyMono}"
+                           FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- File list -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Files, ElementName=Root}" ItemTemplate="{StaticResource DiffFileTemplate}"
+                          Margin="2"/>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
