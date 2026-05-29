@@ -88,7 +88,19 @@ Das löst das Problem „selten gebrauchte Aktionen vergisst man, wo sie sind" �
 
 ## Aktueller Stand
 
-Stand: Phase 1 ist vollständig abgeschlossen ✅. Phase 2a (Modus-Sidebar) ist vollständig implementiert ✅. Phase 2b (Stash-Killer & Fixup-Workflow) ist implementiert und auditiert ✅. Phase 3 (Branch-Operationen & Custom Tools) ist vollständig implementiert ✅. Die folgenden Sektionen markieren erledigte Features mit ✅, in Arbeit mit 🔧, und noch offen mit ⬜.
+Stand: Phase 1 ist vollständig abgeschlossen ✅. Phase 2a (Modus-Sidebar) ist vollständig implementiert ✅. Phase 2b (Stash-Killer & Fixup-Workflow) ist implementiert und auditiert ✅. Phase 3 (Branch-Operationen & Custom Tools) ist vollständig implementiert ✅. Die Pre-Release-Politur (virtualisierte Commit-Liste, Commit-Panel, Toolbar, Custom-Window-Chrome, Such-Grammatik, Datums-Toggle, Branch-Tree, Gravatar) und Phase 4 (Suche & Analyse) sind vollständig implementiert ✅. Die folgenden Sektionen markieren erledigte Features mit ✅, in Arbeit mit 🔧, und noch offen mit ⬜.
+
+### Pre-Release-Politur ✅
+
+- ✅ **Virtualisierte, progressive Commit-Liste** – HEAD→Parent-Streaming, `VirtualizingStackPanel` mit Recycling, Remote-State asynchron im Hintergrund, lazy/cancelbare Diffs. Flüssig auf dem 6.764-Commit-`RepoTest`.
+- ✅ **Commit-Panel (Visual-Studio-Stil)** – Message, Amend, Author-Override, Stage/Unstage, Commit / Commit&Push / Commit&Sync, Stash. Flyout über dem Status-Bar-Text, `Ctrl+K`.
+- ✅ **Toolbar** – Fetch/Pull/Push(Split: normal / force-with-lease / force)/Sync; Switch-Repo-Dropdown (current/pinned/recent/browse); Branch-Dropdown mit Checkout.
+- ✅ **Custom Window Chrome** – native Titelleiste durch `WindowChrome` ersetzt (Inline-Menü, Fenster-Controls, Snap, maximiert-Inset).
+- ✅ **Sektionen** – „Remote (incoming) / Local (outgoing)", kein Synced-Header.
+- ✅ **Operations-Log-Zeile immer sichtbar** – „No operations yet" wenn leer.
+- ✅ **Such-/Filter-Grammatik** – wiederverwendbarer `CommitQuery`-Parser (`author:`/`message:`/`sha:`/`before:`/`after:`/quoted), 150 ms entprellt im Hintergrund.
+- ✅ **Commit-Details** – Author, SHA mit Inline-Hover-Expand + Copy, Datum eigene Zeile.
+- ✅ **Datums-Toggle** (absolut/relativ, persistiert), **vereinheitlichte SearchBox**, **Branch-Tree-Toggle**, **Gravatar (opt-in)**.
 
 ---
 
@@ -205,16 +217,16 @@ Diese Phase eliminiert Kontextwechsel zwischen Branches und macht Gitster für j
 
 ---
 
-## Phase 4 – Suche & Analyse
+## Phase 4 – Suche & Analyse ✅
 
-Die mächtigsten Git-Features sind alle CLI-only und kaum bekannt. Diese Phase macht sie zugänglich – das sind die Features, die kein anderes GUI hat (mit Ausnahme von GitUp, das Mac-only ist).
+Die mächtigsten Git-Features sind alle CLI-only und kaum bekannt. Diese Phase macht sie zugänglich – das sind die Features, die kein anderes GUI hat (mit Ausnahme von GitUp, das Mac-only ist). Heimat ist der eigene **Search-Modus** mit Typ-Selektor; Ergebnisse speisen die wiederverwendbare `DiffView`.
 
-- **Pickaxe-Suche** – `git log -S "string"` als GUI: Finde jeden Commit in der gesamten History, bei dem ein bestimmter String hinzugefügt oder entfernt wurde. Ideal für Security-Audits, Debugging, „wann wurde diese Funktion gelöscht?"
-- **Diff-Suche mit Regex** – `git log -G "regex"` als GUI: Alle Commits anzeigen, die einen Pattern im Diff enthalten
-- **Blame mit Code-Verfolgung** – `git blame -w -C -C -C` als Ansicht: Blame, der Whitespace-Änderungen ignoriert und Code durch Umbenennungen/Refactorings verfolgt. Kein einziges GUI auf Windows implementiert das ordentlich.
-- **Range-diff-Visualizer** – `git range-diff` als GUI: Nach einem Rebase sehen, was sich an den eigenen Commits *außer* dem Parent geändert hat. Unverzichtbar vor Force-Push und für Patch-basiertes Review.
-- **Diff-Comparison zwischen beliebigen Refs** – Klar gekennzeichneter Drei-Punkte- vs. Zwei-Punkte-Diff (`A...B` vs. `A..B`), den heute niemand korrekt erklärt bekommt
-- **Diff-Ansicht des ausgewählten Commits** – Kompakte Anzeige der Änderungen eines ausgewählten Commits direkt in Gitster (Grundlage für die Suche-Ergebnisse)
+- ✅ **Pickaxe-Suche** – `git log -S "string"` als GUI. Hinter `PickaxeSearch`-Capability (CLI).
+- ✅ **Diff-Suche mit Regex** – `git log -G "regex"` als GUI, mit clientseitiger Regex-Validierung. Hinter `DiffRegexSearch`-Capability.
+- ✅ **Blame mit Code-Verfolgung** – `git blame -w -C -C -C --line-porcelain` mit Toggles für Whitespace/Move-Following; libgit2-Fallback für Basis-Blame.
+- ✅ **Range-diff-Visualizer** – `git range-diff` mit Reflog-Preset „vor/nach letztem Rebase".
+- ✅ **Diff-Comparison zwischen beliebigen Refs** – Zwei-Punkte (`A..B`) vs. Drei-Punkte (`A...B`) mit Klartext-Erklärung; libgit2 (Merge-Base + Diff).
+- ✅ **Diff-Ansicht des ausgewählten Commits** – konsolidierte `DiffView` (Datei-Liste + einklappbarer Unified-Diff), überall genutzt. Die alte Filter-Dialog-Box ist absorbiert und entfernt.
 
 ---
 

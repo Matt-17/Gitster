@@ -37,6 +37,18 @@
                                       Height="30"/>
             </Grid>
 
+            <!-- Restore the "read timestamp from commit" affordance (plan: deferred section) -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <Button Content="⤓ From selected commit"
+                        Command="{Binding ReadFromSelectedCommitCommand}"
+                        Style="{StaticResource GhostButton}" Padding="8,3" FontSize="11"
+                        ToolTip="Load the selected commit's time into the editor"/>
+                <Button Content="⤓ From HEAD"
+                        Command="{Binding ReadFromCurrentCommitCommand}"
+                        Style="{StaticResource GhostButton}" Padding="8,3" FontSize="11" Margin="4,0,0,0"
+                        ToolTip="Load HEAD's time into the editor"/>
+            </StackPanel>
+
             <!-- Preset buttons -->
             <ItemsControl ItemsSource="{Binding Presets}" Margin="0,0,0,10">
                 <ItemsControl.ItemsPanel>
