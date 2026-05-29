@@ -39,7 +39,15 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<WorkingTreeState> GetWorkingTreeStateAsync()     => _lib.GetWorkingTreeStateAsync();
     public Task<BranchInfo> GetCurrentBranchAsync()             => _lib.GetCurrentBranchAsync();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(Gitster.ViewModels.CommitFilter? filter = null) => _lib.GetCommitsAsync(filter);
+    public IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(Gitster.ViewModels.CommitFilter? filter = null, CancellationToken ct = default) => _lib.EnumerateCommitsAsync(filter, ct);
+    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default) => _lib.ComputeRemoteSetsAsync(ct);
     public Task<CommitDetails> GetCommitAsync(string sha)       => _lib.GetCommitAsync(sha);
+    public Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default) => _lib.GetCommitDiffAsync(sha, ct);
+    public Task<WorkingTreeStatus> GetWorkingTreeStatusAsync()  => _lib.GetWorkingTreeStatusAsync();
+    public Task StageAsync(IEnumerable<string> paths)           => _lib.StageAsync(paths);
+    public Task UnstageAsync(IEnumerable<string> paths)         => _lib.UnstageAsync(paths);
+    public Task StageAllAsync()                                 => _lib.StageAllAsync();
+    public Task<string> CommitAsync(CommitRequest request)      => _lib.CommitAsync(request);
     public Task<string> AmendAsync(AmendRequest request)        => _lib.AmendAsync(request);
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => _lib.AmendAuthorAsync(request);
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites) => _lib.RewriteCommitsAsync(rewrites);
