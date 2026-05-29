@@ -22,7 +22,7 @@ public partial class UndoBarViewModel : BaseViewModel
     public partial bool HasUndoableOperation { get; set; }
 
     [ObservableProperty]
-    public partial string LastOperationText { get; set; } = string.Empty;
+    public partial string LastOperationText { get; set; } = "No operations yet";
 
     public UndoBarViewModel(OperationsLogService opsLog, IGitBackend git, OperationFeedbackService feedback)
     {
@@ -38,6 +38,8 @@ public partial class UndoBarViewModel : BaseViewModel
             else
                 _timer?.Stop();
         };
+
+        UpdateDisplay();
     }
 
     private void UpdateDisplay()
@@ -45,8 +47,10 @@ public partial class UndoBarViewModel : BaseViewModel
         var op = _opsLog.MostRecentActive;
         if (op is null)
         {
+            // A7 — the ops-log line is always present, so the undo affordance is
+            // discoverable even before any operation has run.
             HasUndoableOperation = false;
-            LastOperationText = string.Empty;
+            LastOperationText = "No operations yet";
             return;
         }
 

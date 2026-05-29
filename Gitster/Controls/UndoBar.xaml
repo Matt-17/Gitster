@@ -11,10 +11,18 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
     </UserControl.Resources>
 
-    <Border Background="{StaticResource AccentBlueBackground}"
-            Padding="10,0"
-            Height="36"
-            Visibility="{Binding HasUndoableOperation, Converter={StaticResource BoolToVis}}">
+    <!-- A7 — always present. Tinted accent when an undoable op exists, neutral otherwise. -->
+    <Border Padding="10,0" Height="32">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasUndoableOperation}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <DockPanel VerticalAlignment="Center">
 
             <!-- Right: action buttons -->
@@ -22,22 +30,33 @@
                 <Button Content="Undo"
                         Command="{Binding UndoCommand}"
                         Style="{StaticResource GhostButton}"
-                        Height="26"
-                        Padding="10,2"
-                        Margin="0,0,4,0"/>
+                        Height="24"
+                        Padding="10,1"
+                        Margin="0,0,4,0"
+                        Visibility="{Binding HasUndoableOperation, Converter={StaticResource BoolToVis}}"/>
                 <Button Content="Log"
                         Command="{Binding OpenLogCommand}"
                         Style="{StaticResource GhostButton}"
-                        Height="26"
-                        Padding="10,2"/>
+                        Height="24"
+                        Padding="10,1"/>
             </StackPanel>
 
             <!-- Left: description text -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="🕘 " FontSize="13" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding LastOperationText}"
-                           Foreground="{StaticResource TextPrimary}"
-                           VerticalAlignment="Center"/>
+                <TextBlock Text="🕘 " FontSize="12" VerticalAlignment="Center"/>
+                <TextBlock VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="{Binding LastOperationText}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasUndoableOperation}" Value="False">
+                                    <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
 
         </DockPanel>

@@ -257,9 +257,10 @@ public partial class CommitPanelViewModel : BaseViewModel
             // Follow-up remote action. Amend that rewrote an already-pushed commit needs
             // force-with-lease; a fresh commit is a fast-forward push.
             var remote = _getRemote() ?? "origin";
+            var pushMode = amend ? PushMode.ForceWithLease : PushMode.Normal;
             if (followUp == CommitFollowUp.Push)
             {
-                await _feedback.RunAsync("Push", () => _git.PushAsync(remote, forceWithLease: amend));
+                await _feedback.RunAsync("Push", () => _git.PushAsync(remote, pushMode));
             }
             else if (followUp == CommitFollowUp.Sync)
             {
@@ -267,7 +268,7 @@ public partial class CommitPanelViewModel : BaseViewModel
                 {
                     await _git.FetchAsync(remote);
                     await _git.PullAsync(remote);
-                    await _git.PushAsync(remote, forceWithLease: amend);
+                    await _git.PushAsync(remote, pushMode);
                 });
             }
 

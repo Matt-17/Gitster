@@ -18,6 +18,12 @@ public partial class TitleBarViewModel : BaseViewModel
     public RecentReposService RecentRepos { get; }
     public ObservableCollection<RecentRepositoryItemViewModel> RecentRepositoryItems { get; } = [];
 
+    /// <summary>Pinned repos only — the "Pinned" section of the switch-repo dropdown (A4).</summary>
+    public ObservableCollection<RecentRepositoryItemViewModel> PinnedItems { get; } = [];
+
+    /// <summary>Recent repos excluding pinned — the "Recent" section of the switch-repo dropdown (A4).</summary>
+    public ObservableCollection<RecentRepositoryItemViewModel> RecentItems { get; } = [];
+
     public TitleBarViewModel(Action browseFolder, Action<string> openRepo, AutoFetchService autoFetch, RecentReposService recentRepos)
     {
         _browseFolder = browseFolder;
@@ -72,6 +78,8 @@ public partial class TitleBarViewModel : BaseViewModel
     public partial RecentRepositoryItemViewModel? SelectedRecentRepository { get; set; }
 
     public bool HasRecentRepositories => RecentRepositoryItems.Count > 0;
+    public bool HasPinned => PinnedItems.Count > 0;
+    public bool HasRecentOnly => RecentItems.Count > 0;
 
     partial void OnAutoFetchEnabledChanged(bool value)
     {
@@ -185,6 +193,17 @@ public partial class TitleBarViewModel : BaseViewModel
         RecentRepositoryItems.Clear();
         foreach (var item in items)
             RecentRepositoryItems.Add(item);
+
+        PinnedItems.Clear();
+        foreach (var item in items.Where(i => i.IsPinned))
+            PinnedItems.Add(item);
+
+        RecentItems.Clear();
+        foreach (var item in items.Where(i => !i.IsPinned))
+            RecentItems.Add(item);
+
+        OnPropertyChanged(nameof(HasPinned));
+        OnPropertyChanged(nameof(HasRecentOnly));
 
         SelectedRecentRepository = RecentRepositoryItems.FirstOrDefault(item =>
             IsSamePath(item.FullPath, selectedPath))
