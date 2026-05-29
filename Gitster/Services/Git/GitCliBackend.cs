@@ -243,7 +243,25 @@ public sealed class GitCliBackend : IGitBackend
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites) => NSVoid();
     public Task FetchAsync(string remoteName = "origin")        => NSVoid();
     public Task PullAsync(string remoteName = "origin")         => NSVoid();
-    public Task PushAsync(string remoteName = "origin", bool forceWithLease = false) => NSVoid();
+
+    /// <summary>Real <c>git push</c> — the only path that can do a true --force-with-lease.</summary>
+    public async Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
+    {
+        EnsurePath();
+        EnsureCli();
+
+        var flag = mode switch
+        {
+            PushMode.ForceWithLease => "--force-with-lease ",
+            PushMode.Force          => "--force ",
+            _                       => string.Empty,
+        };
+
+        var r = await GitCli.RunAsync(RepositoryPath, $"push {flag}{remoteName} HEAD",
+            new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" });
+        if (!r.Success)
+            throw new InvalidOperationException($"Push failed:\n{r.Output}");
+    }
     public Task<string> GetReflogSelectorForHeadAsync()         => NS<string>();
     public Task ResetHardAsync(string targetReference)          => NSVoid();
     public Task<string> GetHeadShaAsync()                       => NS<string>();

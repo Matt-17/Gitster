@@ -624,13 +624,35 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
+    private string ActiveRemote(string? remoteName) =>
+        !string.IsNullOrWhiteSpace(remoteName) ? remoteName
+        : !string.IsNullOrWhiteSpace(SelectedRemote) ? SelectedRemote
+        : Remotes.FirstOrDefault() ?? "origin";
+
     [RelayCommand]
-    private async Task Push(string? remoteName)
+    private Task Push(string? remoteName) => PushWithModeAsync(remoteName, PushMode.Normal);
+
+    [RelayCommand]
+    private Task PushForceWithLease(string? remoteName) => PushWithModeAsync(remoteName, PushMode.ForceWithLease);
+
+    [RelayCommand]
+    private Task PushForce(string? remoteName)
+    {
+        var confirm = MessageBox.Show(
+            "Force push (--force) overwrites the remote branch and can destroy commits " +
+            "other people rely on.\n\nPrefer \"Push (force-with-lease)\" unless you are certain.\n\nForce push anyway?",
+            "Dangerous: force push", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        return confirm == MessageBoxResult.Yes ? PushWithModeAsync(remoteName, PushMode.Force) : Task.CompletedTask;
+    }
+
+    private async Task PushWithModeAsync(string? remoteName, PushMode mode)
     {
         try
         {
-            var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
-            await _feedbackService.RunAsync("Push", () => _gitBackend.PushAsync(selectedRemote, forceWithLease: true));
+            var remote = ActiveRemote(remoteName);
+            var verb = mode == PushMode.Normal ? "Push" : mode == PushMode.ForceWithLease ? "Push (lease)" : "Force push";
+            await _feedbackService.RunAsync(verb, () => _gitBackend.PushAsync(remote, mode));
+            await UpdateElementsAsync();
         }
         catch (Exception ex)
         {
@@ -643,12 +665,12 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         try
         {
-            var selectedRemote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+            var remote = ActiveRemote(remoteName);
             await _feedbackService.RunAsync("Sync", async () =>
             {
-                await _gitBackend.FetchAsync(selectedRemote);
-                await _gitBackend.PullAsync(selectedRemote);
-                await _gitBackend.PushAsync(selectedRemote);
+                await _gitBackend.FetchAsync(remote);
+                await _gitBackend.PullAsync(remote);
+                await _gitBackend.PushAsync(remote);
             });
 
             await UpdateElementsAsync();

@@ -53,7 +53,12 @@ public sealed class HybridGitBackend : IGitBackend
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites) => _lib.RewriteCommitsAsync(rewrites);
     public Task FetchAsync(string remoteName = "origin")        => _lib.FetchAsync(remoteName);
     public Task PullAsync(string remoteName = "origin")         => _lib.PullAsync(remoteName);
-    public Task PushAsync(string remoteName = "origin", bool forceWithLease = false) => _lib.PushAsync(remoteName, forceWithLease);
+    public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
+        // True --force-with-lease only exists in the CLI; libgit2 would degrade it to a
+        // plain force, so prefer the CLI when it's available for the safe variant.
+        => mode == PushMode.ForceWithLease && GitCli.IsAvailable
+            ? _cli.PushAsync(remoteName, mode)
+            : _lib.PushAsync(remoteName, mode);
     public Task<string> GetReflogSelectorForHeadAsync()         => _lib.GetReflogSelectorForHeadAsync();
     public Task ResetHardAsync(string targetReference)          => _lib.ResetHardAsync(targetReference);
     public Task<string> GetHeadShaAsync()                       => _lib.GetHeadShaAsync();

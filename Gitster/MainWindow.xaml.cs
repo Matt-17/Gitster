@@ -30,7 +30,20 @@ public partial class MainWindow : Window
     {
         base.OnStateChanged(e);
         _viewModel.AutoFetch.OnWindowStateChanged(WindowState);
+
+        // Custom-chrome windows clip content under the screen edges when maximized;
+        // pad the root by the resize border so nothing is hidden (A6).
+        RootContainer.Padding = WindowState == WindowState.Maximized
+            ? new Thickness(SystemParameters.WindowResizeBorderThickness.Left + SystemParameters.FixedFrameVerticalBorderWidth)
+            : new Thickness(0);
     }
+
+    private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void OnMaxRestore(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {

@@ -7,10 +7,17 @@
        xmlns:models="clr-namespace:Gitster.Models"
        xmlns:controls="clr-namespace:Gitster.Controls"
        xmlns:modes="clr-namespace:Gitster.Views.Modes"
+       xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
-       mc:Ignorable="d"          
-       ResizeMode="CanResizeWithGrip"
-       Title="{Binding WindowTitle}" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
+       mc:Ignorable="d"
+       WindowStyle="None"
+       ResizeMode="CanResize"
+       Title="{Binding WindowTitle}" Height="850" Width="1100" Activated="Window_Activated"
+       Icon="pack://application:,,,/Assets/Icon.ico">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="38" ResizeBorderThickness="6"
+                            GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
     <Window.InputBindings>
         <KeyBinding Key="O"  Modifiers="Ctrl" Command="{Binding BrowseFolderCommand}"/>
         <KeyBinding Key="K"  Modifiers="Ctrl" Command="{Binding OpenCommitPanelCommand}"/>
@@ -25,122 +32,192 @@
         <KeyBinding Key="D5" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Search}"/>
         <KeyBinding Key="D6" Modifiers="Ctrl" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.OperationsLog}"/>
     </Window.InputBindings>
-    <DockPanel>
-        <Menu DockPanel.Dock="Top"
-              Background="{StaticResource BackgroundPrimary}"
-              BorderBrush="{StaticResource BorderTertiary}"
-              BorderThickness="0,0,0,0.5">
 
-            <MenuItem Header="_File">
-                <MenuItem Header="Open repository..."
-                          Command="{Binding BrowseFolderCommand}"
-                          InputGestureText="Ctrl+O"/>
-                <MenuItem Header="Recent" ItemsSource="{Binding RecentRepos}">
-                    <MenuItem.ItemContainerStyle>
-                        <Style TargetType="MenuItem">
-                            <Setter Property="Header" Value="{Binding DisplayPath}"/>
-                            <Setter Property="ToolTip" Value="{Binding FullPath}"/>
-                            <Setter Property="Command" Value="{Binding DataContext.OpenRepoCommand,
-                                        RelativeSource={RelativeSource AncestorType=Menu}}"/>
-                            <Setter Property="CommandParameter" Value="{Binding FullPath}"/>
-                        </Style>
-                    </MenuItem.ItemContainerStyle>
-                </MenuItem>
-                <Separator/>
-                <MenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
-            </MenuItem>
+    <Window.Resources>
+        <!-- Top-level menu items are white on the accent bar; submenu items keep default dark. -->
+        <Style x:Key="ChromeMenuItem" TargetType="MenuItem">
+            <Style.Triggers>
+                <Trigger Property="Role" Value="TopLevelHeader">
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="Role" Value="TopLevelItem">
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ChromeButton" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
-            <MenuItem Header="_Repository">
-                <MenuItem Header="Commit..." Command="{Binding OpenCommitPanelCommand}" InputGestureText="Ctrl+K"/>
-                <Separator/>
-                <MenuItem Header="Fetch"   Command="{Binding FetchCommand}" InputGestureText="F5"/>
-                <MenuItem Header="Pull"    Command="{Binding PullCommand}"/>
-                <MenuItem Header="Push"    Command="{Binding PushCommand}"/>
-                <Separator/>
-                <MenuItem Header="Switch branch..."      Command="{Binding SwitchBranchCommand}"/>
-                <Separator/>
-                <MenuItem Header="Operations log..."     Command="{Binding OpenOperationsLogCommand}"/>
-                <MenuItem Header="Repository settings..." Command="{Binding OpenRepoSettingsCommand}"/>
-                <Separator/>
-                <MenuItem Header="Repair author..."           Command="{Binding OpenAuthorRepairCommand}"/>
-                <MenuItem Header="Rewrite timestamps..."      Command="{Binding OpenRewriteTimestampsCommand}"/>
-            </MenuItem>
+    <Border x:Name="RootContainer" Background="{StaticResource BackgroundPrimary}">
+        <DockPanel>
+            <!-- ── Custom-chrome top bar (accent) ───────────────────────────── -->
+            <Grid DockPanel.Dock="Top" Height="38" Background="{StaticResource AccentBlue}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <MenuItem Header="_Edit">
-                <MenuItem Header="Undo"    Command="{Binding UndoBarVM.UndoCommand}" InputGestureText="Ctrl+Z"/>
-                <Separator/>
-                <MenuItem Header="Filter..." Command="{Binding CommitListVM.OpenFilterCommand}" InputGestureText="Ctrl+F"/>
-            </MenuItem>
+                <Image Grid.Column="0" Source="pack://application:,,,/Assets/Icon.ico"
+                       Width="18" Height="18" Margin="10,0,8,0" VerticalAlignment="Center"/>
 
-            <MenuItem Header="_View">
-                <MenuItem Header="Refresh" Command="{Binding RefreshCommand}" InputGestureText="F5"/>
-                <Separator/>
-                <MenuItem Header="_Commits"       Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Commits}"      InputGestureText="Ctrl+1"/>
-                <MenuItem Header="_Stashes"       Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Stashes}"      InputGestureText="Ctrl+2"/>
-                <MenuItem Header="B_ranches"      Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Branches}"     InputGestureText="Ctrl+3"/>
-                <MenuItem Header="_Worktrees"     Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Worktrees}"    InputGestureText="Ctrl+4"/>
-                <MenuItem Header="S_earch"        Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Search}"       InputGestureText="Ctrl+5"/>
-                <MenuItem Header="Operations _log" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.OperationsLog}" InputGestureText="Ctrl+6"/>
-                <Separator/>
-                <MenuItem Header="Dark mode" IsCheckable="True" IsChecked="{Binding IsDarkMode}"
-                          IsEnabled="False" ToolTip="Coming in a future release"/>
-            </MenuItem>
+                <Menu Grid.Column="1" Background="Transparent" VerticalAlignment="Center"
+                      shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <MenuItem Header="_File" Style="{StaticResource ChromeMenuItem}">
+                        <MenuItem Header="Open repository..." Command="{Binding BrowseFolderCommand}" InputGestureText="Ctrl+O"/>
+                        <MenuItem Header="Recent" ItemsSource="{Binding RecentRepos}">
+                            <MenuItem.ItemContainerStyle>
+                                <Style TargetType="MenuItem">
+                                    <Setter Property="Header" Value="{Binding DisplayPath}"/>
+                                    <Setter Property="ToolTip" Value="{Binding FullPath}"/>
+                                    <Setter Property="Command" Value="{Binding DataContext.OpenRepoCommand, RelativeSource={RelativeSource AncestorType=Menu}}"/>
+                                    <Setter Property="CommandParameter" Value="{Binding FullPath}"/>
+                                </Style>
+                            </MenuItem.ItemContainerStyle>
+                        </MenuItem>
+                        <Separator/>
+                        <MenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
+                    </MenuItem>
 
-            <MenuItem Header="_Tools" x:Name="ToolsMenu" SubmenuOpened="ToolsMenu_SubmenuOpened">
-                <MenuItem Header="Manage tools…" Command="{Binding ManageToolsCommand}"/>
-            </MenuItem>
+                    <MenuItem Header="_Repository" Style="{StaticResource ChromeMenuItem}">
+                        <MenuItem Header="Commit..." Command="{Binding OpenCommitPanelCommand}" InputGestureText="Ctrl+K"/>
+                        <Separator/>
+                        <MenuItem Header="Fetch"   Command="{Binding FetchCommand}" InputGestureText="F5"/>
+                        <MenuItem Header="Pull"    Command="{Binding PullCommand}"/>
+                        <MenuItem Header="Push"    Command="{Binding PushCommand}"/>
+                        <MenuItem Header="Sync"    Command="{Binding SyncCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Switch branch..."      Command="{Binding SwitchBranchCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Operations log..."     Command="{Binding OpenOperationsLogCommand}"/>
+                        <MenuItem Header="Repository settings..." Command="{Binding OpenRepoSettingsCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Repair author..."           Command="{Binding OpenAuthorRepairCommand}"/>
+                        <MenuItem Header="Rewrite timestamps..."      Command="{Binding OpenRewriteTimestampsCommand}"/>
+                    </MenuItem>
 
-            <MenuItem Header="_Help">
-                <MenuItem Header="Documentation"       Command="{Binding OpenDocsCommand}"/>
-                <MenuItem Header="Keyboard shortcuts"  Command="{Binding OpenShortcutsCommand}"/>
-                <Separator/>
-                <MenuItem Header="About Gitster"       Command="{Binding OpenAboutCommand}"/>
-            </MenuItem>
-        </Menu>
+                    <MenuItem Header="_Edit" Style="{StaticResource ChromeMenuItem}">
+                        <MenuItem Header="Undo"    Command="{Binding UndoBarVM.UndoCommand}" InputGestureText="Ctrl+Z"/>
+                        <Separator/>
+                        <MenuItem Header="Filter..." Command="{Binding CommitListVM.OpenFilterCommand}" InputGestureText="Ctrl+F"/>
+                    </MenuItem>
 
-        <controls:TitleBar DockPanel.Dock="Top" DataContext="{Binding TitleBarVM}"/>
-        <controls:UndoBar DockPanel.Dock="Top" DataContext="{Binding UndoBarVM}"/>
-        <controls:StatusBar x:Name="StatusBarControl" DockPanel.Dock="Bottom" DataContext="{Binding StatusBarVM}"/>
+                    <MenuItem Header="_View" Style="{StaticResource ChromeMenuItem}">
+                        <MenuItem Header="Refresh" Command="{Binding RefreshCommand}" InputGestureText="F5"/>
+                        <Separator/>
+                        <MenuItem Header="_Commits"        Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Commits}"      InputGestureText="Ctrl+1"/>
+                        <MenuItem Header="_Stashes"        Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Stashes}"      InputGestureText="Ctrl+2"/>
+                        <MenuItem Header="B_ranches"       Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Branches}"     InputGestureText="Ctrl+3"/>
+                        <MenuItem Header="_Worktrees"      Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Worktrees}"    InputGestureText="Ctrl+4"/>
+                        <MenuItem Header="S_earch"         Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.Search}"       InputGestureText="Ctrl+5"/>
+                        <MenuItem Header="Operations _log" Command="{Binding SidebarVM.SelectModeCommand}" CommandParameter="{x:Static models:AppMode.OperationsLog}" InputGestureText="Ctrl+6"/>
+                        <Separator/>
+                        <MenuItem Header="Relative dates" IsCheckable="True" IsChecked="{Binding Ui.UseRelativeDates}"/>
+                        <MenuItem Header="Show avatars (Gravatar)" IsCheckable="True" IsChecked="{Binding Ui.GravatarEnabled}"
+                                  ToolTip="Fetches avatars from Gravatar using a hash of the author email."/>
+                        <Separator/>
+                        <MenuItem Header="Dark mode" IsCheckable="True" IsChecked="{Binding IsDarkMode}"
+                                  IsEnabled="False" ToolTip="Coming in a future release"/>
+                    </MenuItem>
 
-        <!-- Commit panel flyout (A2), anchored above the status-bar working-tree text -->
-        <Popup PlacementTarget="{Binding ElementName=StatusBarControl}"
-               Placement="Top" HorizontalOffset="8" VerticalOffset="-2"
-               AllowsTransparency="True" PopupAnimation="Fade"
-               StaysOpen="True"
-               IsOpen="{Binding CommitPanelVM.IsOpen, Mode=TwoWay}">
-            <controls:CommitPanel DataContext="{Binding CommitPanelVM}" Margin="8">
-                <controls:CommitPanel.InputBindings>
-                    <KeyBinding Key="Enter" Modifiers="Ctrl" Command="{Binding CommitAndPushCommand}"/>
-                    <KeyBinding Key="Escape" Command="{Binding CloseCommand}"/>
-                </controls:CommitPanel.InputBindings>
-            </controls:CommitPanel>
-        </Popup>
+                    <MenuItem Header="_Tools" x:Name="ToolsMenu" SubmenuOpened="ToolsMenu_SubmenuOpened" Style="{StaticResource ChromeMenuItem}">
+                        <MenuItem Header="Manage tools…" Command="{Binding ManageToolsCommand}"/>
+                    </MenuItem>
 
-        <!-- Main content: sidebar + mode content area -->
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="44"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+                    <MenuItem Header="_Help" Style="{StaticResource ChromeMenuItem}">
+                        <MenuItem Header="Documentation"       Command="{Binding OpenDocsCommand}"/>
+                        <MenuItem Header="Keyboard shortcuts"  Command="{Binding OpenShortcutsCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="About Gitster"       Command="{Binding OpenAboutCommand}"/>
+                    </MenuItem>
+                </Menu>
 
-            <!-- Left sidebar -->
-            <controls:Sidebar Grid.Column="0" DataContext="{Binding SidebarVM}"/>
+                <!-- App + repo identity (muted, right of center) -->
+                <TextBlock Grid.Column="2" Text="{Binding WindowTitle}" VerticalAlignment="Center"
+                           HorizontalAlignment="Right" Margin="12,0"
+                           Foreground="#CCFFFFFF" FontSize="12" TextTrimming="CharacterEllipsis"/>
 
-            <!-- Mode content area — visibility-switched panels -->
-            <Grid Grid.Column="1">
-                <modes:CommitsModeView
-                    Visibility="{Binding SidebarVM.IsCommitsActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <modes:StashesModeView
-                    Visibility="{Binding SidebarVM.IsStashesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <modes:BranchesModeView
-                    Visibility="{Binding SidebarVM.IsBranchesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <modes:WorktreesModeView
-                    Visibility="{Binding SidebarVM.IsWorktreesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <modes:SearchModeView
-                    Visibility="{Binding SidebarVM.IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <modes:OperationsLogModeView
-                    Visibility="{Binding SidebarVM.IsOperationsLogActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <!-- Window controls -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <Button Style="{StaticResource ChromeButton}" Click="OnMinimize" ToolTip="Minimize">
+                        <Path Width="10" Height="1" Stroke="White" StrokeThickness="1" Data="M0,0 H10"/>
+                    </Button>
+                    <Button Style="{StaticResource ChromeButton}" Click="OnMaxRestore" ToolTip="Maximize/Restore">
+                        <Path Width="10" Height="10" Stroke="White" StrokeThickness="1" Fill="Transparent" Data="M0,0 H10 V10 H0 Z"/>
+                    </Button>
+                    <Button x:Name="CloseButton" Style="{StaticResource ChromeButton}" Click="OnCloseWindow" ToolTip="Close">
+                        <Path Width="10" Height="10" Stroke="White" StrokeThickness="1.2" Data="M0,0 L10,10 M10,0 L0,10"/>
+                    </Button>
+                </StackPanel>
             </Grid>
-        </Grid>
-    </DockPanel>
+
+            <!-- ── Neutral toolbar (A3/A4/A11) ──────────────────────────────── -->
+            <controls:Toolbar DockPanel.Dock="Top"/>
+
+            <!-- ── Ops-log line (A7, always present) ────────────────────────── -->
+            <controls:UndoBar DockPanel.Dock="Top" DataContext="{Binding UndoBarVM}"/>
+
+            <!-- ── Status bar ───────────────────────────────────────────────── -->
+            <controls:StatusBar x:Name="StatusBarControl" DockPanel.Dock="Bottom" DataContext="{Binding StatusBarVM}"/>
+
+            <!-- Commit panel flyout (A2), anchored above the status-bar working-tree text -->
+            <Popup PlacementTarget="{Binding ElementName=StatusBarControl}"
+                   Placement="Top" HorizontalOffset="8" VerticalOffset="-2"
+                   AllowsTransparency="True" PopupAnimation="Fade"
+                   StaysOpen="True"
+                   IsOpen="{Binding CommitPanelVM.IsOpen, Mode=TwoWay}">
+                <controls:CommitPanel DataContext="{Binding CommitPanelVM}" Margin="8">
+                    <controls:CommitPanel.InputBindings>
+                        <KeyBinding Key="Enter" Modifiers="Ctrl" Command="{Binding CommitAndPushCommand}"/>
+                        <KeyBinding Key="Escape" Command="{Binding CloseCommand}"/>
+                    </controls:CommitPanel.InputBindings>
+                </controls:CommitPanel>
+            </Popup>
+
+            <!-- Main content: sidebar + mode content area -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="44"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <controls:Sidebar Grid.Column="0" DataContext="{Binding SidebarVM}"/>
+
+                <Grid Grid.Column="1">
+                    <modes:CommitsModeView
+                        Visibility="{Binding SidebarVM.IsCommitsActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <modes:StashesModeView
+                        Visibility="{Binding SidebarVM.IsStashesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <modes:BranchesModeView
+                        Visibility="{Binding SidebarVM.IsBranchesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <modes:WorktreesModeView
+                        Visibility="{Binding SidebarVM.IsWorktreesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <modes:SearchModeView
+                        Visibility="{Binding SidebarVM.IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <modes:OperationsLogModeView
+                        Visibility="{Binding SidebarVM.IsOperationsLogActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </Grid>
+            </Grid>
+        </DockPanel>
+    </Border>
 </Window>

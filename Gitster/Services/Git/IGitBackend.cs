@@ -39,7 +39,7 @@ public interface IGitBackend
     Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites);
     Task FetchAsync(string remoteName = "origin");
     Task PullAsync(string remoteName = "origin");
-    Task PushAsync(string remoteName = "origin", bool forceWithLease = false);
+    Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal);
 
     Task<string> GetReflogSelectorForHeadAsync();
     Task ResetHardAsync(string targetReference);

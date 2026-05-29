@@ -663,12 +663,14 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.CompletedTask;
     }
 
-    public Task PushAsync(string remoteName = "origin", bool forceWithLease = false)
+    public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
     {
         using var repo = OpenRepository();
         _ = ResolveRemote(repo, remoteName);
 
-        if (forceWithLease)
+        // libgit2 has no real force-with-lease — HybridGitBackend routes that to the CLI.
+        // Here a lease request degrades to a plain force (the prior behaviour) when no CLI.
+        if (mode == PushMode.Force || mode == PushMode.ForceWithLease)
         {
             var pushRefSpec = $"+{repo.Head.CanonicalName}:{repo.Head.CanonicalName}";
             repo.Network.Push(repo.Network.Remotes[remoteName], pushRefSpec, new PushOptions());

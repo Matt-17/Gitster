@@ -56,6 +56,9 @@ public partial class BranchesViewModel : BaseViewModel
 
     public ObservableCollection<BranchRow> Branches { get; } = [];
 
+    /// <summary>Local branches only — backs the title-bar branch dropdown (plan A11).</summary>
+    public ObservableCollection<BranchRow> LocalBranches { get; } = [];
+
     /// <summary>Branches grouped by Local/Remote for the section headers in the list.</summary>
     public ICollectionView GroupedBranches { get; }
 
@@ -160,6 +163,13 @@ public partial class BranchesViewModel : BaseViewModel
                          ?? Branches.FirstOrDefault();
 
         HasBranches = Branches.Count > 0;
+
+        // Local-only projection for the title-bar branch picker (current branch first).
+        LocalBranches.Clear();
+        foreach (var b in _all.Where(b => !b.IsRemote)
+                              .OrderByDescending(b => b.IsCurrent)
+                              .ThenByDescending(b => b.LastActivity))
+            LocalBranches.Add(b);
     }
 
     [RelayCommand]
@@ -169,10 +179,18 @@ public partial class BranchesViewModel : BaseViewModel
     private void SortByNameToggle() => SortByName = true;
 
     [RelayCommand(CanExecute = nameof(CanCheckout))]
-    private async Task Checkout()
-    {
-        if (SelectedBranch is not { } row) return;
+    private Task Checkout() => SelectedBranch is { } row ? CheckoutRowAsync(row) : Task.CompletedTask;
 
+    /// <summary>Checks out a branch by name (title-bar dropdown, A11). No-op if already current.</summary>
+    [RelayCommand]
+    private Task CheckoutNamed(string? name)
+    {
+        var row = _all.FirstOrDefault(b => b.Name == name);
+        return row is { IsCurrent: false } ? CheckoutRowAsync(row) : Task.CompletedTask;
+    }
+
+    private async Task CheckoutRowAsync(BranchRow row)
+    {
         try
         {
             await _feedback.RunAsync("Checkout", () => _git.CheckoutBranchAsync(row.Name));
