@@ -13,14 +13,31 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="10,0">
-                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{Binding StateIndicatorBrush}"/>
-                <TextBlock Text="{Binding StateText}" Margin="6,0,0,0"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextSecondary}"/>
-            </StackPanel>
+            <Button Grid.Column="0" Cursor="Hand" Padding="10,0"
+                    Background="Transparent" BorderThickness="0"
+                    ToolTip="Open commit panel (Ctrl+K)"
+                    Command="{Binding DataContext.OpenCommitPanelCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BackgroundPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                             Fill="{Binding StateIndicatorBrush}"/>
+                    <TextBlock Text="{Binding StateText}" Margin="6,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Button>
 
             <Grid Grid.Column="1" HorizontalAlignment="Center"
                   Visibility="{Binding HasFeedback, Converter={StaticResource BooleanToVisibilityConverter}}">
