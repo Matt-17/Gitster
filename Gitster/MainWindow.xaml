@@ -13,6 +13,7 @@
        Title="{Binding WindowTitle}" Height="850" Width="1100" Activated="Window_Activated" Icon="pack://application:,,,/Assets/Icon.ico">
     <Window.InputBindings>
         <KeyBinding Key="O"  Modifiers="Ctrl" Command="{Binding BrowseFolderCommand}"/>
+        <KeyBinding Key="K"  Modifiers="Ctrl" Command="{Binding OpenCommitPanelCommand}"/>
         <KeyBinding Key="F"  Modifiers="Ctrl" Command="{Binding CommitListVM.FocusSearchCommand}"/>
         <KeyBinding Key="Z"  Modifiers="Ctrl" Command="{Binding UndoBarVM.UndoCommand}"/>
         <KeyBinding Key="F5"                  Command="{Binding FetchCommand}"/>
@@ -50,6 +51,8 @@
             </MenuItem>
 
             <MenuItem Header="_Repository">
+                <MenuItem Header="Commit..." Command="{Binding OpenCommitPanelCommand}" InputGestureText="Ctrl+K"/>
+                <Separator/>
                 <MenuItem Header="Fetch"   Command="{Binding FetchCommand}" InputGestureText="F5"/>
                 <MenuItem Header="Pull"    Command="{Binding PullCommand}"/>
                 <MenuItem Header="Push"    Command="{Binding PushCommand}"/>
@@ -97,7 +100,21 @@
 
         <controls:TitleBar DockPanel.Dock="Top" DataContext="{Binding TitleBarVM}"/>
         <controls:UndoBar DockPanel.Dock="Top" DataContext="{Binding UndoBarVM}"/>
-        <controls:StatusBar DockPanel.Dock="Bottom" DataContext="{Binding StatusBarVM}"/>
+        <controls:StatusBar x:Name="StatusBarControl" DockPanel.Dock="Bottom" DataContext="{Binding StatusBarVM}"/>
+
+        <!-- Commit panel flyout (A2), anchored above the status-bar working-tree text -->
+        <Popup PlacementTarget="{Binding ElementName=StatusBarControl}"
+               Placement="Top" HorizontalOffset="8" VerticalOffset="-2"
+               AllowsTransparency="True" PopupAnimation="Fade"
+               StaysOpen="True"
+               IsOpen="{Binding CommitPanelVM.IsOpen, Mode=TwoWay}">
+            <controls:CommitPanel DataContext="{Binding CommitPanelVM}" Margin="8">
+                <controls:CommitPanel.InputBindings>
+                    <KeyBinding Key="Enter" Modifiers="Ctrl" Command="{Binding CommitAndPushCommand}"/>
+                    <KeyBinding Key="Escape" Command="{Binding CloseCommand}"/>
+                </controls:CommitPanel.InputBindings>
+            </controls:CommitPanel>
+        </Popup>
 
         <!-- Main content: sidebar + mode content area -->
         <Grid>

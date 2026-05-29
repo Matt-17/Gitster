@@ -49,6 +49,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public StashesViewModel StashesVM { get; }
     public BranchesViewModel BranchesVM { get; }
     public WorktreesViewModel WorktreesVM { get; }
+    public CommitPanelViewModel CommitPanelVM { get; }
     public OperationsLogService OpsLogService => _opsLogService;
     public UiPreferencesService Ui => _uiPreferences;
 
@@ -107,6 +108,15 @@ public partial class MainWindowViewModel : BaseViewModel
             _snapshotService,
             () => Path,
             OpenRepoByPath);
+        CommitPanelVM = new CommitPanelViewModel(
+            _gitBackend,
+            _feedbackService,
+            _opsLogService,
+            _snapshotService,
+            _authorDirService,
+            async () => await UpdateElementsAsync(),
+            () => TitleBarVM.CurrentBranch,
+            () => string.IsNullOrEmpty(SelectedRemote) ? Remotes.FirstOrDefault() : SelectedRemote);
 
         // Update ops log badge whenever the log changes
         _opsLogService.Changed += (_, _) =>
@@ -311,6 +321,31 @@ public partial class MainWindowViewModel : BaseViewModel
 
     [RelayCommand]
     private void SwitchBranch() { }
+
+    /// <summary>Opens the Visual-Studio-style commit panel (status-bar text, Repository menu, Ctrl+K).</summary>
+    [RelayCommand]
+    private async Task OpenCommitPanel()
+    {
+        if (string.IsNullOrWhiteSpace(Path)) return;
+
+        // Clicking the status text / Ctrl+K toggles the flyout.
+        if (CommitPanelVM.IsOpen)
+        {
+            CommitPanelVM.IsOpen = false;
+            return;
+        }
+        try
+        {
+            var head = await _gitBackend.GetHeadShaAsync();
+            var details = await _gitBackend.GetCommitAsync(head);
+            CommitPanelVM.SetLastCommitMessage(details.Message);
+        }
+        catch
+        {
+            CommitPanelVM.SetLastCommitMessage(null);
+        }
+        await CommitPanelVM.OpenAsync();
+    }
 
     [RelayCommand]
     private void OpenOperationsLog()
@@ -818,6 +853,10 @@ public partial class MainWindowViewModel : BaseViewModel
 
     private void OnRepositoryStateChanged(object? sender, PropertyChangedEventArgs e)
     {
+        // The commit panel mirrors working-tree changes live while it is open (A2).
+        if (e.PropertyName == nameof(RepositoryStateService.WorkingTreeState) && CommitPanelVM.IsOpen)
+            _ = CommitPanelVM.LoadAsync();
+
         if (e.PropertyName != nameof(RepositoryStateService.CurrentBranch))
             return;
 
