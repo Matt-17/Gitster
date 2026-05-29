@@ -44,12 +44,31 @@ public sealed class BranchRow
     public string  UpstreamDisplay => string.IsNullOrEmpty(Info.UpstreamName) ? "no upstream" : Info.UpstreamName!;
 }
 
+/// <summary>A node in the branch tree (A13): either a path folder or a leaf branch.</summary>
+public sealed class BranchTreeNode
+{
+    public BranchTreeNode(string name, BranchRow? row)
+    {
+        Name = name;
+        Row = row;
+    }
+
+    public string Name { get; }
+    public BranchRow? Row { get; }
+    public ObservableCollection<BranchTreeNode> Children { get; } = [];
+
+    public bool IsBranch => Row != null;
+    public bool IsCurrent => Row?.IsCurrent ?? false;
+    public string? BranchName => Row?.Name;
+}
+
 public partial class BranchesViewModel : BaseViewModel
 {
     private readonly IGitBackend              _git;
     private readonly OperationFeedbackService _feedback;
     private readonly OperationsLogService     _opsLog;
     private readonly SnapshotService          _snapshots;
+    private readonly UiPreferencesService     _ui;
     private readonly Func<Task>               _onChanged;
 
     private List<BranchRow> _all = [];
@@ -97,16 +116,35 @@ public partial class BranchesViewModel : BaseViewModel
         OperationFeedbackService feedback,
         OperationsLogService     opsLog,
         SnapshotService          snapshots,
+        UiPreferencesService     ui,
         Func<Task>               onChanged)
     {
         _git       = git;
         _feedback  = feedback;
         _opsLog    = opsLog;
         _snapshots = snapshots;
+        _ui        = ui;
         _onChanged = onChanged;
+
+        ShowTree = ui.BranchTreeView;
 
         GroupedBranches = CollectionViewSource.GetDefaultView(Branches);
         GroupedBranches.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BranchRow.GroupLabel)));
+    }
+
+    /// <summary>Branches arranged as a path-segment tree (plan A13). Built alongside the flat list.</summary>
+    public ObservableCollection<BranchTreeNode> BranchTree { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowFlat))]
+    public partial bool ShowTree { get; set; }
+
+    public bool ShowFlat => !ShowTree;
+
+    partial void OnShowTreeChanged(bool value)
+    {
+        _ui.BranchTreeView = value;
+        Rebuild();
     }
 
     public async Task LoadAsync()
@@ -170,7 +208,53 @@ public partial class BranchesViewModel : BaseViewModel
                               .OrderByDescending(b => b.IsCurrent)
                               .ThenByDescending(b => b.LastActivity))
             LocalBranches.Add(b);
+
+        if (ShowTree)
+            RebuildTree(ordered);
     }
+
+    /// <summary>Builds the path-segment tree from the filtered, ordered rows (A13).</summary>
+    private void RebuildTree(IReadOnlyList<BranchRow> rows)
+    {
+        var roots = new List<BranchTreeNode>();
+        var index = new Dictionary<string, BranchTreeNode>(StringComparer.Ordinal);
+
+        foreach (var row in rows)
+        {
+            var segments = row.Name.Split('/');
+            var path = string.Empty;
+            IList<BranchTreeNode> level = roots;
+
+            for (int i = 0; i < segments.Length; i++)
+            {
+                var isLeaf = i == segments.Length - 1;
+                path = path.Length == 0 ? segments[i] : $"{path}/{segments[i]}";
+
+                if (isLeaf)
+                {
+                    level.Add(new BranchTreeNode(segments[i], row));
+                }
+                else if (index.TryGetValue(path, out var existing))
+                {
+                    level = existing.Children;
+                }
+                else
+                {
+                    var folder = new BranchTreeNode(segments[i], null);
+                    level.Add(folder);
+                    index[path] = folder;
+                    level = folder.Children;
+                }
+            }
+        }
+
+        BranchTree.Clear();
+        foreach (var node in roots)
+            BranchTree.Add(node);
+    }
+
+    [RelayCommand]
+    private void ToggleTree() => ShowTree = !ShowTree;
 
     [RelayCommand]
     private void SortByDate() => SortByName = false;

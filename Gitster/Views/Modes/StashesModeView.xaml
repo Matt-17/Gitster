@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:models="clr-namespace:Gitster.Models"
+             xmlns:controls="clr-namespace:Gitster.Controls"
              xmlns:converters="clr-namespace:Gitster.Converters"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
@@ -39,23 +40,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBox Grid.Column="0"
-                         Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="12"
-                         Padding="6,4"
-                         Background="{StaticResource BackgroundSecondary}"
-                         Foreground="{StaticResource TextPrimary}"
-                         BorderBrush="{StaticResource BorderTertiary}">
-                    <TextBox.Style>
-                        <Style TargetType="TextBox">
-                            <Style.Triggers>
-                                <Trigger Property="Text" Value="">
-                                    <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBox.Style>
-                </TextBox>
+                <controls:SearchBox Grid.Column="0"
+                                    Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                    Placeholder="Filter stashes by name, file or branch"/>
 
                 <Button Grid.Column="2"
                         Content="New stash…"
