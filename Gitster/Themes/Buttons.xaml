@@ -89,4 +89,31 @@
         <Setter Property="Background"      Value="Transparent"/>
     </Style>
 
+    <!-- ── CopyGlyphButton ───────────────────────────────────────── -->
+    <!-- Borderless copy glyph (A9): no border, slightly muted, hover darkens. -->
+    <Style x:Key="CopyGlyphButton" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width"           Value="20"/>
+        <Setter Property="Height"          Value="20"/>
+        <Setter Property="Padding"         Value="0"/>
+        <Setter Property="Margin"          Value="4,0,0,0"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+        <Setter Property="Opacity"         Value="0.55"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="1"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
 </ResourceDictionary>

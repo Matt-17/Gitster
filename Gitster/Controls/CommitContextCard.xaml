@@ -4,23 +4,22 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:local="clr-namespace:Gitster.Controls"
+             xmlns:converters="clr-namespace:Gitster.Converters"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:CommitListViewModel}">
 
     <UserControl.Resources>
-        <Style x:Key="CopyButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
-            <Setter Property="Width" Value="22"/>
-            <Setter Property="Height" Value="22"/>
-            <Setter Property="Margin" Value="4,0,0,0"/>
-            <Setter Property="Padding" Value="0"/>
-        </Style>
+        <converters:DateDisplayConverter x:Key="CardDateConverter"/>
+        <!-- Shared copy glyph used by both copy buttons -->
+        <Geometry x:Key="CopyGlyph">M7,3 H17 V17 H7 Z M3,7 H7 M3,7 V17 H7</Geometry>
     </UserControl.Resources>
 
     <Border Style="{StaticResource PanelCard}">
         <StackPanel>
 
-            <!-- Message (or placeholder when nothing is selected) -->
-            <Grid Margin="0,0,0,4">
+            <!-- Message + borderless copy button -->
+            <Grid Margin="0,0,0,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -29,10 +28,10 @@
                            ToolTip="{Binding SelectedCommit.Message}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
-                            <Setter Property="Text"       Value="{Binding SelectedCommit.Message}"/>
-                            <Setter Property="FontWeight"  Value="Medium"/>
-                            <Setter Property="FontSize"    Value="13"/>
-                            <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
+                            <Setter Property="Text"      Value="{Binding SelectedCommit.Message}"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="FontSize"   Value="14"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding SelectedCommit}" Value="{x:Null}">
                                     <Setter Property="Text"       Value="No commit selected"/>
@@ -44,96 +43,95 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <!-- Copy message button (full message) -->
-                <Button Grid.Column="1"
-                        ToolTip="Copy full message"
-                        Tag="{Binding SelectedCommit.Message}"
-                        Click="CopyMessage_Click">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource CopyButton}">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedCommit}" Value="{x:Null}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                    <Path Width="10" Height="10" Stretch="Uniform" Fill="Transparent"
-                          Stroke="{StaticResource TextTertiary}" StrokeThickness="1.5"
-                          Data="M7,3 H17 V17 H7 Z M3,7 H7 M3,7 V17 H7"/>
+                <Button Grid.Column="1" Style="{StaticResource CopyGlyphButton}"
+                        ToolTip="Copy full message" Tag="{Binding SelectedCommit.Message}" Click="CopyMessage_Click"
+                        Visibility="{Binding SelectedCommit, Converter={StaticResource NullToCollapsedConverter}}">
+                    <Path Width="11" Height="11" Stretch="Uniform" Fill="Transparent"
+                          Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5" Data="{StaticResource CopyGlyph}"/>
                 </Button>
             </Grid>
 
-            <!-- SHA · date · remote-state indicator (hidden when nothing is selected) -->
-            <Grid>
-                <Grid.Style>
-                    <Style TargetType="Grid">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding SelectedCommit}" Value="{x:Null}">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Grid.Style>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <!-- Details (hidden when nothing is selected) -->
+            <StackPanel Visibility="{Binding SelectedCommit, Converter={StaticResource NullToCollapsedConverter}}">
 
-                <!-- Remote-state dot -->
-                <Ellipse Grid.Column="0" Width="7" Height="7"
-                         VerticalAlignment="Center"
-                         Margin="0,0,5,0">
-                    <Ellipse.Style>
-                        <Style TargetType="Ellipse">
-                            <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                            <Setter Property="ToolTip" Value="Outgoing — local only"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedCommit.RemoteState}" Value="Incoming">
-                                    <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
-                                    <Setter Property="ToolTip" Value="Incoming — on remote, not yet merged locally"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding SelectedCommit.RemoteState}" Value="OnRemote">
-                                    <Setter Property="Fill" Value="Transparent"/>
-                                    <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
-                                    <Setter Property="StrokeThickness" Value="1.5"/>
-                                    <Setter Property="ToolTip" Value="Synced — on both local and remote"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding SelectedCommit.RemoteState}" Value="NoTrackingBranch">
-                                    <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                    <Setter Property="ToolTip" Value="No tracking branch — local only"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Ellipse.Style>
-                </Ellipse>
+                <!-- Author -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                    <local:Avatar Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"
+                                  Email="{Binding SelectedCommit.AuthorEmail}"
+                                  DisplayName="{Binding SelectedCommit.AuthorName}"
+                                  Enabled="{Binding Ui.GravatarEnabled}"/>
+                    <TextBlock Text="{Binding SelectedCommit.AuthorName}" FontSize="12"
+                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                </StackPanel>
 
-                <!-- SHA + date -->
-                <TextBlock Grid.Column="1"
-                           FontFamily="{StaticResource FontFamilyMono}"
-                           FontSize="11"
-                           Foreground="{StaticResource TextSecondary}"
-                           VerticalAlignment="Center">
-                    <Run Text="{Binding SelectedCommit.CommitId, Mode=OneWay}"/>
-                    <Run Text=" · "/>
-                    <Run Text="{Binding SelectedCommit.Date, StringFormat='dd.MM.yyyy HH:mm', Mode=OneWay}"/>
+                <!-- SHA (expands to full on hover) + remote dot + copy -->
+                <Grid Margin="0,0,0,3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,6,0">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                <Setter Property="ToolTip" Value="Outgoing — local only"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedCommit.RemoteState}" Value="Incoming">
+                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="ToolTip" Value="Incoming — on remote, not yet merged locally"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding SelectedCommit.RemoteState}" Value="OnRemote">
+                                        <Setter Property="Fill" Value="Transparent"/>
+                                        <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                                        <Setter Property="StrokeThickness" Value="1.5"/>
+                                        <Setter Property="ToolTip" Value="Synced — on both local and remote"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding SelectedCommit.RemoteState}" Value="NoTrackingBranch">
+                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
+                                        <Setter Property="ToolTip" Value="No tracking branch — local only"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
+                    <!-- Abbreviated by default; the value itself expands to the full 40-char SHA on hover -->
+                    <TextBlock Grid.Column="1" x:Name="ShaText"
+                               FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
+                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" ToolTip="Hover to reveal full SHA">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="{Binding SelectedCommit.CommitId}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Text" Value="{Binding SelectedCommit.FullSha}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <Button Grid.Column="2" Style="{StaticResource CopyGlyphButton}"
+                            ToolTip="Copy full SHA" Tag="{Binding SelectedCommit.FullSha}" Click="CopySha_Click">
+                        <Path Width="11" Height="11" Stretch="Uniform" Fill="Transparent"
+                              Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5" Data="{StaticResource CopyGlyph}"/>
+                    </Button>
+                </Grid>
+
+                <!-- Date on its own line (absolute by default, A10) -->
+                <TextBlock FontSize="11" Foreground="{StaticResource TextTertiary}">
+                    <TextBlock.Text>
+                        <MultiBinding Converter="{StaticResource CardDateConverter}">
+                            <Binding Path="SelectedCommit.Date"/>
+                            <Binding Path="Ui.UseRelativeDates"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
                 </TextBlock>
-
-                <!-- Copy full SHA button -->
-                <Button Grid.Column="2"
-                        Style="{StaticResource CopyButton}"
-                        ToolTip="Copy full SHA"
-                        Tag="{Binding SelectedCommit.FullSha}"
-                        Click="CopySha_Click">
-                    <Path Width="10" Height="10" Stretch="Uniform" Fill="Transparent"
-                          Stroke="{StaticResource TextTertiary}" StrokeThickness="1.5"
-                          Data="M7,3 H17 V17 H7 Z M3,7 H7 M3,7 V17 H7"/>
-                </Button>
-
-            </Grid>
-
+            </StackPanel>
         </StackPanel>
     </Border>
 </UserControl>

@@ -101,6 +101,7 @@ public partial class MainWindowViewModel : BaseViewModel
             _feedbackService,
             _opsLogService,
             _snapshotService,
+            _uiPreferences,
             async () => await RefreshSidebarBadgesAsync());
         WorktreesVM = new WorktreesViewModel(
             _gitBackend,

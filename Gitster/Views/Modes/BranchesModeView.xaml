@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:controls="clr-namespace:Gitster.Controls"
              xmlns:converters="clr-namespace:Gitster.Converters"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
@@ -37,15 +38,36 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBox Grid.Column="0"
-                         Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="12" Padding="6,4"
-                         Background="{StaticResource BackgroundSecondary}"
-                         Foreground="{StaticResource TextPrimary}"
-                         BorderBrush="{StaticResource BorderTertiary}"
-                         ToolTip="Filter branches by name"/>
+                <controls:SearchBox Grid.Column="0"
+                                    Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                    Placeholder="Filter branches by name"/>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Command="{Binding ToggleTreeCommand}" Padding="8,4" Margin="0,0,8,0"
+                            ToolTip="Toggle flat list / tree by path">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowTree}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="⊞ Tree"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowTree}" Value="True">
+                                            <Setter Property="Text" Value="☰ Flat"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Button>
                     <Button Content="Recent"
                             Command="{Binding SortByDateCommand}"
                             Padding="10,4" Margin="0,0,4,0"
@@ -86,12 +108,50 @@
                            Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Branch list -->
+            <!-- Branch tree (A13) -->
+            <TreeView Grid.Row="1"
+                      x:Name="BranchTreeView"
+                      ItemsSource="{Binding BranchTree}"
+                      Background="Transparent" BorderThickness="0"
+                      MouseDoubleClick="BranchTree_MouseDoubleClick"
+                      Visibility="{Binding ShowTree, Converter={StaticResource BoolVis}}"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📁 " FontSize="11" VerticalAlignment="Center"
+                                       Visibility="{Binding IsBranch, Converter={StaticResource InverseBoolVis}}"/>
+                            <Ellipse Width="6" Height="6" Margin="0,0,5,0" VerticalAlignment="Center"
+                                     Fill="{StaticResource AccentBlue}"
+                                     Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBranch}" Value="False">
+                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+
+            <!-- Branch list (flat) -->
             <ListView Grid.Row="1"
                       ItemsSource="{Binding GroupedBranches}"
                       SelectedItem="{Binding SelectedBranch}"
                       Background="Transparent" BorderThickness="0"
-                      Visibility="{Binding HasBranches, Converter={StaticResource BoolVis}}"
+                      Visibility="{Binding ShowFlat, Converter={StaticResource BoolVis}}"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListView.GroupStyle>
                     <GroupStyle>

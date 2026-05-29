@@ -179,9 +179,13 @@
 
                 <TextBlock Grid.Column="1" Text="{Binding Message}" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" Margin="2,0,8,0"/>
-                <TextBlock Grid.Column="2" Text="{Binding AuthorName}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis"
-                           Foreground="{StaticResource TextSecondary}" Margin="0,0,8,0"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <local:Avatar Email="{Binding AuthorEmail}" DisplayName="{Binding AuthorName}"
+                                  Margin="0,0,5,0"
+                                  Enabled="{Binding DataContext.Ui.GravatarEnabled, RelativeSource={RelativeSource AncestorType=ListView}}"/>
+                    <TextBlock Text="{Binding AuthorName}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}"/>
+                </StackPanel>
                 <TextBlock Grid.Column="3" VerticalAlignment="Center"
                            Foreground="{StaticResource TextSecondary}" FontSize="11">
                     <TextBlock.Text>

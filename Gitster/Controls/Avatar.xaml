@@ -1,0 +1,22 @@
+<UserControl x:Class="Gitster.Controls.Avatar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             x:Name="Root"
+             mc:Ignorable="d"
+             Width="18" Height="18">
+    <Grid>
+        <!-- Initials circle (always present; shown until an image arrives) -->
+        <Border x:Name="InitialsCircle" CornerRadius="9">
+            <TextBlock x:Name="InitialsText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="White" FontSize="8" FontWeight="SemiBold"/>
+        </Border>
+        <!-- Gravatar image, clipped to a circle -->
+        <Ellipse x:Name="ImageCircle" Visibility="Collapsed">
+            <Ellipse.Fill>
+                <ImageBrush x:Name="ImageFill" Stretch="UniformToFill"/>
+            </Ellipse.Fill>
+        </Ellipse>
+    </Grid>
+</UserControl>
