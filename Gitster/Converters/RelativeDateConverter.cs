@@ -17,9 +17,15 @@ public class RelativeDateConverter : IValueConverter
         if (value is not DateTime date)
             return string.Empty;
 
-        if (Mode == RelativeDateMode.Full)
-            return date.ToString("dd.MM.yyyy HH:mm");
+        return Mode == RelativeDateMode.Full ? Absolute(date) : Relative(date);
+    }
 
+    /// <summary>Absolute date string (culture-independent short format).</summary>
+    public static string Absolute(DateTime date) => date.ToString("dd.MM.yyyy HH:mm");
+
+    /// <summary>Human-friendly relative date ("2h ago", "yesterday", "3 weeks ago").</summary>
+    public static string Relative(DateTime date)
+    {
         var now = SystemTime.Now;
         var diff = now - date;
 

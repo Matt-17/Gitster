@@ -13,7 +13,26 @@ public interface IGitBackend
     Task<BranchInfo> GetCurrentBranchAsync();
 
     Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(Gitster.ViewModels.CommitFilter? filter = null);
+
+    /// <summary>Streams commits HEAD→parent (newest first) for progressive UI loading (plan A0.1).</summary>
+    IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(
+        Gitster.ViewModels.CommitFilter? filter = null,
+        CancellationToken ct = default);
+
+    /// <summary>Computes incoming/outgoing sets + remote identity off the UI thread (plan A0.4).</summary>
+    Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default);
+
     Task<CommitDetails> GetCommitAsync(string sha);
+
+    /// <summary>Computes a commit's file-level diff lazily and cancellably (plan A0.3).</summary>
+    Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default);
+
+    // ── Commit panel (plan A2) ────────────────────────────────────────────
+    Task<WorkingTreeStatus> GetWorkingTreeStatusAsync();
+    Task StageAsync(IEnumerable<string> paths);
+    Task UnstageAsync(IEnumerable<string> paths);
+    Task StageAllAsync();
+    Task<string> CommitAsync(CommitRequest request);
 
     Task<string> AmendAsync(AmendRequest request);
     Task AmendAuthorAsync(AmendAuthorRequest request);

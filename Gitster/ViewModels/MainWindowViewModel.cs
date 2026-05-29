@@ -25,7 +25,6 @@ namespace Gitster.ViewModels;
 /// </summary>
 public partial class MainWindowViewModel : BaseViewModel
 {
-    private List<CommitItem> _allCommits = [];
     private FilterWindow? _filterWindow;
     private readonly OperationsLogService _opsLogService = new();
     private readonly IGitBackend _gitBackend;
@@ -36,7 +35,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly SnapshotService _snapshotService = new();
     private readonly StashNameService _stashNameService = new();
     private readonly CustomToolsService _customToolsService = new();
-    private bool _hasTrackingBranch = true;
+    private readonly UiPreferencesService _uiPreferences = new();
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -51,6 +50,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public BranchesViewModel BranchesVM { get; }
     public WorktreesViewModel WorktreesVM { get; }
     public OperationsLogService OpsLogService => _opsLogService;
+    public UiPreferencesService Ui => _uiPreferences;
 
     public MainWindowViewModel()
     {
@@ -73,7 +73,7 @@ public partial class MainWindowViewModel : BaseViewModel
             if (e.PropertyName is nameof(TitleBarViewModel.RepositoryName) or nameof(TitleBarViewModel.CurrentBranch))
                 OnPropertyChanged(nameof(WindowTitle));
         };
-        CommitListVM = new CommitListViewModel(OpenFilter, ClearAllFilters);
+        CommitListVM = new CommitListViewModel(_gitBackend, _uiPreferences, OpenFilter, ClearAllFilters);
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
         TimestampEditVM = new TimestampEditViewModel(
             () => CommitListVM.SelectedCommit,
@@ -116,10 +116,11 @@ public partial class MainWindowViewModel : BaseViewModel
         _gitBackend.HeadChanged += (_, _) =>
             Application.Current.Dispatcher.BeginInvoke(async () => await UpdateElementsAsync());
 
-        // Subscribe to filter changes
+        // Dialog (author/date) filter changes trigger a reload — the inline query
+        // filter is handled in-memory by CommitListViewModel without re-querying git.
         Filter.PropertyChanged += (s, e) =>
         {
-            ApplyFilters();
+            _ = UpdateElementsAsync();
         };
 
         // Load saved path or use default
@@ -169,14 +170,6 @@ public partial class MainWindowViewModel : BaseViewModel
     [ObservableProperty]
     public partial string SelectedRemote { get; set; } = string.Empty;
 
-    [ObservableProperty]
-    public partial string FilterStatusText { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial bool HasActiveFilters { get; set; }
-
-    [ObservableProperty]
-    public partial List<CommitItem> Commits { get; set; } = [];
     public ObservableCollection<string> Remotes { get; } = [];
 
     public CommitFilter Filter { get; } = new();
@@ -205,56 +198,10 @@ public partial class MainWindowViewModel : BaseViewModel
 
     private void OnCommitListVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // Diff loading lives in CommitListViewModel now (lazy + cancellable, A0.3). The main
+        // window only mirrors the selection for the edit/author panels.
         if (e.PropertyName == nameof(CommitListViewModel.SelectedCommit))
-        {
             SelectedCommit = CommitListVM.SelectedCommit;
-            UpdateDiffPreview();
-        }
-    }
-
-    private void UpdateDiffPreview()
-    {
-        var commit = CommitListVM.SelectedCommit;
-        if (commit == null)
-        {
-            CommitListVM.UpdateDiff(string.Empty, []);
-            return;
-        }
-        try
-        {
-            using var repo = new Repository(Path);
-            var gitCommit = repo.Lookup<Commit>(commit.CommitId);
-            if (gitCommit == null)
-            {
-                CommitListVM.UpdateDiff(string.Empty, []);
-                return;
-            }
-            var parent = gitCommit.Parents.FirstOrDefault();
-            // For the initial commit (no parent), compare against empty tree.
-            // LibGit2Sharp handles null oldTree as the empty tree.
-            Patch patch;
-            if (parent == null)
-                patch = repo.Diff.Compare<Patch>(null, gitCommit.Tree);
-            else
-                patch = repo.Diff.Compare<Patch>(parent.Tree, gitCommit.Tree);
-
-            var files = patch
-                .Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted,
-                    e.Status switch
-                    {
-                        ChangeKind.Added    => "A",
-                        ChangeKind.Deleted  => "D",
-                        ChangeKind.Renamed  => "R",
-                        _                   => "M"
-                    }))
-                .ToList();
-            var header = $"{files.Count} {(files.Count == 1 ? "file" : "files")} · +{patch.LinesAdded} −{patch.LinesDeleted}";
-            CommitListVM.UpdateDiff(header, files, commit.RemoteState);
-        }
-        catch
-        {
-            CommitListVM.UpdateDiff(string.Empty, []);
-        }
     }
 
     [RelayCommand]
@@ -310,7 +257,7 @@ public partial class MainWindowViewModel : BaseViewModel
             filterViewModel.AuthorNames.Clear();
             filterViewModel.AuthorNames.Add("All");
 
-            var distinctAuthors = _allCommits
+            var distinctAuthors = CommitListVM.AllCommits
                 .Select(c => c.AuthorName)
                 .Where(name => !string.IsNullOrEmpty(name))
                 .Distinct()
@@ -395,12 +342,12 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private async Task OpenRewriteTimestamps()
     {
-        if (_allCommits.Count == 0) return;
+        if (CommitListVM.AllCommits.Count == 0) return;
 
         try
         {
             var beforeSha = await _gitBackend.GetHeadShaAsync();
-            var vm = new RangeTimestampViewModel(_gitBackend, _allCommits.ToList());
+            var vm = new RangeTimestampViewModel(_gitBackend, CommitListVM.AllCommits.ToList());
             var window = new Views.RangeTimestampDialog(vm) { Owner = Application.Current.MainWindow };
 
             if (window.ShowDialog() == true)
@@ -690,95 +637,20 @@ public partial class MainWindowViewModel : BaseViewModel
         settings.Save();
     }
 
-    private void ApplyFilters()
+    /// <summary>Computes the dialog (author/date) filter summary for the search-status line.</summary>
+    private (bool Active, string Text) DialogFilterStatus()
     {
-        IEnumerable<CommitItem> filteredCommits = _allCommits;
-
-        // Apply author filter
-        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) && Filter.SelectedAuthorName != "All")
-        {
-            filteredCommits = filteredCommits.Where(c => c.AuthorName == Filter.SelectedAuthorName);
-        }
-
-        // Apply from date filter
-        if (Filter.FromDate.HasValue)
-        {
-            var fromDate = Filter.FromDate.Value.Date;
-            filteredCommits = filteredCommits.Where(c => c.Date.Date >= fromDate);
-        }
-
-        // Apply to date filter
-        if (Filter.ToDate.HasValue)
-        {
-            // Include all commits up to the end of the selected day
-            var toDateEndOfDay = Filter.ToDate.Value.Date.AddDays(1);
-            filteredCommits = filteredCommits.Where(c => c.Date < toDateEndOfDay);
-        }
-
-        Commits = filteredCommits.ToList();
-
-        // Update filter status
-        UpdateFilterStatus();
-
-        // Feed CommitListViewModel (handles auto-select and live text filter)
-        CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText, _hasTrackingBranch);
-    }
-
-    private void AutoSelectCommit()
-    {
-        // if selected commit is still in the list, keep it selected
-        if (SelectedCommit != null && Commits.Contains(SelectedCommit))
-        {
-            return;
-        }
-
-        // Auto-select the first commit if available
-        if (Commits.Count > 0)
-        {
-            SelectedCommit = Commits[0];
-        }
-        else
-        {
-            SelectedCommit = null;
-            SelectedCommitDetail.Clear();
-        }
-    }
-
-    private void UpdateFilterStatus()
-    {
-        int filterCount = 0;
-
-        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName)
-            && Filter.SelectedAuthorName != "All")
-        {
-            filterCount++;
-        }
-
-        if (Filter.FromDate.HasValue)
-        {
-            filterCount++;
-        }
-
-        if (Filter.ToDate.HasValue)
-        {
-            filterCount++;
-        }
-
-        if (filterCount > 0)
-        {
-            FilterStatusText = $"{filterCount} Filter{(filterCount > 1 ? "s" : "")} applied";
-            HasActiveFilters = true;
-        }
-        else
-        {
-            FilterStatusText = string.Empty;
-            HasActiveFilters = false;
-        }
+        int count = 0;
+        if (!string.IsNullOrEmpty(Filter.SelectedAuthorName) && Filter.SelectedAuthorName != "All") count++;
+        if (Filter.FromDate.HasValue) count++;
+        if (Filter.ToDate.HasValue) count++;
+        return count > 0
+            ? (true, $"{count} Filter{(count > 1 ? "s" : "")} applied")
+            : (false, string.Empty);
     }
 
     public async Task UpdateElementsAsync()
     {
-        Commits = [];
         try
         {
             await _gitBackend.OpenAsync(Path);
@@ -794,9 +666,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 SelectedCommitDetail.Clear();
                 TimestampEditVM.UpdatePreviewBefore("—");
                 IsGoButtonEnabled = false;
-                _allCommits.Clear();
-                Commits = [];
-                CommitListVM.SetBaseCommits([], false, string.Empty, hasTrackingBranch: false);
+                CommitListVM.ClearList();
                 UpdateStatusBar(repo);
                 return;
             }
@@ -817,84 +687,45 @@ public partial class MainWindowViewModel : BaseViewModel
 
             IsGoButtonEnabled = true;
 
-            // Update commit list using backend (includes RemoteState computation)
-            _allCommits.Clear();
-            var commitInfos = await _gitBackend.GetCommitsAsync();
-            foreach (var c in commitInfos)
-            {
-                _allCommits.Add(new CommitItem(
-                    c.Message,
-                    c.Date,
-                    c.Sha,
-                    c.AuthorName,
-                    c.AuthorEmail,
-                    c.RemoteState,
-                    c.FullSha,
-                    c.OrphanedPairSha));
-            }
-
-            // Refresh author directory from loaded commits
-            _ = _authorDirService.RefreshAsync();
-
-            // Detect whether the current branch has an upstream tracking branch
-            _hasTrackingBranch = repo.Head?.TrackedBranch?.Tip != null;
-
-            // Apply filters if any are active, otherwise show all commits
-            if (Filter.HasActiveFilters())
-            {
-                ApplyFilters();
-            }
-            else
-            {
-                Commits = _allCommits.ToList();
-
-                // Update filter status
-                UpdateFilterStatus();
-
-                // Feed CommitListViewModel (handles auto-select and live text filter)
-                CommitListVM.SetBaseCommits(Commits, HasActiveFilters, FilterStatusText, _hasTrackingBranch);
-            }
-
             // Update remotes list
             Remotes.Clear();
             foreach (var remote in repo.Network.Remotes)
-            {
                 Remotes.Add(remote.Name);
-            }
-
-            // Auto-select the first remote if available
             if (Remotes.Count > 0 && string.IsNullOrEmpty(SelectedRemote))
-            {
                 SelectedRemote = Remotes[0];
-            }
 
-            // Update status bar information
+            // Status bar + stashes/branches/worktrees can run before the (potentially long)
+            // commit-list stream completes.
             UpdateStatusBar(repo);
-
-            // Load stashes, branches and worktrees
             await StashesVM.LoadAsync();
             await BranchesVM.LoadAsync();
             await WorktreesVM.LoadAsync();
             SidebarVM.BranchCount = BranchesVM.LocalCount;
+            await RefreshSidebarBadgesAsync();
+
+            // Progressive commit-list load (A0). The dialog author/date filter is applied
+            // at the git level; the inline query filter runs in-memory on top.
+            var (dialogActive, dialogText) = DialogFilterStatus();
+            var dialogFilter = Filter.HasActiveFilters() ? Filter : null;
+            await CommitListVM.LoadAsync(dialogFilter, dialogActive, dialogText);
+
+            // Refresh author directory from the loaded commits.
+            _ = _authorDirService.RefreshAsync();
+            return;
         }
         catch (Exception)
         {
             StashesVM.Clear();
             BranchesVM.Clear();
             WorktreesVM.Clear();
-            // Empty all the fields
             CurrentCommitDetail.Clear();
             SelectedCommitDetail.Clear();
             SelectedDate = null;
             TimestampEditVM.UpdatePreviewBefore("—");
-
             IsGoButtonEnabled = false;
-
             Remotes.Clear();
-
-            // Clear status bar
             TitleBarVM.Clear();
-            CommitListVM.SetBaseCommits([], false, string.Empty, hasTrackingBranch: false);
+            CommitListVM.ClearList();
         }
 
         await RefreshSidebarBadgesAsync();

@@ -24,39 +24,34 @@ public partial class CommitListView : UserControl
             _vm.FocusSearchRequested += OnFocusSearchRequested;
     }
 
-    private void OnFocusSearchRequested() => SearchBox.Focus();
+    private void OnFocusSearchRequested() => SearchBoxControl.FocusInput();
 
     private void CommitListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_vm == null) return;
+        // Only real commits participate in multi-selection; headers are never selectable.
         _vm.SelectedCommits = CommitListBox.SelectedItems
             .OfType<CommitItem>()
-            .Where(c => !c.IsPlaceholder)
             .ToList();
     }
 }
 
-/// <summary>
-/// Hides invisible placeholder sentinel items and gives real commits the full
-/// interactive container style.
-/// </summary>
-public class CommitListItemStyleSelector : StyleSelector
+/// <summary>Picks the header vs. commit container style for the heterogeneous commit list.</summary>
+public sealed class CommitContainerStyleSelector : StyleSelector
 {
     public Style? CommitStyle { get; set; }
+    public Style? HeaderStyle { get; set; }
 
-    // Placeholder items are completely invisible and take no space.
-    private static readonly Style _placeholderStyle = new(typeof(ListViewItem))
-    {
-        Setters =
-        {
-            new Setter(UIElement.VisibilityProperty,       Visibility.Collapsed),
-            new Setter(UIElement.IsHitTestVisibleProperty, false),
-            new Setter(Control.PaddingProperty,            new Thickness(0)),
-            new Setter(Control.BorderThicknessProperty,    new Thickness(0)),
-            new Setter(FrameworkElement.HeightProperty,    0d),
-        }
-    };
+    public override Style? SelectStyle(object item, DependencyObject container)
+        => item is CommitSectionHeader ? HeaderStyle : CommitStyle;
+}
 
-    public override Style SelectStyle(object item, DependencyObject container)
-        => item is CommitItem { IsPlaceholder: true } ? _placeholderStyle : CommitStyle!;
+/// <summary>Picks the header vs. commit row template for the heterogeneous commit list.</summary>
+public sealed class CommitRowTemplateSelector : DataTemplateSelector
+{
+    public DataTemplate? CommitTemplate { get; set; }
+    public DataTemplate? HeaderTemplate { get; set; }
+
+    public override DataTemplate? SelectTemplate(object item, DependencyObject container)
+        => item is CommitSectionHeader ? HeaderTemplate : CommitTemplate;
 }

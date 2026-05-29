@@ -229,7 +229,15 @@ public sealed class GitCliBackend : IGitBackend
     public Task<WorkingTreeState> GetWorkingTreeStateAsync()     => NS<WorkingTreeState>();
     public Task<BranchInfo> GetCurrentBranchAsync()             => NS<BranchInfo>();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(Gitster.ViewModels.CommitFilter? filter = null) => NS<IReadOnlyList<CommitInfo>>();
+    public IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(Gitster.ViewModels.CommitFilter? filter = null, CancellationToken ct = default) => throw new NotSupportedException("Route through HybridGitBackend.");
+    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default) => NS<RemoteSets>();
     public Task<CommitDetails> GetCommitAsync(string sha)       => NS<CommitDetails>();
+    public Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default) => NS<CommitDiff>();
+    public Task<WorkingTreeStatus> GetWorkingTreeStatusAsync()  => NS<WorkingTreeStatus>();
+    public Task StageAsync(IEnumerable<string> paths)           => NSVoid();
+    public Task UnstageAsync(IEnumerable<string> paths)         => NSVoid();
+    public Task StageAllAsync()                                 => NSVoid();
+    public Task<string> CommitAsync(CommitRequest request)      => NS<string>();
     public Task<string> AmendAsync(AmendRequest request)        => NS<string>();
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => NSVoid();
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites) => NSVoid();

@@ -2,6 +2,7 @@ using Gitster.Helpers;
 using Gitster.Models;
 using LibGit2Sharp;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Gitster.Services.Git;
 
@@ -231,6 +232,272 @@ public sealed class LibGit2Backend : IGitBackend
         // Incoming first, then local (outgoing + synced)
         var result = incomingCommits.Concat(localResult).ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
+    }
+
+    // ── A0.1 — progressive HEAD→parent streaming ───────────────────────────
+
+    /// <summary>
+    /// Yields commits strictly HEAD→parent (newest first), with a neutral remote
+    /// state. The real remote state is filled in later by <see cref="ComputeRemoteSetsAsync"/>
+    /// so first paint never waits on a divergence walk.
+    /// </summary>
+    public async IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(
+        Gitster.ViewModels.CommitFilter? filter = null,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var repo = OpenRepository();
+        if (repo.Head?.Tip == null)
+            yield break;
+
+        var query = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+        {
+            // Topological ensures every parent appears after its child regardless of
+            // manipulated timestamps; anchored at HEAD this is the clean HEAD→root walk (A1).
+            SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+            IncludeReachableFrom = repo.Head.Tip,
+        });
+
+        int counter = 0;
+        foreach (var c in query)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (filter != null && !PassesFilter(c, filter))
+                continue;
+
+            yield return new CommitInfo(
+                c.Id.Sha[..7],
+                c.MessageShort,
+                c.Author.When.DateTime,
+                c.Author.Name ?? string.Empty,
+                c.Author.Email ?? string.Empty,
+                CommitRemoteState.OnRemote,
+                c.Id.Sha);
+
+            // Periodically yield the thread so cancellation stays responsive on huge repos.
+            if ((++counter & 1023) == 0)
+                await Task.Yield();
+        }
+    }
+
+    private static bool PassesFilter(Commit c, Gitster.ViewModels.CommitFilter filter)
+    {
+        if (!string.IsNullOrEmpty(filter.SelectedAuthorName) && filter.SelectedAuthorName != "All"
+            && !string.Equals(c.Author.Name, filter.SelectedAuthorName, StringComparison.Ordinal))
+            return false;
+        if (filter.FromDate.HasValue && c.Author.When.Date < filter.FromDate.Value.Date)
+            return false;
+        if (filter.ToDate.HasValue && c.Author.When.DateTime >= filter.ToDate.Value.Date.AddDays(1))
+            return false;
+        return true;
+    }
+
+    // ── A0.4 — incoming/outgoing computation (background) ──────────────────
+
+    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default)
+    {
+        using var repo = OpenRepository();
+        var headTip = repo.Head?.Tip;
+        var tracking = repo.Head?.TrackedBranch;
+        bool hasRemote = repo.Network.Remotes.Any();
+        bool hasTracking = tracking?.Tip != null && headTip != null;
+
+        string? remoteName = tracking?.RemoteName;
+        if (string.IsNullOrEmpty(remoteName) && hasRemote)
+            remoteName = repo.Network.Remotes.First().Name;
+        string? remoteUrl = null;
+        if (!string.IsNullOrEmpty(remoteName))
+            remoteUrl = repo.Network.Remotes[remoteName]?.Url;
+
+        var outgoing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var incoming = new List<CommitInfo>();
+        var orphaned = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (hasTracking)
+        {
+            foreach (var c in repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                IncludeReachableFrom = headTip,
+                ExcludeReachableFrom = tracking!.Tip,
+            }))
+            {
+                ct.ThrowIfCancellationRequested();
+                outgoing.Add(c.Id.Sha);
+            }
+
+            var incomingCommits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = tracking.Tip,
+                ExcludeReachableFrom = headTip,
+            }).ToList();
+
+            foreach (var c in incomingCommits)
+                incoming.Add(new CommitInfo(
+                    c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
+                    c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
+                    CommitRemoteState.Incoming, c.Id.Sha));
+
+            // Orphaned hash-pair detection: an incoming commit whose tree matches an
+            // outgoing commit is the pre-amend copy still on the remote.
+            var outgoingTreeMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sha in outgoing)
+            {
+                var commit = repo.Lookup<Commit>(sha);
+                if (commit?.Tree?.Sha != null)
+                    outgoingTreeMap.TryAdd(commit.Tree.Sha, sha);
+            }
+            foreach (var inc in incomingCommits)
+            {
+                if (inc.Tree?.Sha != null && outgoingTreeMap.TryGetValue(inc.Tree.Sha, out var outFull))
+                {
+                    orphaned[inc.Id.Sha] = outFull[..7];
+                    orphaned[outFull] = inc.Id.Sha[..7];
+                }
+            }
+        }
+
+        return Task.FromResult(new RemoteSets(
+            incoming, outgoing, orphaned, hasTracking, hasRemote, remoteName, remoteUrl));
+    }
+
+    // ── A2 — commit panel: working-tree status, staging, commit ────────────
+
+    public Task<WorkingTreeStatus> GetWorkingTreeStatusAsync()
+    {
+        using var repo = OpenRepository();
+        var headTree = repo.Head?.Tip?.Tree;
+
+        var staged = new List<WorkingTreeFile>();
+        var unstaged = new List<WorkingTreeFile>();
+
+        // Staged = HEAD tree ↔ index.
+        try
+        {
+            foreach (var e in repo.Diff.Compare<Patch>(headTree, DiffTargets.Index))
+                staged.Add(new WorkingTreeFile(e.Path, MapStaged(e.Status), Staged: true, e.LinesAdded, e.LinesDeleted));
+        }
+        catch { /* leave staged empty on diff error */ }
+
+        // Unstaged + untracked = index ↔ working directory (Added here means untracked).
+        try
+        {
+            foreach (var e in repo.Diff.Compare<Patch>(null, includeUntracked: true, explicitPathsOptions: null))
+                unstaged.Add(new WorkingTreeFile(e.Path, MapWorkdir(e.Status), Staged: false, e.LinesAdded, e.LinesDeleted));
+        }
+        catch { /* leave unstaged empty on diff error */ }
+
+        return Task.FromResult(new WorkingTreeStatus(staged, unstaged));
+    }
+
+    private static WorkingFileStatus MapStaged(ChangeKind kind) => kind switch
+    {
+        ChangeKind.Added      => WorkingFileStatus.Added,
+        ChangeKind.Deleted    => WorkingFileStatus.Deleted,
+        ChangeKind.Renamed    => WorkingFileStatus.Renamed,
+        ChangeKind.TypeChanged => WorkingFileStatus.TypeChange,
+        ChangeKind.Conflicted => WorkingFileStatus.Conflicted,
+        _                     => WorkingFileStatus.Modified,
+    };
+
+    private static WorkingFileStatus MapWorkdir(ChangeKind kind) => kind switch
+    {
+        ChangeKind.Added      => WorkingFileStatus.Untracked, // present in workdir, not index
+        ChangeKind.Deleted    => WorkingFileStatus.Deleted,
+        ChangeKind.Renamed    => WorkingFileStatus.Renamed,
+        ChangeKind.TypeChanged => WorkingFileStatus.TypeChange,
+        ChangeKind.Conflicted => WorkingFileStatus.Conflicted,
+        _                     => WorkingFileStatus.Modified,
+    };
+
+    public Task StageAsync(IEnumerable<string> paths)
+    {
+        using var repo = OpenRepository();
+        var list = paths.ToList();
+        if (list.Count > 0)
+            Commands.Stage(repo, list);
+        return Task.CompletedTask;
+    }
+
+    public Task UnstageAsync(IEnumerable<string> paths)
+    {
+        using var repo = OpenRepository();
+        var list = paths.ToList();
+        if (list.Count > 0)
+            Commands.Unstage(repo, list);
+        return Task.CompletedTask;
+    }
+
+    public Task StageAllAsync()
+    {
+        using var repo = OpenRepository();
+        Commands.Stage(repo, "*");
+        return Task.CompletedTask;
+    }
+
+    public Task<string> CommitAsync(CommitRequest request)
+    {
+        using var repo = OpenRepository();
+        var fallback = repo.Config.BuildSignature(DateTimeOffset.Now)
+            ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+
+        if (request.Amend)
+        {
+            var head = repo.Head.Tip ?? throw new InvalidOperationException("No HEAD commit to amend.");
+            var author = new Signature(
+                request.AuthorName ?? head.Author.Name,
+                request.AuthorEmail ?? head.Author.Email,
+                head.Author.When); // keep the original author date on amend
+            var committer = new Signature(
+                request.CommitterName ?? fallback.Name,
+                request.CommitterEmail ?? fallback.Email,
+                DateTimeOffset.Now);
+            var amended = repo.Commit(request.Message, author, committer,
+                new CommitOptions { AmendPreviousCommit = true });
+            HeadChanged?.Invoke(this, EventArgs.Empty);
+            return Task.FromResult(amended.Sha);
+        }
+        else
+        {
+            var when = DateTimeOffset.Now;
+            var author = new Signature(
+                request.AuthorName ?? fallback.Name,
+                request.AuthorEmail ?? fallback.Email, when);
+            var committer = new Signature(
+                request.CommitterName ?? fallback.Name,
+                request.CommitterEmail ?? fallback.Email, when);
+            // repo.Commit updates the current branch ref — it never detaches HEAD.
+            var commit = repo.Commit(request.Message, author, committer);
+            HeadChanged?.Invoke(this, EventArgs.Empty);
+            return Task.FromResult(commit.Sha);
+        }
+    }
+
+    public Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default)
+    {
+        using var repo = OpenRepository();
+        var commit = repo.Lookup<Commit>(sha);
+        if (commit == null)
+            return Task.FromResult(CommitDiff.Empty);
+
+        ct.ThrowIfCancellationRequested();
+        var parent = commit.Parents.FirstOrDefault();
+        // The root commit (no parent) diffs against the empty tree (null oldTree).
+        var patch = parent == null
+            ? repo.Diff.Compare<Patch>(null, commit.Tree)
+            : repo.Diff.Compare<Patch>(parent.Tree, commit.Tree);
+
+        var files = patch
+            .Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted,
+                e.Status switch
+                {
+                    ChangeKind.Added   => "A",
+                    ChangeKind.Deleted => "D",
+                    ChangeKind.Renamed => "R",
+                    _                  => "M",
+                }))
+            .ToList();
+
+        return Task.FromResult(new CommitDiff(files, patch.LinesAdded, patch.LinesDeleted));
     }
 
     public Task<CommitDetails> GetCommitAsync(string sha)

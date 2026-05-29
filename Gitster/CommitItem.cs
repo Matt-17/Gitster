@@ -1,37 +1,50 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 using Gitster.Services.Git;
 
 namespace Gitster;
 
-public record CommitItem(
-    string Message,
-    DateTime Date,
-    string CommitId,
-    string AuthorName,
-    string AuthorEmail = "",
-    CommitRemoteState RemoteState = CommitRemoteState.LocalOnly,
-    string FullSha = "",
-    string? OrphanedPairSha = null)
+/// <summary>
+/// A row in the commit list. Observable so that <see cref="RemoteState"/> and
+/// <see cref="OrphanedPairSha"/> can be filled in progressively after the initial
+/// fast load (plan A0.4 — remote-state dots appear without blocking first paint).
+/// </summary>
+public partial class CommitItem : ObservableObject
 {
-    public string GroupLabel => RemoteState switch
+    public CommitItem(
+        string message,
+        DateTime date,
+        string commitId,
+        string authorName,
+        string authorEmail = "",
+        CommitRemoteState remoteState = CommitRemoteState.LocalOnly,
+        string fullSha = "",
+        string? orphanedPairSha = null)
     {
-        CommitRemoteState.Incoming => "Incoming",
-        CommitRemoteState.LocalOnly or CommitRemoteState.NoTrackingBranch => "Outgoing",
-        _ => "Synced"
-    };
+        Message = message;
+        Date = date;
+        CommitId = commitId;
+        AuthorName = authorName;
+        AuthorEmail = authorEmail;
+        FullSha = string.IsNullOrEmpty(fullSha) ? commitId : fullSha;
+        RemoteState = remoteState;
+        OrphanedPairSha = orphanedPairSha;
+    }
 
-    public int GroupOrder => RemoteState switch
-    {
-        CommitRemoteState.Incoming => 0,
-        CommitRemoteState.LocalOnly or CommitRemoteState.NoTrackingBranch => 1,
-        _ => 2
-    };
+    public string Message { get; }
+    public DateTime Date { get; }
+    public string CommitId { get; }
+    public string AuthorName { get; }
+    public string AuthorEmail { get; }
+    public string FullSha { get; }
 
-    /// <summary>True when this commit and its orphaned pair (same tree, rewritten) are visible in the list.</summary>
+    [ObservableProperty]
+    public partial CommitRemoteState RemoteState { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOrphanedPair))]
+    public partial string? OrphanedPairSha { get; set; }
+
+    /// <summary>True when this commit and its orphaned pair (same tree, rewritten) are both visible.</summary>
     public bool IsOrphanedPair => OrphanedPairSha != null;
-
-    /// <summary>
-    /// True for sentinel placeholder items injected to keep empty groups visible.
-    /// These items are never shown in the UI and must never be selected.
-    /// </summary>
-    public bool IsPlaceholder { get; init; }
 }
