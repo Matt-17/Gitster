@@ -69,6 +69,7 @@ public partial class BranchesViewModel : BaseViewModel
     private readonly OperationsLogService     _opsLog;
     private readonly SnapshotService          _snapshots;
     private readonly UiPreferencesService     _ui;
+    private readonly IWindowService           _windowService;
     private readonly Func<Task>               _onChanged;
 
     private List<BranchRow> _all = [];
@@ -117,6 +118,7 @@ public partial class BranchesViewModel : BaseViewModel
         OperationsLogService     opsLog,
         SnapshotService          snapshots,
         UiPreferencesService     ui,
+        IWindowService?          windowService,
         Func<Task>               onChanged)
     {
         _git       = git;
@@ -124,6 +126,7 @@ public partial class BranchesViewModel : BaseViewModel
         _opsLog    = opsLog;
         _snapshots = snapshots;
         _ui        = ui;
+        _windowService = windowService ?? new WindowService();
         _onChanged = onChanged;
 
         ShowTree = ui.BranchTreeView;
@@ -283,7 +286,7 @@ public partial class BranchesViewModel : BaseViewModel
         catch (CheckoutConflictException)
         {
             // Dirty working tree would be overwritten — offer stash-and-checkout.
-            var choice = MessageBox.Show(
+            var choice = _windowService.ShowMessage(
                 "You have uncommitted changes that would be overwritten by this checkout.\n\n" +
                 "Stash your changes and switch anyway?",
                 "Uncommitted changes",
@@ -298,18 +301,18 @@ public partial class BranchesViewModel : BaseViewModel
                     await _git.CheckoutBranchAsync(row.Name);
                 });
                 await AfterChangeAsync();
-                MessageBox.Show(
+                _windowService.Info(
                     "Your changes were stashed before switching. Find them in the Stashes view.",
-                    "Stashed", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "Stashed");
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Checkout failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _windowService.Warning(ex.Message, "Checkout failed");
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Checkout failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Checkout failed");
         }
     }
 
@@ -323,9 +326,8 @@ public partial class BranchesViewModel : BaseViewModel
             Title  = "Rename branch",
             Prompt = $"New name for '{row.Name}':",
             Value  = row.IsRemote ? string.Empty : row.Name,
-            Owner  = Application.Current.MainWindow,
         };
-        if (dialog.ShowDialog() != true) return;
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         var newName = dialog.Value.Trim();
         if (string.IsNullOrEmpty(newName) || newName == row.Name) return;
@@ -338,7 +340,7 @@ public partial class BranchesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Rename failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Rename failed");
         }
     }
 
@@ -352,7 +354,7 @@ public partial class BranchesViewModel : BaseViewModel
             : $"Branch '{row.Name}' is NOT merged into the current branch.\n\n" +
               "Deleting it may permanently lose its commits. Delete anyway?";
 
-        var confirm = MessageBox.Show(warn, "Delete branch",
+        var confirm = _windowService.ShowMessage(warn, "Delete branch",
             MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes) return;
 
@@ -364,7 +366,7 @@ public partial class BranchesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Delete failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Delete failed");
         }
     }
 
@@ -378,9 +380,8 @@ public partial class BranchesViewModel : BaseViewModel
             Title  = "Create branch",
             Prompt = $"New branch name (starting from '{row.Name}'):",
             Value  = string.Empty,
-            Owner  = Application.Current.MainWindow,
         };
-        if (dialog.ShowDialog() != true) return;
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         var name = dialog.Value.Trim();
         if (string.IsNullOrEmpty(name)) return;
@@ -393,7 +394,7 @@ public partial class BranchesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Create failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Create failed");
         }
     }
 

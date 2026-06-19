@@ -18,6 +18,7 @@ public partial class QuickActionsViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedback;
     private readonly OperationsLogService     _opsLog;
     private readonly SnapshotService          _snapshots;
+    private readonly IWindowService           _windowService;
     private readonly Func<CommitItem?>        _getSelected;
     private readonly Func<List<CommitItem>>   _getMultiSelected;
     private readonly Func<Task>               _onRefresh;
@@ -27,6 +28,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         OperationFeedbackService feedback,
         OperationsLogService     opsLog,
         SnapshotService          snapshots,
+        IWindowService?          windowService,
         Func<CommitItem?>        getSelected,
         Func<List<CommitItem>>   getMultiSelected,
         Func<Task>               onRefresh)
@@ -35,6 +37,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         _feedback         = feedback;
         _opsLog           = opsLog;
         _snapshots        = snapshots;
+        _windowService    = windowService ?? new WindowService();
         _getSelected      = getSelected;
         _getMultiSelected = getMultiSelected;
         _onRefresh        = onRefresh;
@@ -51,10 +54,10 @@ public partial class QuickActionsViewModel : BaseViewModel
         var isNonHead = await IsNonHeadAsync(commit.FullSha);
         if (isNonHead && !GitCli.IsAvailable)
         {
-            MessageBox.Show(
+            _windowService.Warning(
                 "Rewording an older commit requires the Git command-line tool.\n" +
                 "Install Git for Windows and restart Gitster.",
-                "Git CLI required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Git CLI required");
             return;
         }
 
@@ -62,14 +65,14 @@ public partial class QuickActionsViewModel : BaseViewModel
         // force-push warning must fire for any already-pushed commit.
         if (commit.RemoteState == CommitRemoteState.OnRemote)
         {
-            var r = MessageBox.Show(
+            var r = _windowService.ShowMessage(
                 "This commit has already been pushed. Rewording it will require a force-push.\n\nContinue?",
                 "Force-push warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (r != MessageBoxResult.Yes) return;
         }
 
-        var dlg = new RewordDialog(commit.Message) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true) return;
+        var dlg = new RewordDialog(commit.Message);
+        if (_windowService.ShowDialog(dlg) != true) return;
 
         var newMessage = dlg.NewMessage;
 
@@ -100,7 +103,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Reword failed:\n{ex.Message}", "Gitster", MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Reword failed:\n{ex.Message}", "Gitster");
         }
     }
 
@@ -116,7 +119,7 @@ public partial class QuickActionsViewModel : BaseViewModel
 
         if (commit.RemoteState == CommitRemoteState.OnRemote)
         {
-            var r = MessageBox.Show(
+            var r = _windowService.ShowMessage(
                 "This commit has already been pushed. Fixup will rewrite history and require a force-push.\n\nContinue?",
                 "Force-push warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (r != MessageBoxResult.Yes) return;
@@ -152,7 +155,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Fixup failed:\n{ex.Message}", "Gitster", MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Fixup failed:\n{ex.Message}", "Gitster");
         }
     }
 
@@ -175,25 +178,25 @@ public partial class QuickActionsViewModel : BaseViewModel
 
         if (!contiguous)
         {
-            MessageBox.Show(
+            _windowService.Warning(
                 "Squash needs a contiguous range of commits — your selection has a gap.\n\n" +
                 "Select commits that are directly next to each other in history and try again.",
-                "Cannot squash", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Cannot squash");
             return;
         }
 
         var anyOnRemote = commits.Any(c => c.RemoteState == CommitRemoteState.OnRemote);
         if (anyOnRemote)
         {
-            var r = MessageBox.Show(
+            var r = _windowService.ShowMessage(
                 "One or more selected commits have already been pushed. Squashing will rewrite history and require a force-push.\n\nContinue?",
                 "Force-push warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (r != MessageBoxResult.Yes) return;
         }
 
         var combined = string.Join("\n\n", commits.Select(c => c.Message));
-        var dlg = new SquashDialog(combined) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true) return;
+        var dlg = new SquashDialog(combined);
+        if (_windowService.ShowDialog(dlg) != true) return;
 
         try
         {
@@ -223,7 +226,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Squash failed:\n{ex.Message}", "Gitster", MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Squash failed:\n{ex.Message}", "Gitster");
         }
     }
 
@@ -241,13 +244,12 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not load branches:\n{ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning($"Could not load branches:\n{ex.Message}", "Gitster");
             return;
         }
 
-        var dlg = new CherryPickDialog(_git, branches) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true || dlg.SelectedSha is null) return;
+        var dlg = new CherryPickDialog(_git, branches);
+        if (_windowService.ShowDialog(dlg) != true || dlg.SelectedSha is null) return;
 
         try
         {
@@ -290,8 +292,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Cherry-pick failed:\n{ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Cherry-pick failed:\n{ex.Message}", "Gitster");
         }
     }
 
@@ -311,8 +312,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not load branches:\n{ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning($"Could not load branches:\n{ex.Message}", "Gitster");
             return;
         }
 
@@ -321,8 +321,8 @@ public partial class QuickActionsViewModel : BaseViewModel
             .Select(b => b.Name)
             .ToList();
 
-        var dlg = new CommitToBranchDialog(localTargets) { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true) return;
+        var dlg = new CommitToBranchDialog(localTargets);
+        if (_windowService.ShowDialog(dlg) != true) return;
 
         try
         {
@@ -363,8 +363,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Commit to branch failed:\n{ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Commit to branch failed:\n{ex.Message}", "Gitster");
         }
     }
 
@@ -373,8 +372,8 @@ public partial class QuickActionsViewModel : BaseViewModel
     [RelayCommand]
     private async Task SnapshotToBranch()
     {
-        var dlg = new SnapshotBranchDialog { Owner = Application.Current.MainWindow };
-        if (dlg.ShowDialog() != true) return;
+        var dlg = new SnapshotBranchDialog();
+        if (_windowService.ShowDialog(dlg) != true) return;
 
         try
         {
@@ -401,8 +400,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Snapshot failed:\n{ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Snapshot failed:\n{ex.Message}", "Gitster");
         }
     }
 

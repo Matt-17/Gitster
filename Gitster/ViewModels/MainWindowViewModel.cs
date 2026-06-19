@@ -25,16 +25,17 @@ namespace Gitster.ViewModels;
 /// </summary>
 public partial class MainWindowViewModel : BaseViewModel
 {
-    private readonly OperationsLogService _opsLogService = new();
+    private readonly OperationsLogService _opsLogService;
+    private readonly IWindowService _windowService;
     private readonly IGitBackend _gitBackend;
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
     private readonly RecentReposService _recentRepos;
     private readonly AuthorDirectoryService _authorDirService;
-    private readonly SnapshotService _snapshotService = new();
-    private readonly StashNameService _stashNameService = new();
-    private readonly CustomToolsService _customToolsService = new();
-    private readonly UiPreferencesService _uiPreferences = new();
+    private readonly SnapshotService _snapshotService;
+    private readonly StashNameService _stashNameService;
+    private readonly CustomToolsService _customToolsService;
+    private readonly UiPreferencesService _uiPreferences;
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -53,28 +54,50 @@ public partial class MainWindowViewModel : BaseViewModel
     public OperationsLogService OpsLogService => _opsLogService;
     public UiPreferencesService Ui => _uiPreferences;
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(
+        IWindowService windowService,
+        IGitBackend gitBackend,
+        RepositoryStateService stateService,
+        OperationFeedbackService feedbackService,
+        RecentReposService recentRepos,
+        AuthorDirectoryService authorDirService,
+        AutoFetchService autoFetch,
+        CapabilityService capabilityService,
+        OperationsLogService opsLogService,
+        SnapshotService snapshotService,
+        StashNameService stashNameService,
+        CustomToolsService customToolsService,
+        UiPreferencesService uiPreferences,
+        StatusBarViewModel statusBarViewModel,
+        CommitListViewModel commitListViewModel,
+        UndoBarViewModel undoBarViewModel,
+        AuthorPanelViewModel authorPanelViewModel)
     {
-        _gitBackend = new HybridGitBackend();
-        _stateService = new RepositoryStateService(_gitBackend);
-        _feedbackService = new OperationFeedbackService();
-        _recentRepos = new RecentReposService();
-        _authorDirService = new AuthorDirectoryService(_gitBackend);
-        AutoFetch = new AutoFetchService(_gitBackend);
+        _windowService = windowService;
+        _gitBackend = gitBackend;
+        _stateService = stateService;
+        _feedbackService = feedbackService;
+        _recentRepos = recentRepos;
+        _authorDirService = authorDirService;
+        AutoFetch = autoFetch;
+        _opsLogService = opsLogService;
+        _snapshotService = snapshotService;
+        _stashNameService = stashNameService;
+        _customToolsService = customToolsService;
+        _uiPreferences = uiPreferences;
 
-        var capabilityService = new CapabilityService(_gitBackend);
         Capability.Initialize(capabilityService);
 
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
-        StatusBarVM = new StatusBarViewModel(_stateService, _feedbackService);
+        StatusBarVM = statusBarViewModel;
         TitleBarVM = new TitleBarViewModel(BrowseFolder, OpenRepoByPath, AutoFetch, _recentRepos);
         TitleBarVM.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(TitleBarViewModel.RepositoryName) or nameof(TitleBarViewModel.CurrentBranch))
                 OnPropertyChanged(nameof(WindowTitle));
         };
-        CommitListVM = new CommitListViewModel(_gitBackend, _uiPreferences);
+        CommitListVM = commitListViewModel;
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
         TimestampEditVM = new TimestampEditViewModel(
             () => CommitListVM.SelectedCommit,
@@ -84,17 +107,19 @@ public partial class MainWindowViewModel : BaseViewModel
             _feedbackService,
             _opsLogService,
             _snapshotService,
+            _windowService,
             () => CommitListVM.SelectedCommit,
             () => CommitListVM.SelectedCommits,
             async () => await UpdateElementsAsync());
-        UndoBarVM = new UndoBarViewModel(_opsLogService, _gitBackend, _feedbackService);
-        AuthorPanelVM = new AuthorPanelViewModel(_gitBackend, _authorDirService);
+        UndoBarVM = undoBarViewModel;
+        AuthorPanelVM = authorPanelViewModel;
         StashesVM = new StashesViewModel(
             _gitBackend,
             _feedbackService,
             _opsLogService,
             _snapshotService,
             _stashNameService,
+            _windowService,
             async () => await RefreshSidebarBadgesAsync());
         BranchesVM = new BranchesViewModel(
             _gitBackend,
@@ -102,11 +127,13 @@ public partial class MainWindowViewModel : BaseViewModel
             _opsLogService,
             _snapshotService,
             _uiPreferences,
+            _windowService,
             async () => await RefreshSidebarBadgesAsync());
         WorktreesVM = new WorktreesViewModel(
             _gitBackend,
             _feedbackService,
             _snapshotService,
+            _windowService,
             () => Path,
             OpenRepoByPath);
         CommitPanelVM = new CommitPanelViewModel(
@@ -115,10 +142,11 @@ public partial class MainWindowViewModel : BaseViewModel
             _opsLogService,
             _snapshotService,
             _authorDirService,
+            _windowService,
             async () => await UpdateElementsAsync(),
             () => TitleBarVM.CurrentBranch,
             () => string.IsNullOrEmpty(SelectedRemote) ? Remotes.FirstOrDefault() : SelectedRemote);
-        SearchVM = new SearchViewModel(_gitBackend, () => CommitListVM.AllCommits);
+        SearchVM = new SearchViewModel(_gitBackend, _windowService, () => CommitListVM.AllCommits);
 
         // Update ops log badge whenever the log changes
         _opsLogService.Changed += (_, _) =>
@@ -141,7 +169,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public string WindowTitle =>
         string.IsNullOrWhiteSpace(TitleBarVM.RepositoryName)
             ? "Gitster"
-            : $"{TitleBarVM.RepositoryName} \u00b7 {TitleBarVM.CurrentBranch} \u2013 Gitster";
+            : $"{TitleBarVM.RepositoryName}";
 
     public ObservableCollection<RecentRepoEntry> RecentRepos => _recentRepos.Entries;
 
@@ -222,7 +250,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 InitialDirectory = initialDirectory
             };
 
-            if (dialog.ShowDialog() == true)
+            if (_windowService.ShowDialog(dialog) == true)
             {
                 FolderPath = dialog.FolderName;
                 _recentRepos.Record(dialog.FolderName);
@@ -230,7 +258,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error opening folder dialog: {ex.Message}");
+            _windowService.Error($"Error opening folder dialog: {ex.Message}", "Gitster");
         }
     }
 
@@ -285,11 +313,8 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private void OpenOperationsLog()
     {
-        var window = new OperationsLogWindow(_opsLogService, TitleBarVM.RepositoryName)
-        {
-            Owner = Application.Current.MainWindow
-        };
-        window.ShowDialog();
+        var window = new OperationsLogWindow(_opsLogService, TitleBarVM.RepositoryName);
+        _windowService.ShowDialog(window);
     }
 
     [RelayCommand]
@@ -297,16 +322,16 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         if (string.IsNullOrWhiteSpace(Path)) return;
         var vm = new RepositorySettingsViewModel(Path);
-        var window = new RepositorySettingsWindow(vm) { Owner = Application.Current.MainWindow };
-        window.ShowDialog();
+        var window = new RepositorySettingsWindow(vm);
+        _windowService.ShowDialog(window);
     }
 
     [RelayCommand]
     private void OpenAuthorRepair()
     {
-        var vm = new AuthorRepairViewModel(_gitBackend, _authorDirService.Authors);
-        var window = new Views.AuthorRepairDialog(vm) { Owner = Application.Current.MainWindow };
-        window.ShowDialog();
+        var vm = new AuthorRepairViewModel(_gitBackend, _authorDirService.Authors, _windowService);
+        var window = new Views.AuthorRepairDialog(vm);
+        _windowService.ShowDialog(window);
     }
 
     [RelayCommand]
@@ -318,9 +343,9 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             var beforeSha = await _gitBackend.GetHeadShaAsync();
             var vm = new RangeTimestampViewModel(_gitBackend, CommitListVM.AllCommits.ToList());
-            var window = new Views.RangeTimestampDialog(vm) { Owner = Application.Current.MainWindow };
+            var window = new Views.RangeTimestampDialog(vm);
 
-            if (window.ShowDialog() == true)
+            if (_windowService.ShowDialog(window) == true)
             {
                 var afterSha = await _gitBackend.GetHeadShaAsync();
                 var branchName = TitleBarVM.CurrentBranch;
@@ -344,7 +369,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error rewriting timestamps: {ex.Message}");
+            _windowService.Error($"Error rewriting timestamps: {ex.Message}", "Gitster");
         }
     }
 
@@ -360,9 +385,9 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private void ManageTools()
     {
-        var vm = new ManageToolsViewModel(_customToolsService);
-        var window = new Views.ManageToolsDialog(vm) { Owner = Application.Current.MainWindow };
-        window.ShowDialog();
+        var vm = new ManageToolsViewModel(_customToolsService, _windowService);
+        var window = new Views.ManageToolsDialog(vm);
+        _windowService.ShowDialog(window);
     }
 
     public async Task RunCustomToolAsync(Gitster.Models.CustomTool tool)
@@ -374,8 +399,7 @@ public partial class MainWindowViewModel : BaseViewModel
             var selected = CommitListVM.SelectedCommit;
             if (selected is null || string.IsNullOrEmpty(selected.FullSha))
             {
-                MessageBox.Show("Select a commit first — this tool needs one.",
-                    tool.Name, MessageBoxButton.OK, MessageBoxImage.Information);
+                _windowService.Info("Select a commit first — this tool needs one.", tool.Name);
                 return;
             }
             revision = selected.FullSha;
@@ -389,9 +413,8 @@ public partial class MainWindowViewModel : BaseViewModel
             {
                 Title  = tool.Name,
                 Prompt = tool.Prompt!,
-                Owner  = Application.Current.MainWindow,
             };
-            if (input.ShowDialog() != true) return;
+            if (_windowService.ShowDialog(input) != true) return;
             args = input.Value;
         }
 
@@ -401,7 +424,7 @@ public partial class MainWindowViewModel : BaseViewModel
         if (!string.IsNullOrEmpty(tool.Confirm))
         {
             var prompt = $"{tool.Confirm}\n\nCommand:\n{command}";
-            if (MessageBox.Show(prompt, tool.Name, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (!_windowService.Confirm(prompt, tool.Name))
                 return;
         }
 
@@ -414,19 +437,15 @@ public partial class MainWindowViewModel : BaseViewModel
                 () => _customToolsService.RunAsync(command),
                 r => r.Success ? "completed" : $"exit {r.ExitCode}");
 
-            var dialog = new Views.ToolResultDialog(tool.Name, result.ExitCode, result.Output)
-            {
-                Owner = Application.Current.MainWindow,
-            };
-            dialog.ShowDialog();
+            var dialog = new Views.ToolResultDialog(tool.Name, result.ExitCode, result.Output);
+            _windowService.ShowDialog(dialog);
 
             // A tool may have changed the repository — refresh.
             await UpdateElementsAsync();
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Tool '{tool.Name}' failed:\n{ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Tool '{tool.Name}' failed:\n{ex.Message}", "Gitster");
         }
     }
 
@@ -447,7 +466,7 @@ public partial class MainWindowViewModel : BaseViewModel
             var editDate = TimestampEditVM.SelectedDate;
             if (editDate == null)
             {
-                MessageBox.Show("Please select a date");
+                _windowService.Warning("Please select a date", "Gitster");
                 return;
             }
 
@@ -490,7 +509,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error amending commit: {ex.Message}");
+            _windowService.Error($"Error amending commit: {ex.Message}", "Gitster");
         }
     }
 
@@ -508,7 +527,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error reading selected commit: {ex.Message}");
+            _windowService.Error($"Error reading selected commit: {ex.Message}", "Gitster");
         }
     }
 
@@ -525,7 +544,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error reading current commit: {ex.Message}");
+            _windowService.Error($"Error reading current commit: {ex.Message}", "Gitster");
         }
     }
 
@@ -540,7 +559,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error fetching: {ex.Message}");
+            _windowService.Error($"Error fetching: {ex.Message}", "Gitster");
         }
     }
 
@@ -555,7 +574,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error pulling: {ex.Message}");
+            _windowService.Error($"Error pulling: {ex.Message}", "Gitster");
         }
     }
 
@@ -573,11 +592,11 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private Task PushForce(string? remoteName)
     {
-        var confirm = MessageBox.Show(
+        var confirm = _windowService.Confirm(
             "Force push (--force) overwrites the remote branch and can destroy commits " +
             "other people rely on.\n\nPrefer \"Push (force-with-lease)\" unless you are certain.\n\nForce push anyway?",
-            "Dangerous: force push", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        return confirm == MessageBoxResult.Yes ? PushWithModeAsync(remoteName, PushMode.Force) : Task.CompletedTask;
+            "Dangerous: force push");
+        return confirm ? PushWithModeAsync(remoteName, PushMode.Force) : Task.CompletedTask;
     }
 
     private async Task PushWithModeAsync(string? remoteName, PushMode mode)
@@ -591,7 +610,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error pushing: {ex.Message}");
+            _windowService.Error($"Error pushing: {ex.Message}", "Gitster");
         }
     }
 
@@ -612,7 +631,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error syncing: {ex.Message}");
+            _windowService.Error($"Error syncing: {ex.Message}", "Gitster");
         }
     }
 

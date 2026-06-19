@@ -16,6 +16,7 @@ public partial class UndoBarViewModel : BaseViewModel
     private readonly OperationsLogService _opsLog;
     private readonly IGitBackend _git;
     private readonly OperationFeedbackService _feedback;
+    private readonly IWindowService _windowService;
     private DispatcherTimer? _timer;
 
     [ObservableProperty]
@@ -24,11 +25,12 @@ public partial class UndoBarViewModel : BaseViewModel
     [ObservableProperty]
     public partial string LastOperationText { get; set; } = "No operations yet";
 
-    public UndoBarViewModel(OperationsLogService opsLog, IGitBackend git, OperationFeedbackService feedback)
+    public UndoBarViewModel(OperationsLogService opsLog, IGitBackend git, OperationFeedbackService feedback, IWindowService? windowService = null)
     {
         _opsLog = opsLog;
         _git = git;
         _feedback = feedback;
+        _windowService = windowService ?? new WindowService();
 
         _opsLog.Changed += (_, _) =>
         {
@@ -87,7 +89,7 @@ public partial class UndoBarViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Undo preparation failed: {ex.Message}", "Undo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning($"Undo preparation failed: {ex.Message}", "Undo");
             return;
         }
 
@@ -97,8 +99,8 @@ public partial class UndoBarViewModel : BaseViewModel
             bool replayOnTop = false;
             if (ready.WouldDiscard.Count > 0)
             {
-                var dialog = new UndoConfirmationDialog(ready) { Owner = Application.Current.MainWindow };
-                if (dialog.ShowDialog() != true) return;
+                var dialog = new UndoConfirmationDialog(ready);
+                if (_windowService.ShowDialog(dialog) != true) return;
                 replayOnTop = dialog.ReplayOnTop;
             }
 
@@ -111,23 +113,23 @@ public partial class UndoBarViewModel : BaseViewModel
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Undo failed: {ex.Message}", "Undo", MessageBoxButton.OK, MessageBoxImage.Error);
+                _windowService.Error($"Undo failed: {ex.Message}", "Undo");
             }
         }
         else if (plan is UndoPlan.NotAvailable na)
         {
-            MessageBox.Show(na.Reason, "Cannot undo", MessageBoxButton.OK, MessageBoxImage.Information);
+            _windowService.Info(na.Reason, "Cannot undo");
         }
         else if (plan is UndoPlan.Expired exp)
         {
-            MessageBox.Show(exp.Reason, "Undo expired", MessageBoxButton.OK, MessageBoxImage.Information);
+            _windowService.Info(exp.Reason, "Undo expired");
         }
     }
 
     [RelayCommand]
     private void OpenLog()
     {
-        var window = new OperationsLogWindow(_opsLog, string.Empty) { Owner = Application.Current.MainWindow };
-        window.ShowDialog();
+        var window = new OperationsLogWindow(_opsLog, string.Empty);
+        _windowService.ShowDialog(window);
     }
 }

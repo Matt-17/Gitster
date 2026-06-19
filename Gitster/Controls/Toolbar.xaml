@@ -14,10 +14,110 @@
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-        <Style x:Key="DropItemButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Style x:Key="RepoPinButton" TargetType="Button">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.45"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{StaticResource AccentBlueBackground}"/>
+                                <Setter Property="Opacity" Value="1"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="#B8D8F2"/>
+                            </Trigger>
+
+                            <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                <Setter Property="Opacity" Value="1"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RepoPinIcon" TargetType="Path">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+            <Setter Property="StrokeThickness" Value="1.4"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+            <Setter Property="StrokeStartLineCap" Value="Round"/>
+            <Setter Property="StrokeEndLineCap" Value="Round"/>
+            <Setter Property="Fill" Value="Transparent"/>
+            <Setter Property="Data"
+            Value="M16,9 L16,4 L17,3 L17,2 L7,2 L7,3 L8,4 L8,9 L6,11 L6,12 L11.2,12 L11.2,19 L12.8,19 L12.8,12 L18,12 L18,11 Z"/>
+
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                    <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                    <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="DropItemButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="4">
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{StaticResource AccentBlueBackground}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="#B8D8F2"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- A pinned/recent repo row: name + path (opens repo) and a pin toggle -->
@@ -29,34 +129,20 @@
                 </Grid.ColumnDefinitions>
                 <Button Grid.Column="0" Style="{StaticResource DropItemButton}" Click="ClosePopup"
                         Command="{Binding DataContext.OpenRepoCommand, ElementName=Root}"
-                        CommandParameter="{Binding FullPath}" ToolTip="{Binding FullPath}">
+                        CommandParameter="{Binding FullPath}" ToolTip="{Binding FullPath}" ToolTipService.Placement="Bottom">
                     <StackPanel>
                         <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimary}"
                                    FontWeight="Medium" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding DisplayPath}" Foreground="{StaticResource TextSecondary}"
+                        <TextBlock Text="{Binding DisplayPath}" Foreground="{StaticResource TextSecondary}" Opacity="0.6"
                                    FontFamily="{StaticResource FontFamilyMono}" FontSize="10" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="1" Width="26" Height="26" Padding="5" Background="Transparent"
-                        BorderThickness="0" Cursor="Hand"
+                <Button Grid.Column="1"
+                        Style="{StaticResource RepoPinButton}"
                         Command="{Binding DataContext.TitleBarVM.TogglePinRepoCommand, ElementName=Root}"
-                        CommandParameter="{Binding FullPath}" ToolTip="{Binding PinTooltip}">
-                    <Path Width="13" Height="13" Stretch="Uniform"
-                          Data="M8,1 L12,5 L10,7 L12,10 L10,12 L7,9 L3,13 L1,11 L5,7 L2,4 L4,2 L7,5 Z"
-                          StrokeThickness="1.2" StrokeLineJoin="Round">
-                        <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
-                                <Setter Property="Fill" Value="Transparent"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
-                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Path.Style>
-                    </Path>
+                        CommandParameter="{Binding FullPath}"
+                        ToolTip="{Binding PinTooltip}">
+                    <Path Style="{StaticResource RepoPinIcon}"/>
                 </Button>
             </Grid>
         </DataTemplate>
@@ -139,7 +225,7 @@
                                       Visibility="{Binding TitleBarVM.HasRecentOnly, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <Separator Margin="4,4"/>
-                        <Button Style="{StaticResource DropItemButton}" Click="ClosePopup"
+                        <Button Style="{StaticResource DropItemButton}" Click="ClosePopup" HorizontalContentAlignment="Stretch"
                                 Command="{Binding BrowseFolderCommand}">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Right" Text="Ctrl+O" Foreground="{StaticResource TextTertiary}" FontSize="11"/>
@@ -212,7 +298,7 @@
                                 Padding="10,0" Cursor="Hand" VerticalContentAlignment="Center">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Push" VerticalAlignment="Center"/>
-                                <Border Background="{StaticResource AccentWarning}" CornerRadius="8" Padding="5,0" Margin="6,0,0,0"
+                                <Border Background="{StaticResource AccentWarning}" CornerRadius="8" Height="8" Width="8" Padding="0" Margin="6,2,0,0"
                                         Visibility="{Binding TitleBarVM.HasOutgoing, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <TextBlock Text="{Binding TitleBarVM.OutgoingCount}" Foreground="White" FontSize="10" VerticalAlignment="Center"/>
                                 </Border>
@@ -264,8 +350,8 @@
                         <Path Stretch="Uniform" Width="14" Height="14" Stroke="{StaticResource TextSecondary}"
                               StrokeThickness="1.5" Fill="Transparent"
                               Data="M3,10 a7,7 0 0,1 14,0 M17,10 L14,7 M17,10 L20,7 M17,10 a7,7 0 0,1 -14,0 M3,10 L6,13 M3,10 L0,13"/>
-                        <Ellipse Width="5" Height="5" Fill="{StaticResource AccentSuccess}"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource AccentSuccess}"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,0,0"
                                  Visibility="{Binding TitleBarVM.AutoFetchEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </Grid>
                 </ToggleButton>

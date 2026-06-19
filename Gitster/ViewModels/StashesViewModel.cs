@@ -67,6 +67,7 @@ public partial class StashesViewModel : BaseViewModel
     private readonly OperationsLogService  _opsLogService;
     private readonly SnapshotService       _snapshotService;
     private readonly StashNameService      _nameService;
+    private readonly IWindowService        _windowService;
     private readonly Func<Task>            _onStashesChanged;
 
     private List<StashItem> _allStashes = [];
@@ -101,6 +102,7 @@ public partial class StashesViewModel : BaseViewModel
         OperationsLogService opsLogService,
         SnapshotService snapshotService,
         StashNameService nameService,
+        IWindowService? windowService,
         Func<Task> onStashesChanged)
     {
         _git              = git;
@@ -108,6 +110,7 @@ public partial class StashesViewModel : BaseViewModel
         _opsLogService    = opsLogService;
         _snapshotService  = snapshotService;
         _nameService      = nameService;
+        _windowService    = windowService ?? new WindowService();
         _onStashesChanged = onStashesChanged;
     }
 
@@ -182,8 +185,8 @@ public partial class StashesViewModel : BaseViewModel
     [RelayCommand]
     private async Task NewStash()
     {
-        var dialog = new NewStashDialog { Owner = Application.Current.MainWindow };
-        if (dialog.ShowDialog() != true) return;
+        var dialog = new NewStashDialog();
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         try
         {
@@ -194,7 +197,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Stash failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Stash failed");
         }
     }
 
@@ -211,7 +214,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Apply failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Apply failed");
         }
     }
 
@@ -244,7 +247,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Pop failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Pop failed");
         }
     }
 
@@ -253,7 +256,7 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        var confirm = MessageBox.Show(
+        var confirm = _windowService.ShowMessage(
             $"Drop \"{stash.DisplayName}\" ({stash.Ref})?\n\n" +
             "Dropped stashes cannot be recovered from the reflog easily.",
             "Drop stash",
@@ -287,7 +290,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Drop failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Drop failed");
         }
     }
 
@@ -301,9 +304,8 @@ public partial class StashesViewModel : BaseViewModel
             Title  = "Rename stash",
             Prompt = "New name (leave empty to reset to auto-name):",
             Value  = stash.UserName,
-            Owner  = Application.Current.MainWindow,
         };
-        if (dialog.ShowDialog() != true) return;
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         await _nameService.SetNameAsync(stash.CommitSha, dialog.Value.Trim());
         await LoadAsync(); // rebuilds display names
@@ -319,15 +321,13 @@ public partial class StashesViewModel : BaseViewModel
             Title  = "Convert stash to branch",
             Prompt = "New branch name:",
             Value  = stash.SlugName,
-            Owner  = Application.Current.MainWindow,
         };
-        if (dialog.ShowDialog() != true) return;
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         var branchName = dialog.Value.Trim();
         if (string.IsNullOrEmpty(branchName))
         {
-            MessageBox.Show("Branch name cannot be empty.",
-                "Convert to branch", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning("Branch name cannot be empty.", "Convert to branch");
             return;
         }
 
@@ -353,16 +353,14 @@ public partial class StashesViewModel : BaseViewModel
             await LoadAsync();
             await _onStashesChanged();
 
-            MessageBox.Show(
+            _windowService.Info(
                 $"Created branch '{branchName}' from {stash.Ref} and applied the stash.\n\n" +
                 "You are now on the new branch.",
-                "Branch created",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                "Branch created");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Convert failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Convert failed");
         }
     }
 }

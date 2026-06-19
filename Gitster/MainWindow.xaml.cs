@@ -9,13 +9,18 @@ namespace Gitster;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
-    private readonly AppSettingsService _appSettings = new();
+    private readonly IWindowService _windowService;
+    private readonly AppSettingsService _appSettings;
 
-    public MainWindow()
+    public MainWindow(MainWindowViewModel viewModel, IWindowService windowService, AppSettingsService appSettings)
     {
         InitializeComponent();
 
-        _viewModel = new MainWindowViewModel();
+        _viewModel = viewModel;
+        _windowService = windowService;
+        _appSettings = appSettings;
+
+        _windowService.SetOwner(this);
         DataContext = _viewModel;
 
         RestoreWindowSettings();

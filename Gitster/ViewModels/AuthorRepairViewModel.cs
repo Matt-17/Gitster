@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
+using Gitster.Services;
 using Gitster.Services.Git;
 
 namespace Gitster.ViewModels;
@@ -11,6 +12,7 @@ namespace Gitster.ViewModels;
 public partial class AuthorRepairViewModel : BaseViewModel
 {
     private readonly IGitBackend _git;
+    private readonly IWindowService _windowService;
 
     public event Action? RewriteCompleted;
 
@@ -38,9 +40,10 @@ public partial class AuthorRepairViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool IsRewriteEnabled { get; set; }
 
-    public AuthorRepairViewModel(IGitBackend git, IEnumerable<AuthorEntry> authors)
+    public AuthorRepairViewModel(IGitBackend git, IEnumerable<AuthorEntry> authors, IWindowService? windowService = null)
     {
         _git = git;
+        _windowService = windowService ?? new WindowService();
         Authors = new ObservableCollection<AuthorEntry>(authors);
     }
 
@@ -111,9 +114,7 @@ public partial class AuthorRepairViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show(
-                $"Error rewriting commits: {ex.Message}", "Gitster",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            _windowService.Error($"Error rewriting commits: {ex.Message}", "Gitster");
         }
     }
 }

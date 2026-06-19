@@ -12,6 +12,7 @@ namespace Gitster.ViewModels;
 public partial class ManageToolsViewModel : BaseViewModel
 {
     private readonly CustomToolsService _service;
+    private readonly IWindowService _windowService;
 
     public ObservableCollection<CustomTool> Tools { get; } = [];
 
@@ -31,9 +32,10 @@ public partial class ManageToolsViewModel : BaseViewModel
 
     public bool HasSelection => SelectedTool != null;
 
-    public ManageToolsViewModel(CustomToolsService service)
+    public ManageToolsViewModel(CustomToolsService service, IWindowService? windowService = null)
     {
         _service = service;
+        _windowService = windowService ?? new WindowService();
         // Repository scope only if a repo is open; otherwise default to global.
         IsRepoScope = false;
         ReloadFromDisk();
@@ -74,12 +76,12 @@ public partial class ManageToolsViewModel : BaseViewModel
     {
         if (string.IsNullOrWhiteSpace(Name))
         {
-            MessageBox.Show("Give the tool a name.", "Manage tools", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning("Give the tool a name.", "Manage tools");
             return;
         }
         if (string.IsNullOrWhiteSpace(Command))
         {
-            MessageBox.Show("Enter the command to run.", "Manage tools", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning("Enter the command to run.", "Manage tools");
             return;
         }
 
@@ -110,7 +112,7 @@ public partial class ManageToolsViewModel : BaseViewModel
     {
         if (SelectedTool is not { } sel) return;
 
-        var confirm = MessageBox.Show($"Delete tool '{sel.Name}'?", "Manage tools",
+        var confirm = _windowService.ShowMessage($"Delete tool '{sel.Name}'?", "Manage tools",
             MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes) return;
 
@@ -131,7 +133,7 @@ public partial class ManageToolsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Save failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Save failed");
             return;
         }
         ReloadFromDisk();
