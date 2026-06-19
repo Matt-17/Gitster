@@ -56,6 +56,7 @@ public partial class CommitPanelViewModel : BaseViewModel
     private readonly OperationsLogService _opsLog;
     private readonly SnapshotService _snapshots;
     private readonly AuthorDirectoryService _authorDir;
+    private readonly IWindowService _windowService;
     private readonly Func<Task> _onChanged;
     private readonly Func<string> _getBranch;
     private readonly Func<string?> _getRemote;
@@ -71,6 +72,7 @@ public partial class CommitPanelViewModel : BaseViewModel
         OperationsLogService opsLog,
         SnapshotService snapshots,
         AuthorDirectoryService authorDir,
+        IWindowService? windowService,
         Func<Task> onChanged,
         Func<string> getBranch,
         Func<string?> getRemote)
@@ -80,6 +82,7 @@ public partial class CommitPanelViewModel : BaseViewModel
         _opsLog = opsLog;
         _snapshots = snapshots;
         _authorDir = authorDir;
+        _windowService = windowService ?? new WindowService();
         _onChanged = onChanged;
         _getBranch = getBranch;
         _getRemote = getRemote;
@@ -159,7 +162,7 @@ public partial class CommitPanelViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Stage failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Stage failed");
         }
     }
 
@@ -180,8 +183,8 @@ public partial class CommitPanelViewModel : BaseViewModel
     [RelayCommand]
     private void EditAuthor()
     {
-        var dialog = new Views.EditAuthorsDialog(_authorDir) { Owner = Application.Current.MainWindow };
-        if (dialog.ShowDialog() == true)
+        var dialog = new Views.EditAuthorsDialog(_authorDir);
+        if (_windowService.ShowDialog(dialog) == true)
         {
             _authorText = dialog.SelectedAuthorText;
             _committerText = dialog.SelectedCommitterText;
@@ -195,7 +198,7 @@ public partial class CommitPanelViewModel : BaseViewModel
     private async Task StageAll()
     {
         try { await _git.StageAllAsync(); await LoadAsync(); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Stage failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex) { _windowService.Warning(ex.Message, "Stage failed"); }
     }
 
     [RelayCommand]
@@ -206,7 +209,7 @@ public partial class CommitPanelViewModel : BaseViewModel
             await _git.UnstageAsync(Staged.Select(f => f.Path).ToList());
             await LoadAsync();
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Unstage failed", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex) { _windowService.Warning(ex.Message, "Unstage failed"); }
     }
 
     [RelayCommand(CanExecute = nameof(CanCommit))]
@@ -282,7 +285,7 @@ public partial class CommitPanelViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Commit failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Commit failed");
         }
         finally
         {
@@ -317,7 +320,7 @@ public partial class CommitPanelViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Stash failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Stash failed");
         }
     }
 

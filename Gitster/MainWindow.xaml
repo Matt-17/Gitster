@@ -155,8 +155,8 @@
 
                 <!-- App + repo identity (muted, right of center) -->
                 <TextBlock Grid.Column="2" Text="{Binding WindowTitle}" VerticalAlignment="Center"
-                           HorizontalAlignment="Right" Margin="12,0"
-                           Foreground="#CCFFFFFF" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                           HorizontalAlignment="left" Margin="24,0"
+                           Foreground="#66FFFFFF" FontSize="12" TextTrimming="CharacterEllipsis"/>
 
                 <!-- Window controls -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">

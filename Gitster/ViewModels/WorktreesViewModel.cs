@@ -34,6 +34,7 @@ public partial class WorktreesViewModel : BaseViewModel
     private readonly IGitBackend              _git;
     private readonly OperationFeedbackService _feedback;
     private readonly SnapshotService          _snapshots;
+    private readonly IWindowService           _windowService;
     private readonly Func<string>             _getCurrentPath;
     private readonly Action<string>           _openInGitster;
 
@@ -65,12 +66,14 @@ public partial class WorktreesViewModel : BaseViewModel
         IGitBackend              git,
         OperationFeedbackService feedback,
         SnapshotService          snapshots,
+        IWindowService?          windowService,
         Func<string>             getCurrentPath,
         Action<string>           openInGitster)
     {
         _git            = git;
         _feedback       = feedback;
         _snapshots      = snapshots;
+        _windowService  = windowService ?? new WindowService();
         _getCurrentPath = getCurrentPath;
         _openInGitster  = openInGitster;
     }
@@ -118,8 +121,8 @@ public partial class WorktreesViewModel : BaseViewModel
     [RelayCommand]
     private async Task Add()
     {
-        var dialog = new AddWorktreeDialog(_getCurrentPath()) { Owner = Application.Current.MainWindow };
-        if (dialog.ShowDialog() != true) return;
+        var dialog = new AddWorktreeDialog(_getCurrentPath());
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         try
         {
@@ -130,7 +133,7 @@ public partial class WorktreesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Add worktree failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Add worktree failed");
         }
     }
 
@@ -140,12 +143,11 @@ public partial class WorktreesViewModel : BaseViewModel
         if (SelectedWorktree is not { } w) return;
         if (!Directory.Exists(w.Path))
         {
-            MessageBox.Show("That worktree directory no longer exists.",
-                "Open folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning("That worktree directory no longer exists.", "Open folder");
             return;
         }
         try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{w.Path}\"") { UseShellExecute = true }); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Open folder", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex) { _windowService.Warning(ex.Message, "Open folder"); }
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenInGitster))]
@@ -154,8 +156,7 @@ public partial class WorktreesViewModel : BaseViewModel
         if (SelectedWorktree is not { } w) return;
         if (!Directory.Exists(w.Path))
         {
-            MessageBox.Show("That worktree directory no longer exists.",
-                "Open in Gitster", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning("That worktree directory no longer exists.", "Open in Gitster");
             return;
         }
         _openInGitster(w.Path);
@@ -166,7 +167,7 @@ public partial class WorktreesViewModel : BaseViewModel
     {
         if (SelectedWorktree is not { } w) return;
 
-        var confirm = MessageBox.Show(
+        var confirm = _windowService.ShowMessage(
             $"Remove the worktree at:\n{w.Path}\n\n" +
             "This deletes the working directory (the branch itself is kept).",
             "Remove worktree", MessageBoxButton.YesNo, MessageBoxImage.Warning);
@@ -181,7 +182,7 @@ public partial class WorktreesViewModel : BaseViewModel
         catch (Exception)
         {
             // Likely dirty/locked — offer a forced removal.
-            var force = MessageBox.Show(
+            var force = _windowService.ShowMessage(
                 "The worktree could not be removed cleanly (it may have uncommitted changes or be locked).\n\n" +
                 "Force removal?",
                 "Remove worktree", MessageBoxButton.YesNo, MessageBoxImage.Warning);
@@ -194,7 +195,7 @@ public partial class WorktreesViewModel : BaseViewModel
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message, "Remove failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _windowService.Warning(ex.Message, "Remove failed");
             }
         }
     }
@@ -207,7 +208,7 @@ public partial class WorktreesViewModel : BaseViewModel
             ? string.Join("\n", prunable)
             : "(stale administrative entries)";
 
-        var confirm = MessageBox.Show(
+        var confirm = _windowService.ShowMessage(
             $"Prune stale worktree entries?\n\n{preview}",
             "Prune worktrees", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes) return;
@@ -219,7 +220,7 @@ public partial class WorktreesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "Prune failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Prune failed");
         }
     }
 }

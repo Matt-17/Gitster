@@ -41,14 +41,17 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="10,4,6,4"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter VerticalAlignment="Center"/>
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -69,8 +72,9 @@
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="4"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -89,15 +93,20 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="4">
-                            <ContentPresenter/>
+                                CornerRadius="4"
+                                HorizontalAlignment="Stretch">
+                            <ContentPresenter
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
+
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsActive}" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#E8F3FC"/>
@@ -293,6 +302,7 @@
                                 </Border.Effect>
                                 <Grid>
                                     <ListBox x:Name="RecentRepositoriesList"
+                                             HorizontalContentAlignment="Stretch"
                                              ItemsSource="{Binding RecentRepositoryItems}"
                                              SelectedItem="{Binding SelectedRecentRepository, Mode=TwoWay}"
                                              ItemContainerStyle="{StaticResource RecentRepoListBoxItem}"
@@ -308,7 +318,9 @@
                                         </ListBox.InputBindings>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Height="36">
+                                                <Grid Height="36"
+                                                      HorizontalAlignment="Stretch"
+                                                      Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ListBox}}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="4"/>
                                                         <ColumnDefinition Width="*"/>
@@ -326,20 +338,26 @@
                                                             Style="{StaticResource RecentRepoTextButton}"
                                                             Command="{Binding DataContext.OpenRecentRepoCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                             CommandParameter="{Binding FullPath}"
-                                                            Focusable="False"
+                                                            Focusable="False"          
                                                             ToolTip="{Binding FullPath}">
-                                                        <Grid>
+                                                        <Grid HorizontalAlignment="Stretch">
                                                             <Grid.RowDefinitions>
                                                                 <RowDefinition Height="Auto"/>
                                                                 <RowDefinition Height="Auto"/>
                                                             </Grid.RowDefinitions>
+
                                                             <TextBlock Text="{Binding DisplayName}"
+                                                                       TextAlignment="Left"
+                                                                       HorizontalAlignment="Stretch"
                                                                        Foreground="{StaticResource TextPrimary}"
                                                                        FontWeight="SemiBold"
                                                                        FontSize="12"
                                                                        TextTrimming="CharacterEllipsis"/>
+
                                                             <TextBlock Grid.Row="1"
                                                                        Text="{Binding DisplayPath}"
+                                                                       TextAlignment="Left"
+                                                                       HorizontalAlignment="Stretch"
                                                                        Foreground="{StaticResource TextSecondary}"
                                                                        FontFamily="{StaticResource FontFamilyMono}"
                                                                        FontSize="10"

@@ -1,11 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
+using Gitster.Services;
 using Gitster.Services.Git;
 using Gitster.Services.Search;
 
@@ -22,12 +22,14 @@ public enum SearchKind { Commits, Pickaxe, DiffRegex, Blame, RangeDiff, CompareR
 public partial class SearchViewModel : BaseViewModel
 {
     private readonly IGitBackend _git;
+    private readonly IWindowService _windowService;
     private readonly Func<IReadOnlyList<CommitItem>> _getLoadedCommits;
     private CancellationTokenSource? _cts;
 
-    public SearchViewModel(IGitBackend git, Func<IReadOnlyList<CommitItem>> getLoadedCommits)
+    public SearchViewModel(IGitBackend git, IWindowService? windowService, Func<IReadOnlyList<CommitItem>> getLoadedCommits)
     {
         _git = git;
+        _windowService = windowService ?? new WindowService();
         _getLoadedCommits = getLoadedCommits;
     }
 
@@ -137,7 +139,7 @@ public partial class SearchViewModel : BaseViewModel
         catch (Exception ex)
         {
             StatusText = "Search failed";
-            MessageBox.Show(ex.Message, "Search", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning(ex.Message, "Search");
         }
         finally { IsBusy = false; }
     }
@@ -165,8 +167,7 @@ public partial class SearchViewModel : BaseViewModel
         catch (ArgumentException ex)
         {
             StatusText = "Invalid regex";
-            MessageBox.Show($"Invalid regular expression:\n{ex.Message}", "Diff regex",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            _windowService.Warning($"Invalid regular expression:\n{ex.Message}", "Diff regex");
             return;
         }
         var hits = await _git.DiffRegexSearchAsync(QueryText, NullIfBlank(PathFilter), ct);
@@ -177,7 +178,7 @@ public partial class SearchViewModel : BaseViewModel
     {
         if (string.IsNullOrWhiteSpace(BlameFilePath))
         {
-            MessageBox.Show("Pick a file to blame first.", "Blame", MessageBoxButton.OK, MessageBoxImage.Information);
+            _windowService.Info("Pick a file to blame first.", "Blame");
             return;
         }
         var lines = await _git.BlameAsync(BlameFilePath, BlameIgnoreWhitespace, BlameFollowMoves, ct);
@@ -198,7 +199,7 @@ public partial class SearchViewModel : BaseViewModel
     {
         if (string.IsNullOrWhiteSpace(BaseRef) || string.IsNullOrWhiteSpace(CompareRef))
         {
-            MessageBox.Show("Enter both refs to compare.", "Compare refs", MessageBoxButton.OK, MessageBoxImage.Information);
+            _windowService.Info("Enter both refs to compare.", "Compare refs");
             return;
         }
         var result = await _git.CompareRefsAsync(BaseRef.Trim(), CompareRef.Trim(), ThreeDot, ct);
@@ -215,8 +216,7 @@ public partial class SearchViewModel : BaseViewModel
         var prior = await _git.GetPriorTipFromReflogAsync();
         if (string.IsNullOrEmpty(prior))
         {
-            MessageBox.Show("No prior HEAD position found in the reflog.", "Range-diff",
-                MessageBoxButton.OK, MessageBoxImage.Information);
+            _windowService.Info("No prior HEAD position found in the reflog.", "Range-diff");
             return;
         }
         Range1 = prior;
@@ -231,7 +231,7 @@ public partial class SearchViewModel : BaseViewModel
             Title = "Pick a file to blame",
             InitialDirectory = _git.RepositoryPath,
         };
-        if (dialog.ShowDialog() != true) return;
+        if (_windowService.ShowDialog(dialog) != true) return;
 
         var root = _git.RepositoryPath?.TrimEnd('\\', '/');
         var picked = dialog.FileName;

@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,6 +15,7 @@ public partial class AuthorPanelViewModel : BaseViewModel
 {
     private readonly IGitBackend? _git;
     private readonly AuthorDirectoryService _authorDir;
+    private readonly IWindowService _windowService;
 
     [ObservableProperty]
     public partial ObservableCollection<AuthorEntry> Authors { get; set; } = [];
@@ -34,10 +34,11 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool IsApplyEnabled { get; set; }
 
-    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir)
+    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir, IWindowService? windowService = null)
     {
         _git = git;
         _authorDir = authorDir;
+        _windowService = windowService ?? new WindowService();
         Authors = authorDir.Authors;
         authorDir.PropertyChanged += (_, e) =>
         {
@@ -102,16 +103,15 @@ public partial class AuthorPanelViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error amending author: {ex.Message}", "Gitster",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            _windowService.Error($"Error amending author: {ex.Message}", "Gitster");
         }
     }
 
     [RelayCommand]
     private void AddAuthor()
     {
-        var dialog = new AddAuthorDialog { Owner = Application.Current.MainWindow };
-        if (dialog.ShowDialog() == true && dialog.Result is { } entry)
+        var dialog = new AddAuthorDialog();
+        if (_windowService.ShowDialog(dialog) == true && dialog.Result is { } entry)
         {
             _authorDir.Authors.Add(entry);
             AuthorText = entry.DisplayName;
@@ -121,11 +121,8 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [RelayCommand]
     private void OpenEditAuthors()
     {
-        var dialog = new Views.EditAuthorsDialog(_authorDir)
-        {
-            Owner = Application.Current.MainWindow
-        };
-        if (dialog.ShowDialog() == true)
+        var dialog = new Views.EditAuthorsDialog(_authorDir);
+        if (_windowService.ShowDialog(dialog) == true)
         {
             AuthorText    = dialog.SelectedAuthorText;
             CommitterText = dialog.SelectedCommitterText;
