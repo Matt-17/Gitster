@@ -551,6 +551,7 @@ public sealed class LibGit2Backend : IGitBackend
     public Task AmendAuthorAsync(AmendAuthorRequest request)
     {
         using var repo = OpenRepository();
+        EnsureAttachedHead(repo, "amend commits");
 
         var commit = repo.Head.Tip ?? throw new InvalidOperationException("No HEAD commit.");
 
@@ -569,15 +570,17 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.CompletedTask;
     }
 
-    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites)
+    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null)
     {
         using var repo = OpenRepository();
+        var branch = AttachBranchForHistoryRewrite(repo, branchName, "rewrite commits");
+        var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
 
         // Collect all commits oldest-first for deterministic parent mapping
         var allCommits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
         {
             SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
-            IncludeReachableFrom = repo.Head,
+            IncludeReachableFrom = branchTip,
         }).ToList();
         allCommits.Reverse(); // oldest-first
 
@@ -640,10 +643,9 @@ public sealed class LibGit2Backend : IGitBackend
             mapping[oldCommit.Id.Sha] = newCommit;
         }
 
-        if (anyChanged && repo.Head.Tip != null &&
-            mapping.TryGetValue(repo.Head.Tip.Id.Sha, out var newHead))
+        if (anyChanged && mapping.TryGetValue(branchTip.Id.Sha, out var newHead))
         {
-            repo.Refs.UpdateTarget(repo.Head.Reference, newHead.Id);
+            repo.Refs.UpdateTarget(branch.Reference, newHead.Id, "rewrite commits");
         }
 
         HeadChanged?.Invoke(this, EventArgs.Empty);
@@ -653,6 +655,7 @@ public sealed class LibGit2Backend : IGitBackend
     public Task<string> AmendAsync(AmendRequest request)
     {
         using var repo = OpenRepository();
+        EnsureAttachedHead(repo, "amend commits");
 
         var commit = repo.Head.Tip ?? throw new InvalidOperationException("No HEAD commit.");
         var offset = DateTimeOffset.Now.Offset;
@@ -726,16 +729,102 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.FromResult("HEAD@{1}");
     }
 
-    public Task ResetHardAsync(string targetReference)
+    public Task ResetHardAsync(string targetReference, string? branchName = null)
+        => ResetAsync(targetReference, ResetMode.Hard, branchName);
+
+    public Task ResetMixedAsync(string targetReference, string? branchName = null)
+        => ResetAsync(targetReference, ResetMode.Mixed, branchName);
+
+    private Task ResetAsync(string targetReference, ResetMode mode, string? branchName)
     {
         using var repo = OpenRepository();
         var commit = repo.Lookup<Commit>(targetReference)
             ?? throw new InvalidOperationException($"Target reference not found: {targetReference}");
 
-        repo.Reset(ResetMode.Hard, commit);
+        AttachBranchForReset(repo, branchName);
+        repo.Reset(mode, commit);
         HeadChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
     }
+
+    private static void AttachBranchForReset(Repository repo, string? branchName)
+    {
+        if (string.IsNullOrWhiteSpace(branchName) || IsDetachedBranchLabel(branchName))
+            return;
+
+        var branch = repo.Branches[branchName];
+        if (branch is null || branch.IsRemote)
+        {
+            if (repo.Info.IsHeadDetached)
+                throw new InvalidOperationException(
+                    $"Cannot reset while HEAD is detached because branch '{branchName}' was not found.");
+            return;
+        }
+
+        if (branch.IsCurrentRepositoryHead)
+            return;
+
+        if (repo.Info.IsHeadDetached && repo.Head.Tip is { } detachedTip &&
+            branch.Tip?.Id != detachedTip.Id)
+        {
+            repo.Refs.UpdateTarget(branch.Reference, detachedTip.Id, "reattach branch before reset");
+            branch = repo.Branches[branchName]
+                ?? throw new InvalidOperationException($"Branch not found after reattach: {branchName}");
+        }
+
+        Commands.Checkout(repo, branch);
+    }
+
+    private static Branch AttachBranchForHistoryRewrite(
+        Repository repo,
+        string? branchName,
+        string operation)
+    {
+        if (!repo.Info.IsHeadDetached)
+            return GetCurrentLocalBranch(repo, operation);
+
+        if (string.IsNullOrWhiteSpace(branchName) || IsDetachedBranchLabel(branchName))
+            throw new InvalidOperationException(
+                $"Cannot {operation} while HEAD is detached. Check out a local branch first.");
+
+        var branch = repo.Branches[branchName];
+        if (branch is null || branch.IsRemote)
+            throw new InvalidOperationException(
+                $"Cannot {operation} while HEAD is detached because branch '{branchName}' was not found.");
+
+        if (repo.Head.Tip is { } detachedTip && branch.Tip?.Id != detachedTip.Id)
+        {
+            repo.Refs.UpdateTarget(branch.Reference, detachedTip.Id, $"reattach branch before {operation}");
+            branch = repo.Branches[branchName]
+                ?? throw new InvalidOperationException($"Branch not found after reattach: {branchName}");
+        }
+
+        Commands.Checkout(repo, branch);
+        return repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Branch not found after checkout: {branchName}");
+    }
+
+    private static Branch GetCurrentLocalBranch(Repository repo, string operation)
+    {
+        EnsureAttachedHead(repo, operation);
+        var branch = repo.Branches[repo.Head.FriendlyName];
+        if (branch is null || branch.IsRemote)
+            throw new InvalidOperationException($"Cannot {operation} because the current branch is not a local branch.");
+
+        return branch;
+    }
+
+    private static void EnsureAttachedHead(Repository repo, string operation)
+    {
+        if (repo.Info.IsHeadDetached)
+            throw new InvalidOperationException(
+                $"Cannot {operation} while HEAD is detached. Check out a local branch first.");
+    }
+
+    private static bool IsDetachedBranchLabel(string branchName) =>
+        branchName.StartsWith("detached @", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(branchName, "(no branch)", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(branchName, "HEAD", StringComparison.OrdinalIgnoreCase);
 
     public Task<string> GetHeadShaAsync()
     {

@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services.Git;
+using Gitster.Services.History;
+using Gitster.Models;
 
 namespace Gitster.ViewModels;
 
@@ -16,12 +18,13 @@ public record TimestampPreviewEntry(
 public partial class RangeTimestampViewModel : ObservableObject
 {
     private readonly IGitBackend _git;
-    private readonly List<CommitItem> _allCommits;
+    private readonly CommitHistoryService _history;
+    private readonly List<CommitItem> _allCommits = [];
 
     public event Action? RewriteCompleted;
 
     [ObservableProperty]
-    public partial ObservableCollection<CommitItem> AllCommits { get; set; }
+    public partial ObservableCollection<CommitItem> AllCommits { get; set; } = [];
 
     [ObservableProperty]
     public partial CommitItem? FromCommit { get; set; }
@@ -30,9 +33,15 @@ public partial class RangeTimestampViewModel : ObservableObject
     public partial CommitItem? ToCommit { get; set; }
 
     [ObservableProperty]
+    public partial bool IsLoading { get; set; } = true;
+
+    [ObservableProperty]
+    public partial string LoadStatusText { get; set; } = "Loading full history...";
+
+    [ObservableProperty]
     public partial bool ShiftEarlier { get; set; } = true;
 
-    /// <summary>Inverse of <see cref="ShiftEarlier"/> — used for the "Later" radio button binding.</summary>
+    /// <summary>Inverse of <see cref="ShiftEarlier"/> - used for the "Later" radio button binding.</summary>
     public bool ShiftLater
     {
         get => !ShiftEarlier;
@@ -68,16 +77,45 @@ public partial class RangeTimestampViewModel : ObservableObject
         ? "Rewrite 1 commit"
         : $"Rewrite {Preview.Count} commits";
 
-    public RangeTimestampViewModel(IGitBackend git, List<CommitItem> commits)
+    public RangeTimestampViewModel(IGitBackend git, CommitHistoryService history)
     {
         _git = git;
-        _allCommits = commits;
-        AllCommits = new ObservableCollection<CommitItem>(commits);
+        _history = history;
+        _ = LoadAsync();
+    }
 
-        if (commits.Count > 0)
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        LoadStatusText = "Loading full history...";
+        var progress = new Progress<RepositoryLoadProgress>(p =>
+            LoadStatusText = string.IsNullOrWhiteSpace(p.CounterText)
+                ? p.Stage
+                : $"{p.Stage} - {p.CounterText}");
+
+        try
         {
-            ToCommit   = commits[0];                              // HEAD (newest)
-            FromCommit = commits[Math.Min(4, commits.Count - 1)]; // HEAD~4 or last
+            var rows = await _history.EnsureCompleteAsync(progress);
+            _allCommits.Clear();
+            _allCommits.AddRange(rows.Select(r => r.ToCommitItem()));
+            AllCommits = new ObservableCollection<CommitItem>(_allCommits);
+
+            if (_allCommits.Count > 0)
+            {
+                ToCommit = _allCommits[0];                              // HEAD (newest)
+                FromCommit = _allCommits[Math.Min(4, _allCommits.Count - 1)]; // HEAD~4 or last
+            }
+
+            LoadStatusText = $"Loaded {_allCommits.Count:N0} commit{(_allCommits.Count == 1 ? "" : "s")}.";
+        }
+        catch (Exception ex)
+        {
+            LoadStatusText = $"Could not load history: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+            RefreshPreview();
         }
     }
 
@@ -102,7 +140,7 @@ public partial class RangeTimestampViewModel : ObservableObject
 
     private void RefreshPreview()
     {
-        if (FromCommit == null || ToCommit == null || Amount <= 0)
+        if (IsLoading || FromCommit == null || ToCommit == null || Amount <= 0)
         {
             Preview = [];
             IsRewriteEnabled = false;
@@ -147,7 +185,7 @@ public partial class RangeTimestampViewModel : ObservableObject
         var rewrites = Preview.Select(p =>
         {
             var offset = DateTimeOffset.Now.Offset;
-            DateTimeOffset? newAuthorDate    = UpdateAuthorTimestamp
+            DateTimeOffset? newAuthorDate = UpdateAuthorTimestamp
                 ? new DateTimeOffset(p.NewDate, offset)
                 : null;
             DateTimeOffset? newCommitterDate = UpdateCommitterTimestamp

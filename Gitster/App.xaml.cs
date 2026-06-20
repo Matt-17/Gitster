@@ -2,6 +2,7 @@
 using Gitster.Services;
 using Gitster.Services.Capabilities;
 using Gitster.Services.Git;
+using Gitster.Services.History;
 using Gitster.Services.OperationsLog;
 using Gitster.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,6 +45,7 @@ public partial class App : Application
 				services.AddSingleton<RepositoryStateService>();
 				services.AddSingleton<OperationFeedbackService>();
 				services.AddSingleton<RecentReposService>();
+				services.AddSingleton<CommitHistoryService>();
 				services.AddSingleton<AuthorDirectoryService>();
 				services.AddSingleton<AutoFetchService>();
 				services.AddSingleton<CapabilityService>();

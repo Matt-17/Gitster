@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Threading;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -8,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
 using Gitster.Services.Capabilities;
 using Gitster.Services.Git;
+using Gitster.Services.History;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
 using Gitster.Views.Helper;
@@ -32,10 +34,20 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedbackService;
     private readonly RecentReposService _recentRepos;
     private readonly AuthorDirectoryService _authorDirService;
+    private readonly CommitHistoryService _historyService;
     private readonly SnapshotService _snapshotService;
     private readonly StashNameService _stashNameService;
     private readonly CustomToolsService _customToolsService;
     private readonly UiPreferencesService _uiPreferences;
+    private CancellationTokenSource? _repoSwitchCts;
+    private int _headRefreshRequestVersion;
+    private bool _headRefreshRequested;
+    private bool _headRefreshWorkerRunning;
+    private readonly SemaphoreSlim _headRefreshGate = new(1, 1);
+    private bool _suppressFolderPathChanged;
+    private bool _isSwitchingRepository;
+    private bool _initialRepositoryLoadStarted;
+    private string? _loadedRepositoryPath;
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -61,6 +73,7 @@ public partial class MainWindowViewModel : BaseViewModel
         OperationFeedbackService feedbackService,
         RecentReposService recentRepos,
         AuthorDirectoryService authorDirService,
+        CommitHistoryService historyService,
         AutoFetchService autoFetch,
         CapabilityService capabilityService,
         OperationsLogService opsLogService,
@@ -79,6 +92,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _feedbackService = feedbackService;
         _recentRepos = recentRepos;
         _authorDirService = authorDirService;
+        _historyService = historyService;
         AutoFetch = autoFetch;
         _opsLogService = opsLogService;
         _snapshotService = snapshotService;
@@ -91,7 +105,7 @@ public partial class MainWindowViewModel : BaseViewModel
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
         StatusBarVM = statusBarViewModel;
-        TitleBarVM = new TitleBarViewModel(BrowseFolder, OpenRepoByPath, AutoFetch, _recentRepos);
+        TitleBarVM = new TitleBarViewModel(() => _ = BrowseFolderAsync(), OpenRepoByPath, AutoFetch, _recentRepos);
         TitleBarVM.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(TitleBarViewModel.RepositoryName) or nameof(TitleBarViewModel.CurrentBranch))
@@ -112,6 +126,16 @@ public partial class MainWindowViewModel : BaseViewModel
             () => CommitListVM.SelectedCommits,
             async () => await UpdateElementsAsync());
         UndoBarVM = undoBarViewModel;
+        UndoBarVM.AfterUndoAsync = async progress =>
+        {
+            ClearPendingHeadRefresh();
+            progress.Report(new OperationProgress(
+                "Refreshing view",
+                "Updating HEAD and commit list.",
+                92));
+            await RefreshAfterHeadChangeAsync();
+        };
+        UndoBarVM.UndoCompleted += (_, _) => QueueHeadRefresh();
         AuthorPanelVM = authorPanelViewModel;
         StashesVM = new StashesViewModel(
             _gitBackend,
@@ -146,7 +170,7 @@ public partial class MainWindowViewModel : BaseViewModel
             async () => await UpdateElementsAsync(),
             () => TitleBarVM.CurrentBranch,
             () => string.IsNullOrEmpty(SelectedRemote) ? Remotes.FirstOrDefault() : SelectedRemote);
-        SearchVM = new SearchViewModel(_gitBackend, _windowService, () => CommitListVM.AllCommits);
+        SearchVM = new SearchViewModel(_gitBackend, _historyService, _windowService);
 
         // Update ops log badge whenever the log changes
         _opsLogService.Changed += (_, _) =>
@@ -154,11 +178,17 @@ public partial class MainWindowViewModel : BaseViewModel
 
         // A.3 — refresh commit list after any backend HEAD mutation (e.g. Undo via ResetHard)
         _gitBackend.HeadChanged += (_, _) =>
-            Application.Current.Dispatcher.BeginInvoke(async () => await UpdateElementsAsync());
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                if (!_isSwitchingRepository)
+                    QueueHeadRefresh();
+            });
 
         // Load saved path or use default
+        _suppressFolderPathChanged = true;
         Path = Properties.Settings.Default.Path ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         FolderPath = Path;
+        _suppressFolderPathChanged = false;
 
         _stateService.PropertyChanged += OnRepositoryStateChanged;
     }
@@ -208,12 +238,20 @@ public partial class MainWindowViewModel : BaseViewModel
     /// <summary>True when the selected commit is already on the remote — amending it requires a force-push.</summary>
     public bool IsAmendUnsafe => SelectedCommit?.RemoteState == Gitster.Services.Git.CommitRemoteState.OnRemote;
 
+    public bool CanAmendSelectedCommit =>
+        IsGoButtonEnabled
+        && SelectedCommit is not null
+        && SelectedCommit.RemoteState != Gitster.Services.Git.CommitRemoteState.Incoming;
+
+    partial void OnIsGoButtonEnabledChanged(bool value) => OnPropertyChanged(nameof(CanAmendSelectedCommit));
+
     partial void OnFolderPathChanged(string value)
     {
-        Path = value;
-        UpdateSettingsPath();
-        _ = TryAttachRepositoryServicesAsync();
-        _ = UpdateElementsAsync();
+        if (_suppressFolderPathChanged)
+            return;
+
+        if (!string.Equals(value, Path, StringComparison.OrdinalIgnoreCase))
+            _ = SwitchRepositoryAsync(value, recordRecent: false, showLoadingWindow: true);
     }
 
     partial void OnSelectedCommitChanged(CommitItem? value)
@@ -224,6 +262,7 @@ public partial class MainWindowViewModel : BaseViewModel
             SelectedCommitDetail.Clear();
 
         OnPropertyChanged(nameof(IsAmendUnsafe));
+        OnPropertyChanged(nameof(CanAmendSelectedCommit));
         _ = AuthorPanelVM.LoadFromCommitAsync(value);
     }
 
@@ -236,7 +275,7 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void BrowseFolder()
+    private async Task BrowseFolderAsync()
     {
         try
         {
@@ -252,8 +291,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
             if (_windowService.ShowDialog(dialog) == true)
             {
-                FolderPath = dialog.FolderName;
-                _recentRepos.Record(dialog.FolderName);
+                await SwitchRepositoryAsync(dialog.FolderName, recordRecent: true, showLoadingWindow: true);
             }
         }
         catch (Exception ex)
@@ -265,15 +303,171 @@ public partial class MainWindowViewModel : BaseViewModel
     /// <summary>Opens a repository by path directly (used by recent-repos dropdown).</summary>
     private void OpenRepoByPath(string path)
     {
-        FolderPath = path;
-        _recentRepos.Record(path);
+        _ = SwitchRepositoryAsync(path, recordRecent: true, showLoadingWindow: true);
     }
 
     [RelayCommand]
-    private void OpenRepo(string path)
+    private async Task OpenRepoAsync(string path)
     {
-        FolderPath = path;
-        _recentRepos.Record(path);
+        await SwitchRepositoryAsync(path, recordRecent: true, showLoadingWindow: true);
+    }
+
+    public async Task InitializeAsync()
+    {
+        if (_initialRepositoryLoadStarted)
+            return;
+
+        _initialRepositoryLoadStarted = true;
+        if (!string.IsNullOrWhiteSpace(Path))
+            await SwitchRepositoryAsync(Path, recordRecent: false, showLoadingWindow: true);
+    }
+
+    private async Task<bool> SwitchRepositoryAsync(string targetPath, bool recordRecent, bool showLoadingWindow)
+    {
+        if (string.IsNullOrWhiteSpace(targetPath))
+            return false;
+
+        _repoSwitchCts?.Cancel();
+
+        var previousPath = Path;
+        var previousFolderPath = FolderPath;
+        var previousLoadedPath = _loadedRepositoryPath;
+        using var cts = new CancellationTokenSource();
+        _repoSwitchCts = cts;
+        _isSwitchingRepository = true;
+
+        try
+        {
+            var success = showLoadingWindow
+                ? await RunRepositorySwitchWithDialogAsync(targetPath, cts)
+                : await RunRepositorySwitchAsync(targetPath, cts.Token, progress: null);
+
+            if (_repoSwitchCts != cts)
+                return false;
+
+            if (!success)
+            {
+                await RestoreRepositoryAfterCanceledSwitchAsync(previousPath, previousFolderPath, previousLoadedPath);
+                return false;
+            }
+
+            CommitRepositoryPath(targetPath, recordRecent);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            if (_repoSwitchCts != cts)
+                return false;
+
+            await RestoreRepositoryAfterCanceledSwitchAsync(previousPath, previousFolderPath, previousLoadedPath);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            if (_repoSwitchCts != cts)
+                return false;
+
+            await RestoreRepositoryAfterCanceledSwitchAsync(previousPath, previousFolderPath, previousLoadedPath);
+            _windowService.Error($"Error opening repository:\n{ex.Message}", "Gitster");
+            return false;
+        }
+        finally
+        {
+            if (_repoSwitchCts == cts)
+            {
+                _repoSwitchCts = null;
+                _isSwitchingRepository = false;
+            }
+        }
+    }
+
+    private async Task<bool> RunRepositorySwitchWithDialogAsync(string targetPath, CancellationTokenSource cts)
+    {
+        var loadingVm = new RepositoryLoadingViewModel(targetPath, cts);
+        var loadingWindow = new RepositoryLoadingWindow(loadingVm);
+        var progress = new Progress<RepositoryLoadProgress>(loadingVm.Report);
+
+        Task<bool>? loadTask = null;
+        loadingWindow.ContentRendered += async (_, _) =>
+        {
+            if (loadTask != null)
+                return;
+
+            await loadingWindow.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+
+            loadTask = RunRepositorySwitchAsync(targetPath, cts.Token, progress);
+            _ = loadTask.ContinueWith(task =>
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    loadingWindow.Complete(task.Status == TaskStatus.RanToCompletion);
+                });
+            }, CancellationToken.None);
+        };
+
+        var dialogResult = _windowService.ShowDialog(loadingWindow);
+        if (dialogResult != true)
+            cts.Cancel();
+
+        if (loadTask == null)
+            return false;
+
+        await loadTask;
+        return true;
+    }
+
+    private async Task<bool> RunRepositorySwitchAsync(
+        string targetPath,
+        CancellationToken ct,
+        IProgress<RepositoryLoadProgress>? progress)
+    {
+        await UpdateElementsCoreAsync(targetPath, ct, progress);
+        return true;
+    }
+
+    private void CommitRepositoryPath(string targetPath, bool recordRecent)
+    {
+        _suppressFolderPathChanged = true;
+        Path = targetPath;
+        FolderPath = targetPath;
+        _loadedRepositoryPath = targetPath;
+        _suppressFolderPathChanged = false;
+
+        UpdateSettingsPath();
+        if (recordRecent)
+            _recentRepos.Record(targetPath);
+    }
+
+    private async Task RestoreRepositoryAfterCanceledSwitchAsync(
+        string previousPath,
+        string previousFolderPath,
+        string? previousLoadedPath)
+    {
+        _suppressFolderPathChanged = true;
+        Path = previousPath;
+        FolderPath = previousFolderPath;
+        _suppressFolderPathChanged = false;
+
+        if (string.IsNullOrWhiteSpace(previousLoadedPath))
+        {
+            _loadedRepositoryPath = null;
+            ClearRepositoryUi();
+            return;
+        }
+
+        try
+        {
+            await UpdateElementsCoreAsync(previousLoadedPath, CancellationToken.None, progress: null);
+            _loadedRepositoryPath = previousLoadedPath;
+        }
+        catch
+        {
+            _loadedRepositoryPath = null;
+            ClearRepositoryUi();
+            // Keep the saved path even if the prior repository cannot be refreshed.
+        }
     }
 
     [RelayCommand]
@@ -329,7 +523,7 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private void OpenAuthorRepair()
     {
-        var vm = new AuthorRepairViewModel(_gitBackend, _authorDirService.Authors, _windowService);
+        var vm = new AuthorRepairViewModel(_gitBackend, _historyService, _authorDirService.Authors, _windowService);
         var window = new Views.AuthorRepairDialog(vm);
         _windowService.ShowDialog(window);
     }
@@ -337,12 +531,10 @@ public partial class MainWindowViewModel : BaseViewModel
     [RelayCommand]
     private async Task OpenRewriteTimestamps()
     {
-        if (CommitListVM.AllCommits.Count == 0) return;
-
         try
         {
             var beforeSha = await _gitBackend.GetHeadShaAsync();
-            var vm = new RangeTimestampViewModel(_gitBackend, CommitListVM.AllCommits.ToList());
+            var vm = new RangeTimestampViewModel(_gitBackend, _historyService);
             var window = new Views.RangeTimestampDialog(vm);
 
             if (_windowService.ShowDialog(window) == true)
@@ -471,24 +663,56 @@ public partial class MainWindowViewModel : BaseViewModel
             }
 
             var beforeSha = await _gitBackend.GetHeadShaAsync();
+            var branchName = TitleBarVM.CurrentBranch;
+            var selected = SelectedCommit;
+            if (selected is null)
+            {
+                _windowService.Warning("Please select a commit to amend.", "Gitster");
+                return;
+            }
+
+            if (selected.RemoteState == Gitster.Services.Git.CommitRemoteState.Incoming)
+            {
+                _windowService.Warning("Incoming commits are not on the local branch yet. Pull or cherry-pick the commit before amending it.", "Gitster");
+                return;
+            }
 
             // Collect author/committer changes from AuthorPanelVM
             var (authorName, authorEmail) = AuthorPanelVM.GetPendingAuthor();
             var (committerName, committerEmail) = AuthorPanelVM.GetPendingCommitter();
 
+            var isHead = string.Equals(selected.FullSha, beforeSha, StringComparison.OrdinalIgnoreCase);
             var afterSha = await _feedbackService.RunAsync(
-                "Amend",
-                () => _gitBackend.AmendAsync(new AmendRequest(
-                    editDate.Value,
-                    AuthorName:    authorName,
-                    AuthorEmail:   authorEmail,
-                    CommitterName:  committerName,
-                    CommitterEmail: committerEmail)),
+                isHead ? "Amend" : "Amend selected commit",
+                async () =>
+                {
+                    if (isHead)
+                    {
+                        return await Task.Run(() => _gitBackend.AmendAsync(new AmendRequest(
+                            editDate.Value,
+                            AuthorName: authorName,
+                            AuthorEmail: authorEmail,
+                            CommitterName: committerName,
+                            CommitterEmail: committerEmail)));
+                    }
+
+                    var rewriteDate = BuildRewriteDate(editDate.Value, selected.Date);
+                    var rewrite = new CommitRewrite(
+                        selected.FullSha,
+                        NewAuthorName: authorName,
+                        NewAuthorEmail: authorEmail,
+                        NewCommitterName: committerName,
+                        NewCommitterEmail: committerEmail,
+                        NewAuthorDate: rewriteDate,
+                        NewCommitterDate: rewriteDate);
+
+                    await Task.Run(() => _gitBackend.RewriteCommitsAsync([rewrite], branchName));
+                    return await _gitBackend.GetHeadShaAsync();
+                },
                 sha => sha.Length > 7 ? sha[..7] : sha);
 
             var reflogSelector = await _gitBackend.GetReflogSelectorForHeadAsync();
 
-            var branchName = TitleBarVM.CurrentBranch;
             var shortBefore = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
             var shortAfter = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
 
@@ -496,7 +720,9 @@ public partial class MainWindowViewModel : BaseViewModel
                 Id: Guid.NewGuid().ToString(),
                 Timestamp: DateTimeOffset.Now,
                 Kind: OperationKind.Amend,
-                Description: $"Amend {shortAfter}",
+                Description: isHead
+                    ? $"Amend {shortAfter}"
+                    : $"Amend selected {(selected.CommitId.Length > 0 ? selected.CommitId : selected.FullSha[..Math.Min(7, selected.FullSha.Length)])}",
                 BranchName: branchName,
                 BeforeSha: shortBefore,
                 AfterSha: shortAfter,
@@ -505,13 +731,111 @@ public partial class MainWindowViewModel : BaseViewModel
 
             _ = _snapshotService.CaptureAsync(_gitBackend, "Amend");
 
-            await UpdateElementsAsync();
+            ClearPendingHeadRefresh();
+            await RefreshAfterHeadChangeAsync();
         }
         catch (Exception ex)
         {
             _windowService.Error($"Error amending commit: {ex.Message}", "Gitster");
         }
     }
+
+    private static DateTimeOffset BuildRewriteDate(DateTime newDate, DateTime originalDate)
+    {
+        var offset = DateTimeOffset.Now.Offset;
+        return new DateTimeOffset(
+            newDate.Year,
+            newDate.Month,
+            newDate.Day,
+            newDate.Hour,
+            newDate.Minute,
+            originalDate.Second,
+            offset);
+    }
+
+    [RelayCommand]
+    private async Task ResetToCommitMixed(CommitItem? commit)
+        => await ResetToCommitAsync(commit, hard: false);
+
+    [RelayCommand]
+    private async Task ResetToCommitHard(CommitItem? commit)
+        => await ResetToCommitAsync(commit, hard: true);
+
+    private async Task ResetToCommitAsync(CommitItem? commit, bool hard)
+    {
+        if (commit is null)
+            return;
+
+        var shortTarget = ShortSha(commit.FullSha);
+        var mode = hard ? "--hard" : "--mixed";
+        var action = hard ? "Reset and delete changes" : "Reset and keep changes";
+        var confirmText = hard
+            ? $"Reset the current branch to {shortTarget}?\n\n" +
+              "This runs git reset --hard. It moves the branch to the selected commit and deletes uncommitted working-tree and index changes.\n\n" +
+              "Commits after the selected commit will no longer be on this branch."
+            : $"Reset the current branch to {shortTarget}?\n\n" +
+              "This runs git reset --mixed. It moves the branch to the selected commit, resets the index, and keeps resulting file changes in the working tree.\n\n" +
+              "Commits after the selected commit will no longer be on this branch.";
+
+        if (!_windowService.Confirm(confirmText, action))
+            return;
+
+        try
+        {
+            var beforeSha = await _gitBackend.GetHeadShaAsync();
+            var resetBranchName = TitleBarVM.CurrentBranch;
+            await _snapshotService.CaptureAsync(_gitBackend, $"Before reset {mode} to {shortTarget}");
+
+            var afterSha = await _feedbackService.RunAsync(
+                hard ? "Reset --hard" : "Reset --mixed",
+                async () =>
+                {
+                    if (hard)
+                        await Task.Run(() => _gitBackend.ResetHardAsync(commit.FullSha, resetBranchName));
+                    else
+                        await Task.Run(() => _gitBackend.ResetMixedAsync(commit.FullSha, resetBranchName));
+
+                    return await _gitBackend.GetHeadShaAsync();
+                },
+                ShortSha);
+
+            var reflogSelector = await TryGetHeadReflogSelectorAsync();
+            var branchName = TitleBarVM.CurrentBranch;
+
+            await _opsLogService.RecordAsync(new OperationRecord(
+                Id: Guid.NewGuid().ToString(),
+                Timestamp: DateTimeOffset.Now,
+                Kind: OperationKind.Reset,
+                Description: $"Reset {mode} to {shortTarget}",
+                BranchName: branchName,
+                BeforeSha: ShortSha(beforeSha),
+                AfterSha: ShortSha(afterSha),
+                ReflogSelector: reflogSelector,
+                Status: OperationStatus.Active));
+
+            ClearPendingHeadRefresh();
+            await RefreshAfterHeadChangeAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Reset failed: {ex.Message}", "Gitster");
+        }
+    }
+
+    private async Task<string?> TryGetHeadReflogSelectorAsync()
+    {
+        try
+        {
+            return await _gitBackend.GetReflogSelectorForHeadAsync();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string ShortSha(string sha) =>
+        sha.Length >= 7 ? sha[..7] : sha;
 
     [RelayCommand]
     private void ReadSelectedCommitTime()
@@ -637,8 +961,17 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public async Task OnWindowActivatedAsync()
     {
-        await UpdateElementsAsync();
-        await _stateService.RefreshAsync();
+        if (_isSwitchingRepository || !_initialRepositoryLoadStarted)
+            return;
+
+        var changes = await _stateService.GetActivationChangesAsync();
+        if (changes == RepositoryActivationChange.None)
+            return;
+
+        if (changes.HasFlag(RepositoryActivationChange.GitMetadata))
+            await RefreshRepositoryAfterActivationWithDialogAsync();
+        else
+            await RefreshStateAfterActivationWithDialogAsync();
     }
 
     private void UpdateSettingsPath()
@@ -648,84 +981,328 @@ public partial class MainWindowViewModel : BaseViewModel
         settings.Save();
     }
 
-    public async Task UpdateElementsAsync()
+    private async Task RefreshRepositoryAfterActivationWithDialogAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Path))
+            return;
+
+        ClearPendingHeadRefresh();
+
+        using var cts = new CancellationTokenSource();
+        var loadingVm = new RepositoryLoadingViewModel(Path, cts, "Refreshing repository");
+        var loadingWindow = new RepositoryLoadingWindow(loadingVm);
+        var progress = new Progress<RepositoryLoadProgress>(loadingVm.Report);
+
+        Task? refreshTask = null;
+        loadingWindow.ContentRendered += async (_, _) =>
+        {
+            if (refreshTask is not null)
+                return;
+
+            await loadingWindow.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+
+            refreshTask = RefreshRepositoryAfterActivationCoreAsync(cts.Token, progress);
+            _ = refreshTask.ContinueWith(task =>
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                    loadingWindow.Complete(task.Status == TaskStatus.RanToCompletion));
+            }, CancellationToken.None);
+        };
+
+        var result = _windowService.ShowDialog(loadingWindow);
+        if (result != true)
+            cts.Cancel();
+
+        if (refreshTask is null)
+            return;
+
+        try
+        {
+            await refreshTask;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task RefreshRepositoryAfterActivationCoreAsync(
+        CancellationToken ct,
+        IProgress<RepositoryLoadProgress> progress)
+    {
+        await _headRefreshGate.WaitAsync(ct);
+        try
+        {
+            await UpdateElementsAsync(ct, progress);
+        }
+        finally
+        {
+            _headRefreshGate.Release();
+        }
+    }
+
+    private async Task RefreshStateAfterActivationWithDialogAsync()
+    {
+        var viewModel = new OperationProgressViewModel("Refreshing repository");
+        var window = new OperationProgressWindow(viewModel);
+        var progress = new Progress<OperationProgress>(viewModel.Report);
+
+        Task? refreshTask = null;
+        window.ContentRendered += async (_, _) =>
+        {
+            if (refreshTask is not null)
+                return;
+
+            await window.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+
+            refreshTask = _stateService.RefreshAsync(progress);
+            _ = refreshTask.ContinueWith(task =>
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                    window.Complete(task.Status == TaskStatus.RanToCompletion));
+            }, CancellationToken.None);
+        };
+
+        _windowService.ShowDialog(window);
+
+        if (refreshTask is not null)
+            await refreshTask;
+    }
+
+    public async Task UpdateElementsAsync(
+        CancellationToken ct = default,
+        IProgress<RepositoryLoadProgress>? progress = null)
     {
         try
         {
-            await _gitBackend.OpenAsync(Path);
-            _ = _stateService.AttachAsync(Path);
-
-            using var repo = new Repository(Path);
-
-            // A.1 — guard empty repository (no commits yet)
-            var headTip = repo.Head.Tip;
-            if (headTip == null)
-            {
-                CurrentCommitDetail.Clear();
-                SelectedCommitDetail.Clear();
-                TimestampEditVM.UpdatePreviewBefore("—");
-                IsGoButtonEnabled = false;
-                CommitListVM.ClearList();
-                UpdateStatusBar(repo);
-                return;
-            }
-
-            CurrentCommitDetail.UpdateCommit(
-                headTip.MessageShort,
-                headTip.Author.When.DateTime
-            );
-            var headSha = headTip.Id.Sha.Length >= 6 ? headTip.Id.Sha[..6] : headTip.Id.Sha;
-            TimestampEditVM.UpdatePreviewBefore($"{headTip.Author.When.DateTime:dd.MM. HH:mm} · {headSha}");
-
-            // A.1 — guard initial commit (no parents)
-            var previousCommit = headTip.Parents.FirstOrDefault();
-            if (previousCommit != null)
-                SelectedCommitDetail.UpdateCommit(previousCommit.MessageShort, previousCommit.Author.When.DateTime);
-            else
-                SelectedCommitDetail.Clear();
-
-            IsGoButtonEnabled = true;
-
-            // Update remotes list
-            Remotes.Clear();
-            foreach (var remote in repo.Network.Remotes)
-                Remotes.Add(remote.Name);
-            if (Remotes.Count > 0 && string.IsNullOrEmpty(SelectedRemote))
-                SelectedRemote = Remotes[0];
-
-            // Status bar + stashes/branches/worktrees can run before the (potentially long)
-            // commit-list stream completes.
-            UpdateStatusBar(repo);
-            await StashesVM.LoadAsync();
-            await BranchesVM.LoadAsync();
-            await WorktreesVM.LoadAsync();
-            SidebarVM.BranchCount = BranchesVM.LocalCount;
-            await RefreshSidebarBadgesAsync();
-
-            // Progressive commit-list load (A0). Author/date filtering now lives in the
-            // inline query (author:/before:/after:) and the Search mode — no dialog.
-            await CommitListVM.LoadAsync();
-
-            // Refresh author directory from the loaded commits.
-            _ = _authorDirService.RefreshAsync();
-            return;
+            await UpdateElementsCoreAsync(Path, ct, progress);
         }
-        catch (Exception)
+        catch (OperationCanceledException)
         {
-            StashesVM.Clear();
-            BranchesVM.Clear();
-            WorktreesVM.Clear();
-            CurrentCommitDetail.Clear();
-            SelectedCommitDetail.Clear();
-            SelectedDate = null;
-            TimestampEditVM.UpdatePreviewBefore("—");
-            IsGoButtonEnabled = false;
-            Remotes.Clear();
-            TitleBarVM.Clear();
-            CommitListVM.ClearList();
+            throw;
+        }
+        catch
+        {
+            ClearRepositoryUi();
         }
 
         await RefreshSidebarBadgesAsync();
+    }
+
+    private void QueueHeadRefresh()
+    {
+        if (_isSwitchingRepository)
+            return;
+
+        _headRefreshRequested = true;
+        _headRefreshRequestVersion++;
+
+        if (!_headRefreshWorkerRunning)
+            _ = RunQueuedHeadRefreshAsync();
+    }
+
+    private void ClearPendingHeadRefresh()
+    {
+        _headRefreshRequested = false;
+        _headRefreshRequestVersion++;
+    }
+
+    private async Task RunQueuedHeadRefreshAsync()
+    {
+        if (_headRefreshWorkerRunning)
+            return;
+
+        _headRefreshWorkerRunning = true;
+        try
+        {
+            while (!_isSwitchingRepository)
+            {
+                if (!_headRefreshRequested)
+                    return;
+
+                var version = _headRefreshRequestVersion;
+                await Task.Delay(75);
+
+                if (_isSwitchingRepository || !_headRefreshRequested)
+                    return;
+
+                if (version != _headRefreshRequestVersion)
+                    continue;
+
+                _headRefreshRequested = false;
+                await RefreshAfterHeadChangeAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            _headRefreshWorkerRunning = false;
+
+            if (_headRefreshRequested && !_isSwitchingRepository)
+                _ = RunQueuedHeadRefreshAsync();
+        }
+    }
+
+    private async Task RefreshAfterHeadChangeAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(Path))
+            return;
+
+        await _headRefreshGate.WaitAsync(ct);
+        try
+        {
+            await _gitBackend.OpenAsync(Path);
+            ct.ThrowIfCancellationRequested();
+
+            using var repo = new Repository(Path);
+            ApplyHeadState(repo);
+
+            await CommitListVM.LoadAsync(ct);
+            ct.ThrowIfCancellationRequested();
+
+            UpdateStatusBar(repo);
+            _ = _authorDirService.RefreshAsync();
+            _ = RefreshHeadRelatedSidePanelsAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            await UpdateElementsAsync(ct);
+        }
+        finally
+        {
+            _headRefreshGate.Release();
+        }
+    }
+
+    private async Task RefreshHeadRelatedSidePanelsAsync()
+    {
+        try
+        {
+            await BranchesVM.LoadAsync();
+            SidebarVM.BranchCount = BranchesVM.LocalCount;
+            await WorktreesVM.LoadAsync();
+            await RefreshSidebarBadgesAsync();
+        }
+        catch
+        {
+            // Background side-panel refresh should not block the commit list update.
+        }
+    }
+
+    private async Task UpdateElementsCoreAsync(
+        string repoPath,
+        CancellationToken ct,
+        IProgress<RepositoryLoadProgress>? progress)
+    {
+        progress?.Report(new RepositoryLoadProgress("Opening repository", repoPath));
+        await _gitBackend.OpenAsync(repoPath);
+        ct.ThrowIfCancellationRequested();
+
+        progress?.Report(new RepositoryLoadProgress(
+            "Validating history cache",
+            "Preparing cached commit metadata."));
+        await _historyService.OpenAsync(repoPath, ct, progress);
+        ct.ThrowIfCancellationRequested();
+
+        progress?.Report(new RepositoryLoadProgress(
+            "Attaching repository services",
+            "Preparing watchers, logs, snapshots, and repo-local settings."));
+        await AttachRepositoryServicesAsync(repoPath, ct);
+        ct.ThrowIfCancellationRequested();
+
+        using var repo = new Repository(repoPath);
+
+        progress?.Report(new RepositoryLoadProgress(
+            "Reading HEAD",
+            "Loading current commit and branch state."));
+
+        if (!ApplyHeadState(repo))
+            return;
+
+        Remotes.Clear();
+        foreach (var remote in repo.Network.Remotes)
+            Remotes.Add(remote.Name);
+        if (Remotes.Count > 0 && (string.IsNullOrEmpty(SelectedRemote) || !Remotes.Contains(SelectedRemote)))
+            SelectedRemote = Remotes[0];
+
+        UpdateStatusBar(repo);
+
+        progress?.Report(new RepositoryLoadProgress("Loading stashes", "Reading stash list."));
+        await StashesVM.LoadAsync();
+        ct.ThrowIfCancellationRequested();
+
+        progress?.Report(new RepositoryLoadProgress("Loading branches", "Reading local and remote branches."));
+        await BranchesVM.LoadAsync();
+        ct.ThrowIfCancellationRequested();
+
+        progress?.Report(new RepositoryLoadProgress("Loading worktrees", "Reading linked worktrees."));
+        await WorktreesVM.LoadAsync();
+        ct.ThrowIfCancellationRequested();
+
+        SidebarVM.BranchCount = BranchesVM.LocalCount;
+        await RefreshSidebarBadgesAsync();
+        ct.ThrowIfCancellationRequested();
+
+        await CommitListVM.LoadAsync(ct, progress);
+        ct.ThrowIfCancellationRequested();
+
+        progress?.Report(new RepositoryLoadProgress("Finalizing", "Refreshing author index."));
+        _ = _authorDirService.RefreshAsync();
+    }
+
+    private bool ApplyHeadState(Repository repo)
+    {
+        var headTip = repo.Head.Tip;
+        if (headTip == null)
+        {
+            CurrentCommitDetail.Clear();
+            SelectedCommitDetail.Clear();
+            TimestampEditVM.UpdatePreviewBefore("-");
+            IsGoButtonEnabled = false;
+            CommitListVM.ClearList();
+            UpdateStatusBar(repo);
+            return false;
+        }
+
+        CurrentCommitDetail.UpdateCommit(
+            headTip.MessageShort,
+            headTip.Author.When.DateTime);
+
+        var headSha = headTip.Id.Sha.Length >= 6 ? headTip.Id.Sha[..6] : headTip.Id.Sha;
+        TimestampEditVM.UpdatePreviewBefore($"{headTip.Author.When.DateTime:dd.MM. HH:mm} · {headSha}");
+
+        var previousCommit = headTip.Parents.FirstOrDefault();
+        if (previousCommit != null)
+            SelectedCommitDetail.UpdateCommit(previousCommit.MessageShort, previousCommit.Author.When.DateTime);
+        else
+            SelectedCommitDetail.Clear();
+
+        IsGoButtonEnabled = true;
+        return true;
+    }
+
+    private void ClearRepositoryUi()
+    {
+        StashesVM.Clear();
+        BranchesVM.Clear();
+        WorktreesVM.Clear();
+        CurrentCommitDetail.Clear();
+        SelectedCommitDetail.Clear();
+        SelectedDate = null;
+        TimestampEditVM.UpdatePreviewBefore("-");
+        IsGoButtonEnabled = false;
+        Remotes.Clear();
+        TitleBarVM.Clear();
+        CommitListVM.ClearList();
     }
 
     private async Task RefreshSidebarBadgesAsync()
@@ -796,21 +1373,19 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
-    private async Task TryAttachRepositoryServicesAsync()
+    private async Task AttachRepositoryServicesAsync(string repoPath, CancellationToken ct)
     {
-        try
-        {
-            await _gitBackend.OpenAsync(Path);
-            _ = _stateService.AttachAsync(Path);
-            _ = _opsLogService.AttachAsync(Path);
-            _ = _snapshotService.AttachAsync(Path);
-            _ = _stashNameService.AttachAsync(Path);
-            _customToolsService.Attach(Path);
-        }
-        catch
-        {
-            // ignore invalid path while user edits
-        }
+        await _gitBackend.OpenAsync(repoPath);
+        ct.ThrowIfCancellationRequested();
+        await _stateService.AttachAsync(repoPath);
+        ct.ThrowIfCancellationRequested();
+        await _opsLogService.AttachAsync(repoPath);
+        ct.ThrowIfCancellationRequested();
+        await _snapshotService.AttachAsync(repoPath);
+        ct.ThrowIfCancellationRequested();
+        await _stashNameService.AttachAsync(repoPath);
+        ct.ThrowIfCancellationRequested();
+        _customToolsService.Attach(repoPath);
     }
 
     private void OnRepositoryStateChanged(object? sender, PropertyChangedEventArgs e)

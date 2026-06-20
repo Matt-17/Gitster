@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using Gitster.Models;
 using Gitster.Services.Git;
 
 namespace Gitster.Services.OperationsLog;
@@ -78,50 +79,116 @@ public partial class OperationsLogService : ObservableObject
         await SaveAsync();
     }
 
-    public async Task<UndoPlan> PrepareUndoAsync(OperationRecord record, IGitBackend git)
+    public async Task<UndoPlan> PrepareUndoAsync(
+        OperationRecord record,
+        IGitBackend git,
+        IProgress<OperationProgress>? progress = null)
     {
         // A.5: use the stored pre-operation SHA directly — stable across reflog changes
         var targetSha = record.BeforeSha;
 
-        var exists = await git.CommitExistsAsync(targetSha);
+        progress?.Report(new OperationProgress(
+            "Preparing undo",
+            "Checking that the pre-operation commit still exists.",
+            8));
+        var exists = await Task.Run(() => git.CommitExistsAsync(targetSha));
         if (!exists)
         {
             await MarkExpiredAsync(record.Id);
             return new UndoPlan.Expired("Pre-operation commit no longer available (garbage collected).");
         }
 
-        var currentHead = await git.GetHeadShaAsync();
-        var commitsBetween = await git.GetCommitsBetweenAsync(targetSha, currentHead);
+        progress?.Report(new OperationProgress(
+            "Preparing undo",
+            "Reading current HEAD.",
+            18));
+        var currentHead = await Task.Run(() => git.GetHeadShaAsync());
+
+        progress?.Report(new OperationProgress(
+            "Preparing undo",
+            "Checking commits that would be affected.",
+            28));
+        var commitsBetween = await Task.Run(() => git.GetCommitsBetweenAsync(targetSha, currentHead));
         var wouldBeDiscarded = commitsBetween.Where(c => c.Sha != record.AfterSha).ToList();
+
+        progress?.Report(new OperationProgress(
+            "Preparing undo",
+            "Undo plan is ready.",
+            35));
 
         return new UndoPlan.Ready(record, targetSha, wouldBeDiscarded);
     }
 
-    public async Task ExecuteUndoAsync(UndoPlan.Ready plan, IGitBackend git)
+    public async Task ExecuteUndoAsync(
+        UndoPlan.Ready plan,
+        IGitBackend git,
+        IProgress<OperationProgress>? progress = null)
     {
-        await git.ResetHardAsync(plan.TargetSha);
+        progress?.Report(new OperationProgress(
+            "Undoing operation",
+            "Resetting HEAD to the saved pre-operation commit.",
+            45));
+        await Task.Run(() => git.ResetHardAsync(plan.TargetSha));
+
+        progress?.Report(new OperationProgress(
+            "Undoing operation",
+            "Updating the operations log.",
+            75));
         await MarkUndoneAsync(plan.Record.Id);
+
+        progress?.Report(new OperationProgress(
+            "Undoing operation",
+            "Undo is complete.",
+            85));
     }
 
-    public async Task ExecuteUndoWithReplayAsync(UndoPlan.Ready plan, IGitBackend git)
+    public async Task ExecuteUndoWithReplayAsync(
+        UndoPlan.Ready plan,
+        IGitBackend git,
+        IProgress<OperationProgress>? progress = null)
     {
-        await git.ResetHardAsync(plan.TargetSha);
+        progress?.Report(new OperationProgress(
+            "Undoing operation",
+            "Resetting HEAD to the saved pre-operation commit.",
+            40));
+        await Task.Run(() => git.ResetHardAsync(plan.TargetSha));
         // Replay discarded commits oldest-first on top of the restored HEAD
-        foreach (var commit in plan.WouldDiscard.Reverse())
+        var replay = plan.WouldDiscard.Reverse().ToList();
+        for (var i = 0; i < replay.Count; i++)
         {
+            var commit = replay[i];
             try
             {
-                await git.CherryPickAsync(commit.Sha);
+                var value = 48 + (i / Math.Max(1d, replay.Count)) * 24;
+                progress?.Report(new OperationProgress(
+                    "Replaying commits",
+                    $"Cherry-picking {commit.Sha}.",
+                    value));
+                await Task.Run(() => git.CherryPickAsync(commit.Sha));
             }
             catch
             {
                 // Roll back to the pre-undo state so the repo is not left in an inconsistent state
-                await git.ResetHardAsync(plan.Record.AfterSha);
+                progress?.Report(new OperationProgress(
+                    "Undo failed",
+                    "Replay conflicted. Restoring the repository state before the undo attempt.",
+                    75));
+                await Task.Run(() => git.ResetHardAsync(plan.Record.AfterSha));
                 throw new InvalidOperationException(
                     "Replay produced conflicts. Repository restored to state before undo attempt.");
             }
         }
+
+        progress?.Report(new OperationProgress(
+            "Undoing operation",
+            "Updating the operations log.",
+            75));
         await MarkUndoneAsync(plan.Record.Id);
+
+        progress?.Report(new OperationProgress(
+            "Undoing operation",
+            "Undo is complete.",
+            85));
     }
 
     private static string ResolveStoragePath(string repoPath)

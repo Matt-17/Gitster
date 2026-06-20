@@ -72,6 +72,7 @@
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
                             <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
+                            <Setter TargetName="Root" Property="Background" Value="{StaticResource SoftDisabledBackground}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

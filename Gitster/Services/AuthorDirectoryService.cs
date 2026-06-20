@@ -3,34 +3,23 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Models;
-using Gitster.Services.Git;
+using Gitster.Services.History;
 
 namespace Gitster.Services;
 
 public partial class AuthorDirectoryService : ObservableObject
 {
-    private readonly IGitBackend _git;
+    private readonly CommitHistoryService _history;
 
     [ObservableProperty]
     public partial ObservableCollection<AuthorEntry> Authors { get; set; } = [];
 
-    public AuthorDirectoryService(IGitBackend git) => _git = git;
+    public AuthorDirectoryService(CommitHistoryService history) => _history = history;
 
     public async Task RefreshAsync()
     {
-        var commits = await _git.GetCommitsAsync();
-
-        var seen = new Dictionary<string, AuthorEntry>(StringComparer.OrdinalIgnoreCase);
-        foreach (var c in commits)
-        {
-            if (string.IsNullOrWhiteSpace(c.AuthorName)) continue;
-            var key = $"{c.AuthorName}|{c.AuthorEmail}".ToLowerInvariant();
-            if (!seen.ContainsKey(key))
-                seen[key] = new AuthorEntry(c.AuthorName, c.AuthorEmail);
-        }
-
-        Authors = new ObservableCollection<AuthorEntry>(
-            seen.Values.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase));
+        var authors = await _history.GetAuthorsAsync();
+        Authors = new ObservableCollection<AuthorEntry>(authors);
     }
 
     public void Clear() => Authors = [];

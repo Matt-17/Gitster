@@ -6,12 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Models;
 using Gitster.Services;
 using Gitster.Services.Git;
+using Gitster.Services.History;
 
 namespace Gitster.ViewModels;
 
 public partial class AuthorRepairViewModel : BaseViewModel
 {
     private readonly IGitBackend _git;
+    private readonly CommitHistoryService _history;
     private readonly IWindowService _windowService;
 
     public event Action? RewriteCompleted;
@@ -40,9 +42,14 @@ public partial class AuthorRepairViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool IsRewriteEnabled { get; set; }
 
-    public AuthorRepairViewModel(IGitBackend git, IEnumerable<AuthorEntry> authors, IWindowService? windowService = null)
+    public AuthorRepairViewModel(
+        IGitBackend git,
+        CommitHistoryService history,
+        IEnumerable<AuthorEntry> authors,
+        IWindowService? windowService = null)
     {
         _git = git;
+        _history = history;
         _windowService = windowService ?? new WindowService();
         Authors = new ObservableCollection<AuthorEntry>(authors);
     }
@@ -76,14 +83,9 @@ public partial class AuthorRepairViewModel : BaseViewModel
         IsLoading = true;
         try
         {
-            var all = await _git.GetCommitsAsync();
-            var affected = all
-                .Where(c =>
-                    string.Equals(c.AuthorName,  FindAuthor.Name,  StringComparison.Ordinal) &&
-                    string.Equals(c.AuthorEmail, FindAuthor.Email, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var affected = await _history.GetCommitsByAuthorAsync(FindAuthor);
 
-            AffectedCommits  = affected;
+            AffectedCommits  = affected.ToList();
             HasUnsafeCommits = affected.Any(c => c.RemoteState == CommitRemoteState.OnRemote);
         }
         finally

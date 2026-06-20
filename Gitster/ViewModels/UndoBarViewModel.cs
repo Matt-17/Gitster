@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Gitster.Models;
 using Gitster.Services;
 using Gitster.Services.Git;
 using Gitster.Services.OperationsLog;
@@ -18,6 +19,9 @@ public partial class UndoBarViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedback;
     private readonly IWindowService _windowService;
     private DispatcherTimer? _timer;
+
+    public event EventHandler? UndoCompleted;
+    public Func<IProgress<OperationProgress>, Task>? AfterUndoAsync { get; set; }
 
     [ObservableProperty]
     public partial bool HasUndoableOperation { get; set; }
@@ -82,48 +86,119 @@ public partial class UndoBarViewModel : BaseViewModel
         var record = _opsLog.MostRecentActive;
         if (record is null) return;
 
-        UndoPlan plan;
         try
         {
-            plan = await _opsLog.PrepareUndoAsync(record, _git);
+            var plan = await RunProgressDialogAsync("Undo", async (progress, owner) =>
+            {
+                var prepared = await _opsLog.PrepareUndoAsync(record, _git, progress);
+                if (prepared is not UndoPlan.Ready ready)
+                    return prepared;
+
+                var replayOnTop = false;
+                if (ready.WouldDiscard.Count > 0)
+                {
+                    progress.Report(new OperationProgress(
+                        "Waiting for confirmation",
+                        "Choose how Gitster should handle commits above the undo target.",
+                        36));
+
+                    var confirm = await owner.Dispatcher.InvokeAsync(() =>
+                    {
+                        var dialog = new UndoConfirmationDialog(ready)
+                        {
+                            Owner = owner,
+                        };
+                        var accepted = dialog.ShowDialog() == true;
+                        return accepted ? (Accepted: true, Replay: dialog.ReplayOnTop) : (Accepted: false, Replay: false);
+                    });
+
+                    if (!confirm.Accepted)
+                        return new UndoPlan.NotAvailable("Undo canceled.");
+
+                    replayOnTop = confirm.Replay;
+                }
+
+                var title = replayOnTop ? "Undo with replay" : "Undo";
+                await _feedback.RunAsync(
+                    title,
+                    () => replayOnTop
+                        ? _opsLog.ExecuteUndoWithReplayAsync(ready, _git, progress)
+                        : _opsLog.ExecuteUndoAsync(ready, _git, progress));
+
+                if (AfterUndoAsync is not null)
+                {
+                    progress.Report(new OperationProgress(
+                        "Refreshing view",
+                        "Updating the commit list.",
+                        90));
+                    await AfterUndoAsync(progress);
+                }
+
+                progress.Report(new OperationProgress(
+                    "Done",
+                    "Undo complete.",
+                    100));
+
+                if (AfterUndoAsync is null)
+                    UndoCompleted?.Invoke(this, EventArgs.Empty);
+
+                return ready;
+            });
+
+            if (plan is UndoPlan.NotAvailable na && na.Reason != "Undo canceled.")
+                _windowService.Info(na.Reason, "Cannot undo");
+            else if (plan is UndoPlan.Expired exp)
+                _windowService.Info(exp.Reason, "Undo expired");
         }
         catch (Exception ex)
         {
-            _windowService.Warning($"Undo preparation failed: {ex.Message}", "Undo");
-            return;
+            _windowService.Error($"Undo failed: {ex.Message}", "Undo");
         }
+    }
 
-        if (plan is UndoPlan.Ready ready)
-        {
-            // A.6 — when intermediate commits exist, ask user to Discard or Replay
-            bool replayOnTop = false;
-            if (ready.WouldDiscard.Count > 0)
-            {
-                var dialog = new UndoConfirmationDialog(ready);
-                if (_windowService.ShowDialog(dialog) != true) return;
-                replayOnTop = dialog.ReplayOnTop;
-            }
+    private async Task<T> RunProgressDialogAsync<T>(
+        string title,
+        Func<IProgress<OperationProgress>, OperationProgressWindow, Task<T>> action)
+    {
+        var viewModel = new OperationProgressViewModel(title);
+        var window = new OperationProgressWindow(viewModel);
+        var progress = new Progress<OperationProgress>(viewModel.Report);
 
-            try
-            {
-                if (replayOnTop)
-                    await _feedback.RunAsync("Undo (replay)", () => _opsLog.ExecuteUndoWithReplayAsync(ready, _git));
-                else
-                    await _feedback.RunAsync("Undo", () => _opsLog.ExecuteUndoAsync(ready, _git));
-            }
-            catch (Exception ex)
-            {
-                _windowService.Error($"Undo failed: {ex.Message}", "Undo");
-            }
-        }
-        else if (plan is UndoPlan.NotAvailable na)
+        Task<T>? task = null;
+        window.ContentRendered += async (_, _) =>
         {
-            _windowService.Info(na.Reason, "Cannot undo");
-        }
-        else if (plan is UndoPlan.Expired exp)
+            if (task != null)
+                return;
+
+            await window.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.ApplicationIdle);
+
+            task = action(progress, window);
+            _ = task.ContinueWith(t =>
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                    window.Complete(t.Status == TaskStatus.RanToCompletion));
+            }, CancellationToken.None);
+        };
+
+        _windowService.ShowDialog(window);
+
+        if (task is null)
+            throw new InvalidOperationException("Undo operation did not start.");
+
+        return await task;
+    }
+
+    private async Task RunProgressDialogAsync(
+        string title,
+        Func<IProgress<OperationProgress>, OperationProgressWindow, Task> action)
+    {
+        await RunProgressDialogAsync<object?>(title, async (progress, window) =>
         {
-            _windowService.Info(exp.Reason, "Undo expired");
-        }
+            await action(progress, window);
+            return null;
+        });
     }
 
     [RelayCommand]
