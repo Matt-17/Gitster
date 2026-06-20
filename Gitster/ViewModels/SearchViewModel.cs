@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Models;
 using Gitster.Services;
 using Gitster.Services.Git;
+using Gitster.Services.History;
 using Gitster.Services.Search;
 
 using Microsoft.Win32;
@@ -22,15 +23,15 @@ public enum SearchKind { Commits, Pickaxe, DiffRegex, Blame, RangeDiff, CompareR
 public partial class SearchViewModel : BaseViewModel
 {
     private readonly IGitBackend _git;
+    private readonly CommitHistoryService _history;
     private readonly IWindowService _windowService;
-    private readonly Func<IReadOnlyList<CommitItem>> _getLoadedCommits;
     private CancellationTokenSource? _cts;
 
-    public SearchViewModel(IGitBackend git, IWindowService? windowService, Func<IReadOnlyList<CommitItem>> getLoadedCommits)
+    public SearchViewModel(IGitBackend git, CommitHistoryService history, IWindowService? windowService)
     {
         _git = git;
+        _history = history;
         _windowService = windowService ?? new WindowService();
-        _getLoadedCommits = getLoadedCommits;
     }
 
     // ── Type selection ───────────────────────────────────────────────────
@@ -125,7 +126,7 @@ public partial class SearchViewModel : BaseViewModel
         {
             switch (CurrentKind)
             {
-                case SearchKind.Commits:   RunCommitsQuery(); break;
+                case SearchKind.Commits:   await RunCommitsQueryAsync(ct); break;
                 case SearchKind.Pickaxe:   await RunPickaxeAsync(ct); break;
                 case SearchKind.DiffRegex: await RunDiffRegexAsync(ct); break;
                 case SearchKind.Blame:     await RunBlameAsync(ct); break;
@@ -144,12 +145,11 @@ public partial class SearchViewModel : BaseViewModel
         finally { IsBusy = false; }
     }
 
-    private void RunCommitsQuery()
+    private async Task RunCommitsQueryAsync(CancellationToken ct)
     {
         var query = CommitQuery.Parse(QueryText);
-        var matches = _getLoadedCommits()
-            .Where(c => query.Matches(c.Message, c.AuthorName, c.AuthorEmail, c.FullSha, c.Date));
-        ReplaceResults(matches);
+        var matches = await _history.SearchAsync(query, maxResults: 5000, ct);
+        ReplaceResults(matches.Select(r => r.ToCommitItem()));
     }
 
     private async Task RunPickaxeAsync(CancellationToken ct)

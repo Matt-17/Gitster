@@ -379,7 +379,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task<string> CommitAsync(CommitRequest request)      => NS<string>();
     public Task<string> AmendAsync(AmendRequest request)        => NS<string>();
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => NSVoid();
-    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites) => NSVoid();
+    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => NSVoid();
     public Task FetchAsync(string remoteName = "origin")        => NSVoid();
     public Task PullAsync(string remoteName = "origin")         => NSVoid();
 
@@ -402,7 +402,8 @@ public sealed class GitCliBackend : IGitBackend
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
     }
     public Task<string> GetReflogSelectorForHeadAsync()         => NS<string>();
-    public Task ResetHardAsync(string targetReference)          => NSVoid();
+    public Task ResetMixedAsync(string targetReference, string? branchName = null) => NSVoid();
+    public Task ResetHardAsync(string targetReference, string? branchName = null)  => NSVoid();
     public Task<string> GetHeadShaAsync()                       => NS<string>();
     public Task<string> ResolveRefAsync(string refSpec)         => NS<string>();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string a, string b) => NS<IReadOnlyList<CommitInfo>>();

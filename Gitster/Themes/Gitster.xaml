@@ -7,6 +7,7 @@
     <SolidColorBrush x:Key="BackgroundSecondary"  Color="#F5F5F5"/>
     <SolidColorBrush x:Key="BorderTertiary"       Color="#E0E0E0"/>
     <SolidColorBrush x:Key="BorderSecondary"      Color="#BDBDBD"/>
+    <SolidColorBrush x:Key="WindowBorderBrush"    Color="#8A8A8A"/>
     <SolidColorBrush x:Key="TextPrimary"          Color="#1A1A1A"/>
     <SolidColorBrush x:Key="TextSecondary"        Color="#555555"/>
     <SolidColorBrush x:Key="TextTertiary"         Color="#9E9E9E"/>
@@ -19,6 +20,9 @@
     <SolidColorBrush x:Key="AccentDangerBackground"  Color="#FEE2E2"/>
     <SolidColorBrush x:Key="AccentSuccessBackground" Color="#DCFCE7"/>
     <SolidColorBrush x:Key="AccentInfoBackground"    Color="#DBEAFE"/>
+    <SolidColorBrush x:Key="IncomingHeaderBackground" Color="#F7FBFF"/>
+    <SolidColorBrush x:Key="OutgoingHeaderBackground" Color="#FFFCF2"/>
+    <SolidColorBrush x:Key="SoftDisabledBackground"   Color="#FAFAFA"/>
 
     <!-- ── Spacing ────────────────────────────────────────────────── -->
     <sys:Double  x:Key="PaddingSm">6</sys:Double>

@@ -150,18 +150,18 @@
             <!-- Amend button — command lives on the Window's MainWindowViewModel -->
             <Button Command="{Binding DataContext.AmendCommitCommand,
                               RelativeSource={RelativeSource AncestorType=Window}}"
-                    IsEnabled="{Binding DataContext.IsGoButtonEnabled,
+                    IsEnabled="{Binding DataContext.CanAmendSelectedCommit,
                                 RelativeSource={RelativeSource AncestorType=Window}}"
                     HorizontalAlignment="Stretch"
                     Height="36">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-                        <Setter Property="Content" Value="✏  Amend"/>
+                        <Setter Property="Content" Value="✏  Amend selected commit"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding DataContext.IsAmendUnsafe,
                                                            RelativeSource={RelativeSource AncestorType=Window}}"
                                          Value="True">
-                                <Setter Property="Content" Value="✏  Amend (force-push required)"/>
+                                <Setter Property="Content" Value="✏  Amend selected (force-push required)"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

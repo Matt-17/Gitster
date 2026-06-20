@@ -7,12 +7,24 @@ using Timer = System.Timers.Timer;
 
 namespace Gitster.Services;
 
+[Flags]
+public enum RepositoryActivationChange
+{
+    None = 0,
+    WorkingTree = 1,
+    GitMetadata = 2,
+}
+
 public partial class RepositoryStateService : ObservableObject, IDisposable
 {
     private readonly IGitBackend _git;
     private FileSystemWatcher? _indexWatcher;
     private FileSystemWatcher? _workingDirWatcher;
     private readonly Timer _debounceTimer;
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private RepositoryStateSnapshot? _lastSnapshot;
+    private bool _pendingWorkingTreeChange;
+    private bool _pendingGitMetadataChange;
     private const int DebounceMs = 200;
 
     [ObservableProperty]
@@ -53,7 +65,7 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
                 EnableRaisingEvents = true,
             };
-            _indexWatcher.Changed += OnGitChanged;
+            _indexWatcher.Changed += OnIndexChanged;
         }
 
         _workingDirWatcher = new FileSystemWatcher(repoPath)
@@ -70,35 +82,96 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
         await RefreshAsync();
     }
 
-    public async Task RefreshAsync()
+    public async Task<RepositoryActivationChange> GetActivationChangesAsync()
+    {
+        if (RepositoryPath is null)
+            return RepositoryActivationChange.None;
+
+        var repoPath = RepositoryPath;
+        var snapshot = await Task.Run(() => CaptureSnapshot(repoPath));
+        var prior = _lastSnapshot;
+
+        var changes = RepositoryActivationChange.None;
+        if (_pendingWorkingTreeChange)
+            changes |= RepositoryActivationChange.WorkingTree;
+        if (_pendingGitMetadataChange)
+            changes |= RepositoryActivationChange.GitMetadata;
+
+        if (prior is null)
+            return changes;
+
+        if (!string.Equals(snapshot.GitToken, prior.GitToken, StringComparison.Ordinal))
+            changes |= RepositoryActivationChange.GitMetadata;
+        if (!string.Equals(snapshot.IndexToken, prior.IndexToken, StringComparison.Ordinal))
+            changes |= RepositoryActivationChange.WorkingTree;
+
+        return changes;
+    }
+
+    public async Task RefreshAsync(IProgress<OperationProgress>? progress = null)
     {
         if (RepositoryPath is null)
             return;
 
+        var repoPath = RepositoryPath;
+        await _refreshGate.WaitAsync();
         try
         {
-            var state = await _git.GetWorkingTreeStateAsync();
-            var branch = await _git.GetCurrentBranchAsync();
+            progress?.Report(new OperationProgress(
+                "Refreshing repository",
+                "Checking working tree state.",
+                25));
+
+            var result = await Task.Run(async () =>
+            {
+                var state = await _git.GetWorkingTreeStateAsync();
+                var branch = await _git.GetCurrentBranchAsync();
+                var snapshot = CaptureSnapshot(repoPath);
+                return (state, branch, snapshot);
+            });
+
+            progress?.Report(new OperationProgress(
+                "Refreshing repository",
+                "Updating repository status.",
+                80));
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                WorkingTreeState = state;
-                CurrentBranch = branch.Name;
+                WorkingTreeState = result.state;
+                CurrentBranch = result.branch.Name;
             });
+
+            _lastSnapshot = result.snapshot;
+            _pendingWorkingTreeChange = false;
+            _pendingGitMetadataChange = false;
+
+            progress?.Report(new OperationProgress(
+                "Refreshing repository",
+                "Repository status is current.",
+                100));
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"RepositoryStateService.RefreshAsync failed: {ex}");
         }
+        finally
+        {
+            _refreshGate.Release();
+        }
     }
 
-    private void OnGitChanged(object sender, FileSystemEventArgs e) => RequestRefresh();
+    private void OnIndexChanged(object sender, FileSystemEventArgs e)
+    {
+        _pendingWorkingTreeChange = true;
+        RequestRefresh();
+    }
 
     private void OnWorkingDirChanged(object sender, FileSystemEventArgs e)
     {
         if (e.FullPath.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             return;
 
+        _pendingWorkingTreeChange = true;
         RequestRefresh();
     }
 
@@ -121,5 +194,129 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
     {
         DetachWatchers();
         _debounceTimer.Dispose();
+        _refreshGate.Dispose();
     }
+
+    private static RepositoryStateSnapshot CaptureSnapshot(string repoPath)
+    {
+        try
+        {
+            var gitDir = ResolveGitDir(repoPath);
+            var headPath = Path.Combine(gitDir, "HEAD");
+            var headText = SafeReadText(headPath);
+            var headRefToken = ResolveHeadRefToken(gitDir, headText);
+            var gitToken = string.Join("|",
+                headText,
+                headRefToken,
+                FileToken(Path.Combine(gitDir, "logs", "HEAD")),
+                FileToken(Path.Combine(gitDir, "packed-refs")),
+                FileToken(Path.Combine(gitDir, "FETCH_HEAD")),
+                DirectoryToken(Path.Combine(gitDir, "refs", "remotes")));
+
+            return new RepositoryStateSnapshot(
+                gitToken,
+                FileToken(Path.Combine(gitDir, "index")));
+        }
+        catch
+        {
+            return new RepositoryStateSnapshot(string.Empty, string.Empty);
+        }
+    }
+
+    private static string ResolveGitDir(string repoPath)
+    {
+        var dotGit = Path.Combine(repoPath, ".git");
+        if (Directory.Exists(dotGit))
+            return dotGit;
+
+        if (!File.Exists(dotGit))
+            return dotGit;
+
+        var content = File.ReadAllText(dotGit).Trim();
+        if (!content.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
+            return dotGit;
+
+        var path = content[7..].Trim();
+        return Path.IsPathRooted(path)
+            ? path
+            : Path.GetFullPath(Path.Combine(repoPath, path));
+    }
+
+    private static string ResolveHeadRefToken(string gitDir, string headText)
+    {
+        const string Prefix = "ref:";
+        if (!headText.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+            return headText;
+
+        var refName = headText[Prefix.Length..].Trim();
+        var refPath = Path.Combine(gitDir, refName.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(refPath)
+            ? $"{refName}:{SafeReadText(refPath)}:{FileToken(refPath)}"
+            : $"{refName}:{PackedRefValue(Path.Combine(gitDir, "packed-refs"), refName)}";
+    }
+
+    private static string PackedRefValue(string packedRefsPath, string refName)
+    {
+        if (!File.Exists(packedRefsPath))
+            return string.Empty;
+
+        foreach (var line in File.ReadLines(packedRefsPath))
+        {
+            if (line.Length == 0 || line[0] is '#' or '^')
+                continue;
+
+            var parts = line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2 && string.Equals(parts[1], refName, StringComparison.Ordinal))
+                return parts[0];
+        }
+
+        return string.Empty;
+    }
+
+    private static string SafeReadText(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? File.ReadAllText(path).Trim() : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string FileToken(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return string.Empty;
+
+            var info = new FileInfo(path);
+            return $"{info.LastWriteTimeUtc.Ticks}:{info.Length}";
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string DirectoryToken(string path)
+    {
+        try
+        {
+            if (!Directory.Exists(path))
+                return string.Empty;
+
+            return string.Join(";", Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .Select(p => $"{Path.GetRelativePath(path, p)}={FileToken(p)}"));
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private sealed record RepositoryStateSnapshot(string GitToken, string IndexToken);
 }

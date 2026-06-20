@@ -36,13 +36,14 @@ public interface IGitBackend
 
     Task<string> AmendAsync(AmendRequest request);
     Task AmendAuthorAsync(AmendAuthorRequest request);
-    Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites);
+    Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null);
     Task FetchAsync(string remoteName = "origin");
     Task PullAsync(string remoteName = "origin");
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal);
 
     Task<string> GetReflogSelectorForHeadAsync();
-    Task ResetHardAsync(string targetReference);
+    Task ResetMixedAsync(string targetReference, string? branchName = null);
+    Task ResetHardAsync(string targetReference, string? branchName = null);
     Task<string> GetHeadShaAsync();
     Task<string> ResolveRefAsync(string refSpec);
     Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string fromSha, string toSha);

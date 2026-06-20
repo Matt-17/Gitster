@@ -50,7 +50,7 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<string> CommitAsync(CommitRequest request)      => _lib.CommitAsync(request);
     public Task<string> AmendAsync(AmendRequest request)        => _lib.AmendAsync(request);
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => _lib.AmendAuthorAsync(request);
-    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites) => _lib.RewriteCommitsAsync(rewrites);
+    public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => _lib.RewriteCommitsAsync(rewrites, branchName);
     public Task FetchAsync(string remoteName = "origin")        => _lib.FetchAsync(remoteName);
     public Task PullAsync(string remoteName = "origin")         => _lib.PullAsync(remoteName);
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
@@ -60,7 +60,8 @@ public sealed class HybridGitBackend : IGitBackend
             ? _cli.PushAsync(remoteName, mode)
             : _lib.PushAsync(remoteName, mode);
     public Task<string> GetReflogSelectorForHeadAsync()         => _lib.GetReflogSelectorForHeadAsync();
-    public Task ResetHardAsync(string targetReference)          => _lib.ResetHardAsync(targetReference);
+    public Task ResetMixedAsync(string targetReference, string? branchName = null) => _lib.ResetMixedAsync(targetReference, branchName);
+    public Task ResetHardAsync(string targetReference, string? branchName = null)  => _lib.ResetHardAsync(targetReference, branchName);
     public Task<string> GetHeadShaAsync()                       => _lib.GetHeadShaAsync();
     public Task<string> ResolveRefAsync(string refSpec)         => _lib.ResolveRefAsync(refSpec);
     public Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string a, string b) => _lib.GetCommitsBetweenAsync(a, b);

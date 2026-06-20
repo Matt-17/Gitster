@@ -19,12 +19,15 @@
         <StackPanel>
 
             <!-- Message + borderless copy button -->
-            <Grid Margin="0,0,0,6">
+            <Grid Margin="0,0,0,7">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" TextTrimming="CharacterEllipsis"
+                <TextBlock Grid.Column="0"
+                           TextWrapping="Wrap"
+                           TextTrimming="CharacterEllipsis"
+                           MaxHeight="39"
                            ToolTip="{Binding SelectedCommit.Message}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -44,6 +47,7 @@
                     </TextBlock.Style>
                 </TextBlock>
                 <Button Grid.Column="1" Style="{StaticResource CopyGlyphButton}"
+                        VerticalAlignment="Top"
                         ToolTip="Copy full message" Tag="{Binding SelectedCommit.Message}" Click="CopyMessage_Click"
                         Visibility="{Binding SelectedCommit, Converter={StaticResource NullToCollapsedConverter}}">
                     <Path Width="11" Height="11" Stretch="Uniform" Fill="Transparent"

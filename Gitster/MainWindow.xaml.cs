@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Gitster.Models;
 using Gitster.Services;
 using Gitster.ViewModels;
@@ -24,6 +25,13 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
 
         RestoreWindowSettings();
+        UpdateRootChromeFrame();
+    }
+
+    private async void Window_ContentRendered(object? sender, EventArgs e)
+    {
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        await _viewModel.InitializeAsync();
     }
 
     private async void Window_Activated(object sender, EventArgs e)
@@ -38,9 +46,21 @@ public partial class MainWindow : Window
 
         // Custom-chrome windows clip content under the screen edges when maximized;
         // pad the root by the resize border so nothing is hidden (A6).
+        UpdateRootChromeFrame();
+    }
+
+    private void UpdateRootChromeFrame()
+    {
         RootContainer.Padding = WindowState == WindowState.Maximized
             ? new Thickness(SystemParameters.WindowResizeBorderThickness.Left + SystemParameters.FixedFrameVerticalBorderWidth)
             : new Thickness(0);
+        RootContainer.BorderThickness = WindowState == WindowState.Maximized
+            ? new Thickness(0)
+            : new Thickness(1);
+
+        MaxRestoreGlyph.Text = WindowState == WindowState.Maximized
+            ? "\uE923"
+            : "\uE922";
     }
 
     private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

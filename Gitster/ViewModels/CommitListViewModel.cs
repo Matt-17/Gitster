@@ -6,27 +6,27 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
 using Gitster.Services.Git;
+using Gitster.Services.History;
 using Gitster.Services.Search;
 
 namespace Gitster.ViewModels;
 
 /// <summary>
-/// Owns the commit list: progressive HEAD→parent loading (A0.1), virtualization-friendly
-/// flat item collection with section headers (A0.2/A5), background remote-state computation
-/// (A0.4), debounced query filtering (A0.5/A8), and lazy cancellable diff loading (A0.3).
+/// Owns the commit list. The SQLite cache does the expensive git walk; WPF virtualization
+/// keeps rendering cheap after the full cached history is loaded.
 /// </summary>
 public partial class CommitListViewModel : BaseViewModel
 {
-    private const int BatchSize = 200;
     private const int FilterDebounceMs = 150;
 
     private readonly IGitBackend _git;
+    private readonly CommitHistoryService _history;
 
     /// <summary>Shared UI preferences (date display mode, gravatar) for row bindings.</summary>
     public Gitster.Services.UiPreferencesService Ui { get; }
 
-    private List<CommitItem> _allRows = [];          // full HEAD→parent list (set once per load)
-    private List<CommitItem> _incomingRows = [];     // commits on the tracking remote, not local
+    private List<CommitItem> _allRows = [];
+    private List<CommitItem> _incomingRows = [];
     private RemoteSets? _remoteSets;
     private CommitQuery _query = CommitQuery.Parse(null);
 
@@ -34,17 +34,22 @@ public partial class CommitListViewModel : BaseViewModel
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _diffCts;
 
-    public CommitListViewModel(IGitBackend git, Gitster.Services.UiPreferencesService ui)
+    public CommitListViewModel(
+        IGitBackend git,
+        CommitHistoryService history,
+        Gitster.Services.UiPreferencesService ui)
     {
         _git = git;
+        _history = history;
         Ui = ui;
     }
 
     /// <summary>Flat list of <see cref="CommitSectionHeader"/> and <see cref="CommitItem"/> rows.</summary>
-    public RangeObservableCollection<object> Items { get; } = [];
+    [ObservableProperty]
+    public partial IReadOnlyList<object> Items { get; set; } = [];
 
-    /// <summary>The fully-loaded HEAD→parent commits (for author lists, range tools, etc.).</summary>
-    public IReadOnlyList<CommitItem> AllCommits => _allRows;
+    /// <summary>All cached commits for the current local branch, newest first.</summary>
+    public IReadOnlyList<CommitItem> LoadedCommits => _allRows;
 
     public event Action? FocusSearchRequested;
 
@@ -67,6 +72,12 @@ public partial class CommitListViewModel : BaseViewModel
     public partial string FilterStatusText { get; set; } = string.Empty;
 
     [ObservableProperty]
+    public partial bool HistoryLoading { get; set; }
+
+    [ObservableProperty]
+    public partial string HistoryStatusText { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial string DiffHeader { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -79,7 +90,7 @@ public partial class CommitListViewModel : BaseViewModel
     public partial CommitRemoteState DiffRemoteState { get; set; }
 
     public string DiffHeaderDisplay =>
-        DiffLoading ? "loading…"
+        DiffLoading ? "loading..."
         : string.IsNullOrEmpty(DiffHeader) ? "no commit selected"
         : DiffHeader;
 
@@ -94,75 +105,68 @@ public partial class CommitListViewModel : BaseViewModel
         DiffRemoteState = remoteState;
     }
 
-    // ── Loading ────────────────────────────────────────────────────────────
-
-    /// <summary>Loads the commit list for the current repository (progressive, A0).</summary>
-    public async Task LoadAsync()
+    public async Task LoadAsync(
+        CancellationToken cancellationToken = default,
+        IProgress<RepositoryLoadProgress>? progress = null)
     {
         _loadCts?.Cancel();
-        var cts = new CancellationTokenSource();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _loadCts = cts;
         var ct = cts.Token;
 
         var priorSha = SelectedCommit?.FullSha;
 
-        Items.Clear();
-        _allRows = [];
-        _incomingRows = [];
-        _remoteSets = null;
-
-        var loaded = new List<CommitItem>(1024);
+        HistoryLoading = true;
+        HistoryStatusText = "Loading history...";
 
         try
         {
-            await Task.Run(async () =>
+            if (string.IsNullOrWhiteSpace(_git.RepositoryPath))
             {
-                var batch = new List<CommitItem>(BatchSize);
-                bool firstBatch = true;
+                await Application.Current.Dispatcher.InvokeAsync(ClearList, DispatcherPriority.Normal);
+                return;
+            }
 
-                await foreach (var info in _git.EnumerateCommitsAsync(null, ct).ConfigureAwait(false))
-                {
-                    batch.Add(new CommitItem(
-                        info.Message, info.Date, info.Sha, info.AuthorName,
-                        info.AuthorEmail, info.RemoteState, info.FullSha, info.OrphanedPairSha));
+            await _history.OpenAsync(_git.RepositoryPath, ct, progress);
 
-                    if (batch.Count >= BatchSize)
-                    {
-                        await DispatchBatchAsync(loaded, batch, firstBatch, ct).ConfigureAwait(false);
-                        batch = new List<CommitItem>(BatchSize);
-                        firstBatch = false;
-                    }
-                }
-
-                if (batch.Count > 0)
-                    await DispatchBatchAsync(loaded, batch, firstBatch, ct).ConfigureAwait(false);
-            }, ct).ConfigureAwait(true);
-
+            progress?.Report(new RepositoryLoadProgress(
+                "Loading full history",
+                "Preparing virtualized commit rows."));
+            var rows = await _history.EnsureCompleteAsync(progress, ct);
             if (ct.IsCancellationRequested) return;
 
-            // Remote-state computation happens after the list is already visible.
+            var newAllRows = rows.Select(r => r.ToCommitItem()).ToList();
+
+            progress?.Report(new RepositoryLoadProgress(
+                "Computing remote state",
+                "Checking incoming and outgoing commits.",
+                newAllRows.Count));
             var sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
             if (ct.IsCancellationRequested) return;
 
-            _allRows = loaded;
-            ApplyRemoteSets(sets);
-            BuildAndApply(FilteredIncoming(), FilteredLocal(), priorSha);
-        }
-        catch (OperationCanceledException) { /* superseded by a newer load */ }
-    }
+            await _history.ApplyRemoteSetsAsync(sets, ct);
+            ApplyRemoteSets(sets, newAllRows);
+            var newIncomingRows = sets.Incoming.Select(ToItem).ToList();
 
-    private async Task DispatchBatchAsync(List<CommitItem> loaded, List<CommitItem> batch, bool first, CancellationToken ct)
-    {
-        var toAdd = batch;
-        await Application.Current.Dispatcher.InvokeAsync(() =>
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                _allRows = newAllRows;
+                _incomingRows = newIncomingRows;
+                _remoteSets = sets;
+
+                var remoteRows = BuildRows(FilteredIncoming(), FilteredLocal());
+                ApplyRows(remoteRows, priorSha);
+            }, DispatcherPriority.Normal);
+        }
+        catch (OperationCanceledException)
         {
-            if (ct.IsCancellationRequested) return;
-            loaded.AddRange(toAdd);
-            // Show rows immediately only when no inline filter is pending; otherwise the
-            // final BuildAndApply will lay them out. Headers/dots come after remote sets.
-            if (_query.IsEmpty)
-                foreach (var c in toAdd) Items.Add(c);
-        }, first ? DispatcherPriority.Normal : DispatcherPriority.Background);
+            // Superseded by a newer load.
+        }
+        finally
+        {
+            if (_loadCts == cts)
+                HistoryLoading = false;
+        }
     }
 
     public void ClearList()
@@ -171,35 +175,36 @@ public partial class CommitListViewModel : BaseViewModel
         _allRows = [];
         _incomingRows = [];
         _remoteSets = null;
-        Items.Clear();
+        Items = [];
         SelectedCommit = null;
+        HistoryLoading = false;
+        HistoryStatusText = string.Empty;
         UpdateFilterStatus();
     }
 
-    private void ApplyRemoteSets(RemoteSets sets)
+    private static CommitItem ToItem(CommitInfo info) => new(
+        info.Message,
+        info.Date,
+        info.Sha,
+        info.AuthorName,
+        info.AuthorEmail,
+        info.RemoteState,
+        info.FullSha,
+        info.OrphanedPairSha);
+
+    private void ApplyRemoteSets(RemoteSets sets, IEnumerable<CommitItem> rows)
     {
-        _remoteSets = sets;
         var outgoing = sets.OutgoingFullShas;
         var orphans = sets.OrphanedPairs;
 
-        foreach (var row in _allRows)
+        foreach (var row in rows)
         {
             row.RemoteState = outgoing.Contains(row.FullSha)
                 ? CommitRemoteState.LocalOnly
                 : sets.HasTrackingBranch ? CommitRemoteState.OnRemote : CommitRemoteState.NoTrackingBranch;
             row.OrphanedPairSha = orphans.TryGetValue(row.FullSha, out var p) ? p : null;
         }
-
-        _incomingRows = sets.Incoming.Select(c =>
-        {
-            var item = new CommitItem(c.Message, c.Date, c.Sha, c.AuthorName, c.AuthorEmail,
-                CommitRemoteState.Incoming, c.FullSha);
-            if (orphans.TryGetValue(c.FullSha, out var p)) item.OrphanedPairSha = p;
-            return item;
-        }).ToList();
     }
-
-    // ── Filtering (A8 / A0.5) ───────────────────────────────────────────────
 
     partial void OnFilterTextChanged(string value)
     {
@@ -214,8 +219,6 @@ public partial class CommitListViewModel : BaseViewModel
         _filterCts = cts;
         var token = cts.Token;
         var query = _query;
-        var rows = _allRows;          // immutable after load → safe to read off-thread
-        var incoming = _incomingRows;
 
         Task.Run(async () =>
         {
@@ -223,32 +226,45 @@ public partial class CommitListViewModel : BaseViewModel
             catch (TaskCanceledException) { return; }
             if (token.IsCancellationRequested) return;
 
-            var matchedLocal = query.IsEmpty ? rows : rows.Where(c => Match(query, c)).ToList();
-            var matchedIncoming = query.IsEmpty ? incoming : incoming.Where(c => Match(query, c)).ToList();
+            var rows = _allRows;
+            var incoming = _incomingRows;
+            var matchedLocal = query.IsEmpty
+                ? rows
+                : rows.Where(c => Match(query, c)).ToList();
+            var matchedIncoming = query.IsEmpty
+                ? incoming
+                : incoming.Where(c => Match(query, c)).ToList();
+            var builtRows = BuildRows(matchedIncoming, matchedLocal);
 
-            if (token.IsCancellationRequested) return;
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            try
             {
                 if (token.IsCancellationRequested) return;
-                BuildAndApply(matchedIncoming, matchedLocal, SelectedCommit?.FullSha);
-            });
+
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    ApplyRows(builtRows, SelectedCommit?.FullSha);
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                // Superseded by another filter.
+            }
         });
     }
 
     private static bool Match(CommitQuery query, CommitItem c) =>
         query.Matches(c.Message, c.AuthorName, c.AuthorEmail, c.FullSha, c.Date);
 
-    private List<CommitItem> FilteredLocal() =>
-        _query.IsEmpty ? _allRows : _allRows.Where(c => Match(_query, c)).ToList();
-
     private List<CommitItem> FilteredIncoming() =>
         _query.IsEmpty ? _incomingRows : _incomingRows.Where(c => Match(_query, c)).ToList();
+
+    private List<CommitItem> FilteredLocal() =>
+        _query.IsEmpty ? _allRows : _allRows.Where(c => Match(_query, c)).ToList();
 
     private static bool IsOutgoing(CommitItem c) =>
         c.RemoteState is CommitRemoteState.LocalOnly or CommitRemoteState.NoTrackingBranch;
 
-    /// <summary>Constructs the flat [Remote header][incoming][Local header][outgoing+synced] list.</summary>
-    private void BuildAndApply(List<CommitItem> incoming, List<CommitItem> local, string? priorSha)
+    private BuiltCommitRows BuildRows(List<CommitItem> incoming, List<CommitItem> local)
     {
         int outgoingCount = 0;
         for (int i = 0; i < local.Count; i++)
@@ -262,16 +278,25 @@ public partial class CommitListViewModel : BaseViewModel
         {
             result.Add(new CommitSectionHeader(CommitSectionKind.RemoteIncoming, incoming.Count,
                 _remoteSets?.RemoteName, _remoteSets?.RemoteUrl));
-            result.AddRange(incoming);
+
+            if (incoming.Count == 0)
+                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no incoming commits"));
+            else
+                result.AddRange(incoming);
         }
 
-        if (outgoingCount > 0)
+        if (local.Count > 0 || hasRemote)
             result.Add(new CommitSectionHeader(CommitSectionKind.LocalOutgoing, outgoingCount));
 
         result.AddRange(local);
+        return new BuiltCommitRows(result, local.Count, incoming.Count);
+    }
 
-        Items.ReplaceAll(result);
+    private void ApplyRows(BuiltCommitRows rows, string? priorSha)
+    {
+        Items = rows.Items;
         UpdateFilterStatus();
+        HistoryStatusText = StatusForRows(rows.LocalCount, rows.IncomingCount);
         SelectAfterRebuild(priorSha);
     }
 
@@ -288,7 +313,15 @@ public partial class CommitListViewModel : BaseViewModel
         FilterStatusText = HasActiveFilters ? $"\"{FilterText.Trim()}\"" : string.Empty;
     }
 
-    // ── Diff loading (A0.3) ──────────────────────────────────────────────────
+    private string StatusForRows(int localCount, int incomingCount)
+    {
+        var count = HasActiveFilters ? localCount + incomingCount : _allRows.Count;
+        return HasActiveFilters
+            ? $"{count:N0} matching commit{(count == 1 ? "" : "s")}"
+            : $"{count:N0} commit{(count == 1 ? "" : "s")}";
+    }
+
+    private sealed record BuiltCommitRows(IReadOnlyList<object> Items, int LocalCount, int IncomingCount);
 
     partial void OnSelectedCommitChanged(CommitItem? value) => _ = LoadDiffAsync(value);
 
@@ -321,15 +354,16 @@ public partial class CommitListViewModel : BaseViewModel
             DiffRemoteState = commit.RemoteState;
             DiffLoading = false;
         }
-        catch (OperationCanceledException) { /* selection changed — ignore */ }
+        catch (OperationCanceledException)
+        {
+            // Selection changed.
+        }
         catch
         {
             DiffLoading = false;
             UpdateDiff(string.Empty, []);
         }
     }
-
-    // ── Commands ─────────────────────────────────────────────────────────────
 
     [RelayCommand]
     private void ClearAllFilters() => FilterText = string.Empty;

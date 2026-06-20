@@ -12,7 +12,7 @@
        mc:Ignorable="d"
        WindowStyle="None"
        ResizeMode="CanResize"
-       Title="{Binding WindowTitle}" Height="850" Width="1100" Activated="Window_Activated"
+       Title="{Binding WindowTitle}" Height="850" Width="1100" ContentRendered="Window_ContentRendered" Activated="Window_Activated"
        Icon="pack://application:,,,/Assets/Icon.ico">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="38" ResizeBorderThickness="6"
@@ -47,18 +47,46 @@
         </Style>
         <Style x:Key="ChromeButton" TargetType="Button">
             <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="38"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="10"/>
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#40FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="CloseChromeButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E81123"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#C50F1F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -67,7 +95,11 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="RootContainer" Background="{StaticResource BackgroundPrimary}">
+    <Border x:Name="RootContainer"
+            Background="{StaticResource BackgroundPrimary}"
+            BorderBrush="{StaticResource WindowBorderBrush}"
+            BorderThickness="1"
+            SnapsToDevicePixels="True">
         <DockPanel>
             <!-- ── Custom-chrome top bar (accent) ───────────────────────────── -->
             <Grid DockPanel.Dock="Top" Height="38" Background="{StaticResource AccentBlue}">
@@ -161,13 +193,13 @@
                 <!-- Window controls -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
                     <Button Style="{StaticResource ChromeButton}" Click="OnMinimize" ToolTip="Minimize">
-                        <Path Width="10" Height="1" Stroke="White" StrokeThickness="1" Data="M0,0 H10"/>
+                        <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </Button>
                     <Button Style="{StaticResource ChromeButton}" Click="OnMaxRestore" ToolTip="Maximize/Restore">
-                        <Path Width="10" Height="10" Stroke="White" StrokeThickness="1" Fill="Transparent" Data="M0,0 H10 V10 H0 Z"/>
+                        <TextBlock x:Name="MaxRestoreGlyph" Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </Button>
-                    <Button x:Name="CloseButton" Style="{StaticResource ChromeButton}" Click="OnCloseWindow" ToolTip="Close">
-                        <Path Width="10" Height="10" Stroke="White" StrokeThickness="1.2" Data="M0,0 L10,10 M10,0 L0,10"/>
+                    <Button x:Name="CloseButton" Style="{StaticResource CloseChromeButton}" Click="OnCloseWindow" ToolTip="Close">
+                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </Button>
                 </StackPanel>
             </Grid>

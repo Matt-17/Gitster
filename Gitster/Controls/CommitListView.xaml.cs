@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 using Gitster.ViewModels;
 
@@ -34,6 +35,22 @@ public partial class CommitListView : UserControl
             .OfType<CommitItem>()
             .ToList();
     }
+
+    private void CommitItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ListViewItem item || item.DataContext is not CommitItem commit)
+            return;
+
+        CommitListBox.SelectedItems.Clear();
+        item.IsSelected = true;
+        item.Focus();
+
+        if (_vm is null)
+            return;
+
+        _vm.SelectedCommit = commit;
+        _vm.SelectedCommits = [commit];
+    }
 }
 
 /// <summary>Picks the header vs. commit container style for the heterogeneous commit list.</summary>
@@ -43,7 +60,7 @@ public sealed class CommitContainerStyleSelector : StyleSelector
     public Style? HeaderStyle { get; set; }
 
     public override Style? SelectStyle(object item, DependencyObject container)
-        => item is CommitSectionHeader ? HeaderStyle : CommitStyle;
+        => item is CommitSectionHeader or CommitSectionEmptyRow ? HeaderStyle : CommitStyle;
 }
 
 /// <summary>Picks the header vs. commit row template for the heterogeneous commit list.</summary>
@@ -51,7 +68,13 @@ public sealed class CommitRowTemplateSelector : DataTemplateSelector
 {
     public DataTemplate? CommitTemplate { get; set; }
     public DataTemplate? HeaderTemplate { get; set; }
+    public DataTemplate? EmptyRowTemplate { get; set; }
 
     public override DataTemplate? SelectTemplate(object item, DependencyObject container)
-        => item is CommitSectionHeader ? HeaderTemplate : CommitTemplate;
+        => item switch
+        {
+            CommitSectionHeader => HeaderTemplate,
+            CommitSectionEmptyRow => EmptyRowTemplate,
+            _ => CommitTemplate
+        };
 }
