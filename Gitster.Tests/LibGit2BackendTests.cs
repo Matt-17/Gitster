@@ -319,4 +319,110 @@ public sealed class LibGit2BackendTests
         Assert.AreEqual("c2 rewritten", rewrittenC2.MessageShort);
         Assert.AreEqual(c1, rewrittenC2.Parents.Single().Sha);
     }
+
+    [TestMethod]
+    public async Task MergeBranch_FastForwardOnly_AdvancesCurrentBranchWithoutMergeCommit()
+    {
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        string currentBranch;
+        string featureTip;
+
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            var feature = r.CreateBranch("feature", r.Head.Tip);
+            Commands.Checkout(r, feature);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature.txt"), "feature");
+            Commands.Stage(r, "feature.txt");
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            featureTip = r.Commit("feature work", sig, sig).Sha;
+            Commands.Checkout(r, r.Branches[currentBranch]);
+        }
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var result = await backend.MergeBranchAsync("feature", BranchMergeStrategy.FastForwardOnly);
+
+        Assert.AreEqual(BranchMergeOutcome.FastForward, result.Outcome);
+        Assert.AreEqual(featureTip, result.HeadSha);
+
+        using var check = new Repository(repo.Path);
+        Assert.IsFalse(check.Info.IsHeadDetached);
+        Assert.AreEqual(currentBranch, check.Head.FriendlyName);
+        Assert.AreEqual(featureTip, check.Head.Tip!.Sha);
+        Assert.AreEqual(baseSha, check.Head.Tip.Parents.Single().Sha);
+    }
+
+    [TestMethod]
+    public async Task MergeBranch_NoFastForward_CreatesMergeCommitWhenFastForwardIsPossible()
+    {
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        string currentBranch;
+        string featureTip;
+
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            var feature = r.CreateBranch("feature", r.Head.Tip);
+            Commands.Checkout(r, feature);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature.txt"), "feature");
+            Commands.Stage(r, "feature.txt");
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            featureTip = r.Commit("feature work", sig, sig).Sha;
+            Commands.Checkout(r, r.Branches[currentBranch]);
+        }
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var result = await backend.MergeBranchAsync("feature", BranchMergeStrategy.NoFastForward);
+
+        Assert.AreEqual(BranchMergeOutcome.MergeCommit, result.Outcome);
+        Assert.AreNotEqual(featureTip, result.HeadSha);
+
+        using var check = new Repository(repo.Path);
+        Assert.IsFalse(check.Info.IsHeadDetached);
+        Assert.AreEqual(currentBranch, check.Head.FriendlyName);
+        var mergeCommit = check.Head.Tip!;
+        Assert.AreEqual(2, mergeCommit.Parents.Count());
+        Assert.IsTrue(mergeCommit.Parents.Any(p => p.Sha == baseSha));
+        Assert.IsTrue(mergeCommit.Parents.Any(p => p.Sha == featureTip));
+    }
+
+    [TestMethod]
+    public async Task MergeBranch_FastForwardOnly_WhenDiverged_ThrowsAndLeavesHeadUnchanged()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "shared.txt", "base");
+        string currentBranch;
+
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            var feature = r.CreateBranch("feature", r.Head.Tip);
+            Commands.Checkout(r, feature);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature.txt"), "feature");
+            Commands.Stage(r, "feature.txt");
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            r.Commit("feature work", sig, sig);
+            Commands.Checkout(r, r.Branches[currentBranch]);
+        }
+
+        var beforeHead = repo.Commit("main work", "main.txt", "main");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.MergeBranchAsync("feature", BranchMergeStrategy.FastForwardOnly));
+
+        using var check = new Repository(repo.Path);
+        Assert.IsFalse(check.Info.IsHeadDetached);
+        Assert.AreEqual(currentBranch, check.Head.FriendlyName);
+        Assert.AreEqual(beforeHead, check.Head.Tip!.Sha);
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
 }

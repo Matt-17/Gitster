@@ -430,6 +430,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task<string> CreateBranchAsync(string name, string startPointSha)  => NS<string>();
     public Task DeleteBranchAsync(string name, bool force)                    => NSVoid();
     public Task RenameBranchAsync(string oldName, string newName)             => NSVoid();
+    public Task<BranchMergeResult> MergeBranchAsync(string branchName, BranchMergeStrategy strategy) => NS<BranchMergeResult>();
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)    => NS<string>();
     public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted) => NS<string>();
 

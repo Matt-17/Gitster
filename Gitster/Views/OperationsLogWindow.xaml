@@ -45,6 +45,7 @@
                 <ComboBoxItem Content="Reword"/>
                 <ComboBoxItem Content="Reset"/>
                 <ComboBoxItem Content="Rebase"/>
+                <ComboBoxItem Content="Merge"/>
                 <ComboBoxItem Content="Cherry-pick"/>
             </ComboBox>
         </StackPanel>

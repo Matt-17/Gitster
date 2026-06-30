@@ -1398,6 +1398,74 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.CompletedTask;
     }
 
+    public Task<BranchMergeResult> MergeBranchAsync(string branchName, BranchMergeStrategy strategy)
+    {
+        using var repo = OpenRepository();
+        var targetBranch = repo.Info.IsHeadDetached ? "detached HEAD" : repo.Head.FriendlyName;
+        var beforeHead = repo.Head.Tip?.Sha
+            ?? throw new InvalidOperationException("Cannot merge into a repository without a HEAD commit.");
+
+        var branch = repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Branch not found: {branchName}");
+
+        if (branch.IsCurrentRepositoryHead)
+            throw new InvalidOperationException("Cannot merge a branch into itself.");
+        if (branch.Tip is null)
+            throw new InvalidOperationException($"Branch '{branchName}' has no commits to merge.");
+
+        var signature = repo.Config.BuildSignature(DateTimeOffset.Now)
+            ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+
+        var options = new MergeOptions
+        {
+            CommitOnSuccess = true,
+            FastForwardStrategy = strategy switch
+            {
+                BranchMergeStrategy.FastForwardOnly => FastForwardStrategy.FastForwardOnly,
+                BranchMergeStrategy.NoFastForward => FastForwardStrategy.NoFastForward,
+                _ => FastForwardStrategy.Default,
+            },
+        };
+
+        MergeResult result;
+        try
+        {
+            result = repo.Merge(branch, signature, options);
+        }
+        catch (NonFastForwardException ex) when (strategy == BranchMergeStrategy.FastForwardOnly)
+        {
+            throw new InvalidOperationException(
+                $"Branch '{branchName}' cannot be fast-forwarded into '{targetBranch}'. Choose another merge strategy if you want a merge commit.",
+                ex);
+        }
+
+        if (result.Status == MergeStatus.Conflicts)
+        {
+            throw new InvalidOperationException(
+                $"Merge of '{branchName}' produced conflicts. Resolve them in the working tree, then commit or abort the merge.");
+        }
+
+        if (strategy == BranchMergeStrategy.FastForwardOnly && result.Status == MergeStatus.NonFastForward)
+        {
+            throw new InvalidOperationException(
+                $"Branch '{branchName}' cannot be fast-forwarded into '{targetBranch}'. Choose another merge strategy if you want a merge commit.");
+        }
+
+        var headSha = repo.Head.Tip?.Sha ?? beforeHead;
+        var outcome = result.Status switch
+        {
+            MergeStatus.UpToDate => BranchMergeOutcome.UpToDate,
+            MergeStatus.FastForward => BranchMergeOutcome.FastForward,
+            MergeStatus.NonFastForward => BranchMergeOutcome.MergeCommit,
+            _ => BranchMergeOutcome.MergeCommit,
+        };
+
+        if (!headSha.Equals(beforeHead, StringComparison.OrdinalIgnoreCase))
+            HeadChanged?.Invoke(this, EventArgs.Empty);
+
+        return Task.FromResult(new BranchMergeResult(branch.FriendlyName, targetBranch, headSha, outcome));
+    }
+
     // ── Phase 3: Commit-to-another-branch (Step B) ──────────────────────────
 
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)

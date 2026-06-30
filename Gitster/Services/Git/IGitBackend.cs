@@ -76,6 +76,7 @@ public interface IGitBackend
     Task<string> CreateBranchAsync(string name, string startPointSha);
     Task DeleteBranchAsync(string name, bool force);
     Task RenameBranchAsync(string oldName, string newName);
+    Task<BranchMergeResult> MergeBranchAsync(string branchName, BranchMergeStrategy strategy);
 
     // ── Phase 3: Commit-to-branch & snapshot (libgit2) ────────────────────
     Task<string> CommitToBranchAsync(CommitToBranchRequest request);

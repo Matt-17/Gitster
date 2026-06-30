@@ -271,6 +271,11 @@
                             Command="{Binding CheckoutCommand}"
                             HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
 
+                    <Button Content="Merge..."
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding MergeCommand}"
+                            HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

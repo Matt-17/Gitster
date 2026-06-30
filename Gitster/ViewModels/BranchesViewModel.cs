@@ -86,8 +86,10 @@ public partial class BranchesViewModel : BaseViewModel
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection))]
     [NotifyPropertyChangedFor(nameof(CanCheckout))]
+    [NotifyPropertyChangedFor(nameof(CanMerge))]
     [NotifyPropertyChangedFor(nameof(CanDelete))]
     [NotifyCanExecuteChangedFor(nameof(CheckoutCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreateFromHereCommand))]
@@ -110,6 +112,7 @@ public partial class BranchesViewModel : BaseViewModel
 
     public bool HasSelection    => SelectedBranch != null;
     public bool CanCheckout     => SelectedBranch is { IsCurrent: false };
+    public bool CanMerge        => SelectedBranch is { IsCurrent: false };
     public bool CanDelete       => SelectedBranch is { IsCurrent: false, IsRemote: false };
     public bool SortByDateActive => !SortByName;
     public bool SortByNameActive => SortByName;
@@ -320,6 +323,69 @@ public partial class BranchesViewModel : BaseViewModel
         }
     }
 
+    [RelayCommand(CanExecute = nameof(CanMerge))]
+    private async Task Merge()
+    {
+        if (SelectedBranch is not { } row) return;
+
+        BranchInfo current;
+        try
+        {
+            current = await _git.GetCurrentBranchAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning($"Could not read the current branch:\n{ex.Message}", "Merge failed");
+            return;
+        }
+
+        var dialog = new MergeBranchDialog(row.Name, current.Name);
+        if (_windowService.ShowDialog(dialog) != true) return;
+
+        try
+        {
+            var beforeSha = await _git.GetHeadShaAsync();
+            _ = _snapshots.CaptureAsync(_git, $"Merge {row.Name}");
+
+            var result = await _feedback.RunAsync(
+                "Merge",
+                () => _git.MergeBranchAsync(row.Name, dialog.SelectedStrategy),
+                DescribeMergeOutcome);
+
+            if (result.Outcome != BranchMergeOutcome.UpToDate)
+            {
+                var before7 = ShortSha(beforeSha);
+                var after7 = ShortSha(result.HeadSha);
+
+                await _opsLog.RecordAsync(new OperationRecord(
+                    Id:             Guid.NewGuid().ToString(),
+                    Timestamp:      DateTimeOffset.Now,
+                    Kind:           OperationKind.Merge,
+                    Description:    $"Merge {row.Name} ({DescribeStrategy(dialog.SelectedStrategy)})",
+                    BranchName:     result.TargetBranch,
+                    BeforeSha:      before7,
+                    AfterSha:       after7,
+                    ReflogSelector: null,
+                    Status:         OperationStatus.Active));
+            }
+
+            await AfterChangeAsync();
+        }
+        catch (CheckoutConflictException)
+        {
+            _windowService.Warning(
+                "You have uncommitted changes that would be overwritten by this merge.",
+                "Merge failed");
+        }
+        catch (Exception ex)
+        {
+            if (ex.Message.Contains("produced conflicts", StringComparison.OrdinalIgnoreCase))
+                await AfterChangeAsync();
+
+            _windowService.Warning(ex.Message, "Merge failed");
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task Rename()
     {
@@ -419,4 +485,21 @@ public partial class BranchesViewModel : BaseViewModel
         await LoadAsync();
         await _onChanged();
     }
+
+    private static string ShortSha(string sha) =>
+        sha.Length >= 7 ? sha[..7] : sha;
+
+    private static string DescribeStrategy(BranchMergeStrategy strategy) => strategy switch
+    {
+        BranchMergeStrategy.FastForwardOnly => "fast-forward only",
+        BranchMergeStrategy.NoFastForward => "no fast-forward",
+        _ => "default",
+    };
+
+    private static string DescribeMergeOutcome(BranchMergeResult result) => result.Outcome switch
+    {
+        BranchMergeOutcome.UpToDate => "Already up to date",
+        BranchMergeOutcome.FastForward => $"Fast-forward to {ShortSha(result.HeadSha)}",
+        _ => $"Merge commit {ShortSha(result.HeadSha)}",
+    };
 }
