@@ -68,6 +68,7 @@ public partial class BranchesViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedback;
     private readonly OperationsLogService     _opsLog;
     private readonly SnapshotService          _snapshots;
+    private readonly SourceArchiveService     _archiveService;
     private readonly UiPreferencesService     _ui;
     private readonly IWindowService           _windowService;
     private readonly Func<Task>               _onChanged;
@@ -90,6 +91,7 @@ public partial class BranchesViewModel : BaseViewModel
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreateFromHereCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ArchiveCommand))]
     public partial BranchRow? SelectedBranch { get; set; }
 
     [ObservableProperty]
@@ -117,6 +119,7 @@ public partial class BranchesViewModel : BaseViewModel
         OperationFeedbackService feedback,
         OperationsLogService     opsLog,
         SnapshotService          snapshots,
+        SourceArchiveService     archiveService,
         UiPreferencesService     ui,
         IWindowService?          windowService,
         Func<Task>               onChanged)
@@ -125,6 +128,7 @@ public partial class BranchesViewModel : BaseViewModel
         _feedback  = feedback;
         _opsLog    = opsLog;
         _snapshots = snapshots;
+        _archiveService = archiveService;
         _ui        = ui;
         _windowService = windowService ?? new WindowService();
         _onChanged = onChanged;
@@ -396,6 +400,18 @@ public partial class BranchesViewModel : BaseViewModel
         {
             _windowService.Warning(ex.Message, "Create failed");
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task Archive()
+    {
+        if (SelectedBranch is not { } row)
+            return;
+
+        await _archiveService.ArchiveRefAsync(
+            row.Name,
+            $"branch-{row.Name}",
+            row.Info.TipSha);
     }
 
     private async Task AfterChangeAsync()

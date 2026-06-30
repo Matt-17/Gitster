@@ -36,6 +36,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly AuthorDirectoryService _authorDirService;
     private readonly CommitHistoryService _historyService;
     private readonly SnapshotService _snapshotService;
+    private readonly SourceArchiveService _sourceArchiveService;
     private readonly StashNameService _stashNameService;
     private readonly CustomToolsService _customToolsService;
     private readonly UiPreferencesService _uiPreferences;
@@ -79,6 +80,7 @@ public partial class MainWindowViewModel : BaseViewModel
         CapabilityService capabilityService,
         OperationsLogService opsLogService,
         SnapshotService snapshotService,
+        SourceArchiveService sourceArchiveService,
         StashNameService stashNameService,
         CustomToolsService customToolsService,
         UiPreferencesService uiPreferences,
@@ -97,6 +99,7 @@ public partial class MainWindowViewModel : BaseViewModel
         AutoFetch = autoFetch;
         _opsLogService = opsLogService;
         _snapshotService = snapshotService;
+        _sourceArchiveService = sourceArchiveService;
         _stashNameService = stashNameService;
         _customToolsService = customToolsService;
         _uiPreferences = uiPreferences;
@@ -122,6 +125,7 @@ public partial class MainWindowViewModel : BaseViewModel
             _feedbackService,
             _opsLogService,
             _snapshotService,
+            _sourceArchiveService,
             _windowService,
             () => CommitListVM.SelectedCommit,
             () => CommitListVM.SelectedCommits,
@@ -164,6 +168,7 @@ public partial class MainWindowViewModel : BaseViewModel
             _feedbackService,
             _opsLogService,
             _snapshotService,
+            _sourceArchiveService,
             _uiPreferences,
             _windowService,
             async () => await RefreshSidebarBadgesAsync());
@@ -257,7 +262,11 @@ public partial class MainWindowViewModel : BaseViewModel
         && SelectedCommit is not null
         && SelectedCommit.RemoteState != Gitster.Services.Git.CommitRemoteState.Incoming;
 
-    partial void OnIsGoButtonEnabledChanged(bool value) => OnPropertyChanged(nameof(CanAmendSelectedCommit));
+    partial void OnIsGoButtonEnabledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanAmendSelectedCommit));
+        ArchiveHeadCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnFolderPathChanged(string value)
     {
@@ -288,6 +297,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             SelectedCommit = CommitListVM.SelectedCommit;
             HistoryRewriteDraftVM.SetSelectedCommit(CommitListVM.SelectedCommit);
+            QuickActionsVM.NotifySelectionChanged();
         }
         else if (e.PropertyName == nameof(CommitListViewModel.LoadedCommits))
         {
@@ -496,6 +506,25 @@ public partial class MainWindowViewModel : BaseViewModel
 
     [RelayCommand]
     private async Task Refresh() => await UpdateElementsAsync();
+
+    [RelayCommand(CanExecute = nameof(CanArchiveHead))]
+    private async Task ArchiveHead()
+    {
+        if (string.IsNullOrWhiteSpace(Path))
+            return;
+
+        try
+        {
+            var headSha = await _gitBackend.GetHeadShaAsync();
+            await _sourceArchiveService.ArchiveRefAsync("HEAD", "HEAD", headSha);
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Archive failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    private bool CanArchiveHead() => IsGoButtonEnabled;
 
     [RelayCommand]
     private void SwitchBranch() { }

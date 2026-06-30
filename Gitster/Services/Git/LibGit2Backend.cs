@@ -1466,6 +1466,9 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.FromResult(branch.FriendlyName);
     }
 
+    public Task<ArchiveResult> ArchiveSourceZipAsync(ArchiveRequest request, CancellationToken ct = default) =>
+        throw new NotSupportedException("Archive export requires the Git command-line tool.");
+
     /// <summary>
     /// Builds a tree object capturing the requested changes without disturbing the
     /// index or working tree. Returns the tree and the set of paths it touched

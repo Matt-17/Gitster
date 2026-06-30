@@ -35,10 +35,6 @@ public static class GitCli
         Dictionary<string, string>? env = null,
         CancellationToken ct = default)
     {
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        linkedCts.CancelAfter(TimeSpan.FromSeconds(60));
-        var token = linkedCts.Token;
-
         var psi = new ProcessStartInfo("git", args)
         {
             WorkingDirectory        = workDir ?? Environment.CurrentDirectory,
@@ -47,6 +43,48 @@ public static class GitCli
             UseShellExecute         = false,
             CreateNoWindow          = true,
         };
+
+        var verb = args.Split(' ', 2)[0];
+        return await RunProcessAsync(psi, verb, env, ct);
+    }
+
+    /// <summary>
+    /// Runs <c>git</c> with exact argument boundaries. Use this for file paths and refs
+    /// where string quoting would be fragile.
+    /// </summary>
+    public static async Task<GitResult> RunAsync(
+        string? workDir,
+        IReadOnlyList<string> args,
+        Dictionary<string, string>? env = null,
+        CancellationToken ct = default)
+    {
+        if (args.Count == 0)
+            throw new ArgumentException("At least one Git argument is required.", nameof(args));
+
+        var psi = new ProcessStartInfo("git")
+        {
+            WorkingDirectory        = workDir ?? Environment.CurrentDirectory,
+            RedirectStandardOutput  = true,
+            RedirectStandardError   = true,
+            UseShellExecute         = false,
+            CreateNoWindow          = true,
+        };
+
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
+
+        return await RunProcessAsync(psi, args[0], env, ct);
+    }
+
+    private static async Task<GitResult> RunProcessAsync(
+        ProcessStartInfo psi,
+        string verb,
+        Dictionary<string, string>? env,
+        CancellationToken ct)
+    {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        linkedCts.CancelAfter(TimeSpan.FromSeconds(60));
+        var token = linkedCts.Token;
 
         if (env != null)
             foreach (var (k, v) in env)
@@ -74,7 +112,6 @@ public static class GitCli
             if (ct.IsCancellationRequested)
                 throw new OperationCanceledException(ct);
 
-            var verb = args.Split(' ', 2)[0];
             throw new TimeoutException(
                 $"git {verb} did not finish within 60 seconds and was terminated.");
         }

@@ -16,4 +16,5 @@ public enum GitCapabilities
     StashManagement = 1 << 9,
     DiffRegexSearch = 1 << 10,
     BlameFollow = 1 << 11,
+    SourceArchive = 1 << 12,
 }

@@ -32,6 +32,7 @@ public partial class CapabilityService : ObservableObject
         "BlameFollow"       => HasCapability(GitCapabilities.BlameFollow),
         "RangeDiff"         => HasCapability(GitCapabilities.RangeDiff),
         "Worktrees"         => HasCapability(GitCapabilities.Worktrees),
+        "SourceArchive"     => HasCapability(GitCapabilities.SourceArchive),
         "CommitSigning"     => HasCapability(GitCapabilities.CommitSigning),
         _                   => true,
     };
@@ -46,6 +47,7 @@ public partial class CapabilityService : ObservableObject
         "BlameFollow"       => "Requires the Git command-line tool (git blame -w -C).",
         "RangeDiff"         => "Requires the Git command-line tool (git range-diff).",
         "Worktrees"         => "Requires the Git command-line tool to be installed.",
+        "SourceArchive"     => "Requires the Git command-line tool (git archive).",
         "CommitSigning"     => "Coming later (requires Git CLI and GPG/SSH setup).",
         _                   => "Unavailable.",
     };

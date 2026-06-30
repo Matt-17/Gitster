@@ -6,6 +6,7 @@
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:controls="clr-namespace:Gitster.Controls"
              xmlns:converters="clr-namespace:Gitster.Converters"
+             xmlns:helper="clr-namespace:Gitster.Views.Helper"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
@@ -292,6 +293,10 @@
                                 Style="{StaticResource GhostButton}"
                                 Command="{Binding DeleteCommand}"
                                 Foreground="{StaticResource AccentDanger}" HorizontalAlignment="Stretch"/>
+                        <Button Grid.Row="2" Grid.Column="2" Content="Archive..."
+                                helper:Capability.Requires="SourceArchive"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding ArchiveCommand}" HorizontalAlignment="Stretch"/>
                     </Grid>
                 </StackPanel>
             </StackPanel>

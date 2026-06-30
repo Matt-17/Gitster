@@ -80,6 +80,7 @@ public interface IGitBackend
     // ── Phase 3: Commit-to-branch & snapshot (libgit2) ────────────────────
     Task<string> CommitToBranchAsync(CommitToBranchRequest request);
     Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted);
+    Task<ArchiveResult> ArchiveSourceZipAsync(ArchiveRequest request, CancellationToken ct = default);
 
     // ── Phase 3: Worktrees (CLI) ──────────────────────────────────────────
     Task<IReadOnlyList<WorktreeInfo>> GetWorktreesAsync();

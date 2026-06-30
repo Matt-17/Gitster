@@ -18,6 +18,7 @@ public partial class QuickActionsViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedback;
     private readonly OperationsLogService     _opsLog;
     private readonly SnapshotService          _snapshots;
+    private readonly SourceArchiveService     _archiveService;
     private readonly IWindowService           _windowService;
     private readonly Func<CommitItem?>        _getSelected;
     private readonly Func<List<CommitItem>>   _getMultiSelected;
@@ -28,6 +29,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         OperationFeedbackService feedback,
         OperationsLogService     opsLog,
         SnapshotService          snapshots,
+        SourceArchiveService     archiveService,
         IWindowService?          windowService,
         Func<CommitItem?>        getSelected,
         Func<List<CommitItem>>   getMultiSelected,
@@ -37,6 +39,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         _feedback         = feedback;
         _opsLog           = opsLog;
         _snapshots        = snapshots;
+        _archiveService   = archiveService;
         _windowService    = windowService ?? new WindowService();
         _getSelected      = getSelected;
         _getMultiSelected = getMultiSelected;
@@ -402,6 +405,28 @@ public partial class QuickActionsViewModel : BaseViewModel
         {
             _windowService.Error($"Snapshot failed:\n{ex.Message}", "Gitster");
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanArchiveSelectedCommit))]
+    private async Task ArchiveSelectedCommit()
+    {
+        var commit = _getSelected();
+        if (commit is null)
+            return;
+
+        await _archiveService.ArchiveRefAsync(
+            commit.FullSha,
+            $"commit-{commit.CommitId}",
+            commit.FullSha);
+    }
+
+    private bool CanArchiveSelectedCommit() => _getSelected() is not null;
+
+    public void NotifySelectionChanged()
+    {
+        RewordCommand.NotifyCanExecuteChanged();
+        FixupCommand.NotifyCanExecuteChanged();
+        ArchiveSelectedCommitCommand.NotifyCanExecuteChanged();
     }
 
     // ── Change Author ─────────────────────────────────────────────────────

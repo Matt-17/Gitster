@@ -51,6 +51,7 @@ public partial class App : Application
 				services.AddSingleton<CapabilityService>();
 				services.AddSingleton<OperationsLogService>();
 				services.AddSingleton<SnapshotService>();
+				services.AddSingleton<SourceArchiveService>();
 				services.AddSingleton<StashNameService>();
 				services.AddSingleton<CustomToolsService>();
 				services.AddSingleton<UiPreferencesService>();
