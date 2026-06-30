@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:converters="clr-namespace:Gitster.Converters"
+             xmlns:helper="clr-namespace:Gitster.Views.Helper"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
@@ -123,7 +124,10 @@
 
             <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
                           Background="{StaticResource BorderTertiary}"
-                          ResizeBehavior="PreviousAndNext"/>
+                          ResizeBehavior="PreviousAndNext"
+                          helper:PersistedGridSplitter.Key="WorktreesMode.DetailPanelWidth"
+                          helper:PersistedGridSplitter.DefinitionKind="Column"
+                          helper:PersistedGridSplitter.TargetIndex="2"/>
 
             <!-- Right column: actions -->
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="10">

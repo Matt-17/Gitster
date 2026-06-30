@@ -103,6 +103,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _stashNameService = stashNameService;
         _customToolsService = customToolsService;
         _uiPreferences = uiPreferences;
+        PersistedGridSplitter.Initialize(_uiPreferences);
 
         Capability.Initialize(capabilityService);
 

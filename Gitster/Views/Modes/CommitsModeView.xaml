@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:controls="clr-namespace:Gitster.Controls"
+             xmlns:helper="clr-namespace:Gitster.Views.Helper"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
     <UserControl.InputBindings>
@@ -30,7 +31,10 @@
         <GridSplitter Grid.Column="1"
                       HorizontalAlignment="Stretch"
                       Background="{StaticResource BorderTertiary}"
-                      ResizeBehavior="PreviousAndNext"/>
+                      ResizeBehavior="PreviousAndNext"
+                      helper:PersistedGridSplitter.Key="CommitsMode.ActionPanelWidth"
+                      helper:PersistedGridSplitter.DefinitionKind="Column"
+                      helper:PersistedGridSplitter.TargetIndex="2"/>
 
         <!-- Right: action panel -->
         <ScrollViewer Grid.Column="2"

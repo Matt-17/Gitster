@@ -237,7 +237,10 @@
         <!-- Splitter -->
         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
                       Background="{StaticResource BorderTertiary}"
-                      ResizeBehavior="PreviousAndNext"/>
+                      ResizeBehavior="PreviousAndNext"
+                      helper:PersistedGridSplitter.Key="BranchesMode.ActionPanelWidth"
+                      helper:PersistedGridSplitter.DefinitionKind="Column"
+                      helper:PersistedGridSplitter.TargetIndex="2"/>
 
         <!-- ══════════════ Right column: action panel ══════════════ -->
         <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="10">
