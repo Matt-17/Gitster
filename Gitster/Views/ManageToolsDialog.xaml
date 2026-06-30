@@ -56,14 +56,14 @@
             <StackPanel>
                 <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="13" Padding="6,4" Margin="0,4,0,10"
+                         FontSize="13" Margin="0,4,0,10"
                          Background="{DynamicResource BackgroundSecondary}"
                          Foreground="{DynamicResource TextPrimary}"
                          BorderBrush="{DynamicResource BorderTertiary}"/>
 
                 <TextBlock Text="Command" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                 <TextBox Text="{Binding Command, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="13" Padding="6,4" Margin="0,4,0,2"
+                         FontSize="13" Margin="0,4,0,2"
                          FontFamily="{DynamicResource FontFamilyMono}"
                          AcceptsReturn="False"
                          Background="{DynamicResource BackgroundSecondary}"
@@ -75,14 +75,14 @@
 
                 <TextBlock Text="Confirmation prompt (optional)" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                 <TextBox Text="{Binding Confirm, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="13" Padding="6,4" Margin="0,4,0,10"
+                         FontSize="13" Margin="0,4,0,10"
                          Background="{DynamicResource BackgroundSecondary}"
                          Foreground="{DynamicResource TextPrimary}"
                          BorderBrush="{DynamicResource BorderTertiary}"/>
 
                 <TextBlock Text="Argument prompt (optional → $ARGS)" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                 <TextBox Text="{Binding Prompt, UpdateSourceTrigger=PropertyChanged}"
-                         FontSize="13" Padding="6,4" Margin="0,4,0,10"
+                         FontSize="13" Margin="0,4,0,10"
                          Background="{DynamicResource BackgroundSecondary}"
                          Foreground="{DynamicResource TextPrimary}"
                          BorderBrush="{DynamicResource BorderTertiary}"/>

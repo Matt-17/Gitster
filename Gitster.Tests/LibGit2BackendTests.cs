@@ -126,6 +126,48 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task RewriteCommits_MultipleMetadataEdits_AppliesOneBatchAndRewritesDescendants()
+    {
+        using var repo = new GitTestRepo();
+        var c1 = repo.Commit("c1", "a.txt", "1");
+        var c2 = repo.Commit("c2", "a.txt", "2");
+        var c3 = repo.Commit("c3", "a.txt", "3");
+        var c4 = repo.Commit("c4", "a.txt", "4");
+
+        var newDate = new DateTimeOffset(2026, 2, 3, 4, 5, 6, TimeSpan.Zero);
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RewriteCommitsAsync([
+            new CommitRewrite(c2,
+                NewMessage: "c2 rewritten",
+                NewAuthorName: "Alice",
+                NewAuthorEmail: "alice@gitster.test"),
+            new CommitRewrite(c3,
+                NewAuthorDate: newDate,
+                NewCommitterDate: newDate)
+        ]);
+
+        using var check = new Repository(repo.Path);
+        Assert.IsFalse(check.Info.IsHeadDetached);
+
+        var newHead = check.Head.Tip!;
+        var rewrittenC3 = newHead.Parents.Single();
+        var rewrittenC2 = rewrittenC3.Parents.Single();
+
+        Assert.AreNotEqual(c4, newHead.Sha, "descendant HEAD should be rewritten");
+        Assert.AreNotEqual(c3, rewrittenC3.Sha, "second edited commit should be rewritten");
+        Assert.AreNotEqual(c2, rewrittenC2.Sha, "first edited commit should be rewritten");
+        Assert.AreEqual("c4", newHead.MessageShort);
+        Assert.AreEqual("c2 rewritten", rewrittenC2.MessageShort);
+        Assert.AreEqual("Alice", rewrittenC2.Author.Name);
+        Assert.AreEqual("alice@gitster.test", rewrittenC2.Author.Email);
+        Assert.AreEqual(newDate, rewrittenC3.Author.When);
+        Assert.AreEqual(newDate, rewrittenC3.Committer.When);
+        Assert.AreEqual(c1, rewrittenC2.Parents.Single().Sha);
+    }
+
+    [TestMethod]
     public async Task ResetMixed_MovesHeadAndKeepsWorkingTreeChanges()
     {
         using var repo = new GitTestRepo();

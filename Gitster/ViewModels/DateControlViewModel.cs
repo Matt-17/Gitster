@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows.Input;
 
@@ -13,17 +14,21 @@ namespace Gitster.ViewModels;
 /// <summary>
 /// ViewModel for the DateControl.
 /// </summary>
-public partial class DateControlViewModel : BaseViewModel
+public partial class DateControlViewModel : BaseViewModel, IDataErrorInfo
 {
     private DateTimeHolder[] _days = [];
     private DateTime _date;
     private bool _isOpen;
     private string _dateText = string.Empty;
     private string _timeText = string.Empty;
+    private string? _dateTextError;
+    private string? _timeTextError;
     private DateTime? _selectedDate;
     private EditMode _editMode = Controls.EditMode.DateOnly;
     private int _hour;
     private int _minute;
+    private bool _isEditingDateText;
+    private bool _isEditingTimeText;
 
     public DateControlViewModel()
     {
@@ -34,6 +39,16 @@ public partial class DateControlViewModel : BaseViewModel
     }
 
     public event EventHandler<DateTime?>? SelectedDateChanged;
+
+    public string Error => string.Empty;
+
+    public string this[string columnName] =>
+        columnName switch
+        {
+            nameof(DateText) => _dateTextError ?? string.Empty,
+            nameof(TimeText) => _timeTextError ?? string.Empty,
+            _ => string.Empty
+        };
 
     public ICommand SetWeek4Command { get; }
 
@@ -103,26 +118,25 @@ public partial class DateControlViewModel : BaseViewModel
         {
             if (value == _dateText)
                 return;
-            try
+
+            _dateText = value;
+            if (string.IsNullOrWhiteSpace(value))
             {
-                var parsedDate = string.IsNullOrWhiteSpace(value) ? null : GetDate(value);
-                if (parsedDate.HasValue && _selectedDate.HasValue)
-                {
-                    // Preserve time when updating date
-                    SelectedDate = new DateTime(parsedDate.Value.Year, parsedDate.Value.Month, parsedDate.Value.Day,
-                        _hour, _minute, 0);
-                }
-                else
-                {
-                    SelectedDate = parsedDate;
-                }
+                _dateTextError = null;
+                SelectedDate = null;
+                return;
             }
-            catch
+
+            if (!TryGetDate(value, out var parsedDate))
             {
-                // Invalid date format - just update the text
-                _dateText = value;
-                OnPropertyChanged();
+                _dateTextError = "Enter a valid date.";
+                return;
             }
+
+            _dateTextError = null;
+            SelectedDate = _selectedDate.HasValue
+                ? new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, _hour, _minute, 0)
+                : parsedDate;
         }
     }
 
@@ -133,21 +147,24 @@ public partial class DateControlViewModel : BaseViewModel
         {
             if (value == _timeText)
                 return;
-            try
+
+            _timeText = value;
+            if (string.IsNullOrWhiteSpace(value))
             {
-                var parsedTime = ParseTime(value);
-                if (parsedTime.HasValue)
-                {
-                    Hour = parsedTime.Value.Hour;
-                    Minute = parsedTime.Value.Minute;
-                }
+                _timeTextError = null;
+                return;
             }
-            catch
+
+            var parsedTime = ParseTime(value);
+            if (!parsedTime.HasValue)
             {
-                // Invalid time format - just update the text
-                _timeText = value;
-                OnPropertyChanged();
+                _timeTextError = "Enter a valid time.";
+                return;
             }
+
+            _timeTextError = null;
+            Hour = parsedTime.Value.Hour;
+            Minute = parsedTime.Value.Minute;
         }
     }
 
@@ -200,13 +217,54 @@ public partial class DateControlViewModel : BaseViewModel
     public ObservableCollection<string> Hours { get; } = new(Enumerable.Range(0, 24).Select(h => h.ToString("00"))
         );
     public ObservableCollection<string> Minutes { get; } = new(Enumerable.Range(0, 12).Select(i => (i * 5).ToString("00")));
+
+    public void BeginDateTextEdit()
+    {
+        _isEditingDateText = true;
+    }
+
+    public void EndDateTextEdit()
+    {
+        _isEditingDateText = false;
+        UpdateDateTextDisplay();
+    }
+
+    public void BeginTimeTextEdit()
+    {
+        _isEditingTimeText = true;
+    }
+
+    public void EndTimeTextEdit()
+    {
+        _isEditingTimeText = false;
+        UpdateTimeTextDisplay();
+    }
+
+    public void RefreshTextDisplay()
+    {
+        UpdateDateTextDisplay();
+        UpdateTimeTextDisplay();
+    }
+
     private void UpdateTextDisplay()
     {
-        // TODO: phase-2 culture-aware format
+        if (!_isEditingDateText)
+            UpdateDateTextDisplay();
+
+        if (!_isEditingTimeText)
+            UpdateTimeTextDisplay();
+    }
+
+    private void UpdateDateTextDisplay()
+    {
+        _dateTextError = null;
         _dateText = SelectedDate?.ToString("dd.MM.yyyy") ?? string.Empty;
         OnPropertyChanged(nameof(DateText));
+    }
 
-        // TODO: phase-2 culture-aware format
+    private void UpdateTimeTextDisplay()
+    {
+        _timeTextError = null;
         _timeText = SelectedDate?.ToString("HH:mm") ?? string.Empty;
         OnPropertyChanged(nameof(TimeText));
     }
@@ -299,7 +357,7 @@ public partial class DateControlViewModel : BaseViewModel
 
     public void Reset()
     {
-        UpdateTextDisplay();
+        RefreshTextDisplay();
     }
 
     public void ChangeHour(int hours)
@@ -332,9 +390,8 @@ public partial class DateControlViewModel : BaseViewModel
             OnPropertyChanged(nameof(SelectedDate));
             OnSelectedDateChanged(newDateTime);
 
-            // Update time text
-            _timeText = newDateTime.ToString("HH:mm");
-            OnPropertyChanged(nameof(TimeText));
+            if (!_isEditingTimeText)
+                UpdateTimeTextDisplay();
         }
     }
 
@@ -343,25 +400,56 @@ public partial class DateControlViewModel : BaseViewModel
         SelectedDateChanged?.Invoke(this, e);
     }
 
-    private DateTime? GetDate(string text)
+    private bool TryGetDate(string text, out DateTime dateTime)
     {
         // TODO: phase-2 i18n/culture-aware parsing
+        if (TryGetYearFirstDate(text, out dateTime))
+            return true;
+
         var formats = new[]
         {
-            "ddMMyy", "ddMMyyyy", "dd-MM-yy", "dd-MM-yyyy", "dd.MM.yy", "dd.MM.yyyy", "dd MM yy", "dd MM yyyy",
-            "d-M-yy", "d-M-yyyy", "d.M.yy", "d.M.yyyy", "d M yy", "d M yyyy",
-            "MMddyy", "MMddyyyy", "MM-dd-yy", "MM-dd-yyyy", "MM.dd.yy", "MM.dd.yyyy", "MM dd yy", "MM dd yyyy",
-            "M-d-yy", "M-d-yyyy", "M.d.yy", "M.d.yyyy", "M d yy", "M d yyyy",
-            "ddMM", "dd-MM", "dd.MM", "dd MM", "d-M", "d.M", "d M",
-            "MMdd", "MM-dd", "MM.dd", "MM dd", "M-d", "M.d", "M d"
+            "ddMMyy", "ddMMyyyy", "dd.MM.yy", "dd.MM.yyyy", "dd MM yy", "dd MM yyyy",
+            "d.M.yy", "d.M.yyyy", "d M yy", "d M yyyy",
+            "ddMM", "dd.MM", "dd MM", "d.M", "d M"
         };
         var distinctFormats = formats.Distinct();
         foreach (var format in distinctFormats)
         {
-            if (DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out var dateTime))
-                return dateTime;
+            if (DateTime.TryParseExact(text, format, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out dateTime))
+                return true;
         }
-        throw new ArgumentOutOfRangeException();
+        dateTime = default;
+        return false;
+    }
+
+    private static bool TryGetYearFirstDate(string text, out DateTime dateTime)
+    {
+        var formats = new[] { "yyyyMMdd", "yyyy-MM-dd", "yyyy-M-d" };
+        foreach (var format in formats)
+        {
+            if (DateTime.TryParseExact(text, format, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal, out dateTime))
+                return true;
+        }
+
+        var parts = text.Trim().Split('-', StringSplitOptions.TrimEntries);
+        if (parts.Length == 3
+            && parts[0].Length == 2
+            && int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var shortYear)
+            && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var month)
+            && int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var day))
+        {
+            try
+            {
+                dateTime = new DateTime(2000 + shortYear, month, day);
+                return true;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+            }
+        }
+
+        dateTime = default;
+        return false;
     }
 
     public void SetMinute(int result)

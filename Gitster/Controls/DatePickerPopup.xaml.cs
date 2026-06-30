@@ -126,6 +126,7 @@ public partial class DatePickerPopup : UserControl
         {
             var holder = (DateTimeHolder)(sender as FrameworkElement)!.DataContext;
             ViewModel.Select(holder);
+            ViewModel.RefreshTextDisplay();
             if (e.ClickCount == 2)
                 ViewModel.IsOpen = false;
         }
@@ -144,12 +145,14 @@ public partial class DatePickerPopup : UserControl
     private void HourOnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         ViewModel.ChangeHour(-Math.Sign(e.Delta));
+        ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }
 
     private void MinuteOnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         ViewModel.ChangeMinute(-Math.Sign(e.Delta));
+        ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }
 
@@ -170,6 +173,7 @@ public partial class DatePickerPopup : UserControl
                 ViewModel.ChangeHour(change);
             else
                 ViewModel.ChangeMinute(change);
+            ViewModel.RefreshTextDisplay();
         }, _source.Token);
     }
 
@@ -199,6 +203,7 @@ public partial class DatePickerPopup : UserControl
             if (int.TryParse(text, out var hour))
             {
                 ViewModel.SetHour(hour);
+                ViewModel.RefreshTextDisplay();
                 if (e.ClickCount == 2)
                     ViewModel.IsOpen = false;
             }
@@ -212,6 +217,7 @@ public partial class DatePickerPopup : UserControl
             if (int.TryParse(text, out var minute))
             {
                 ViewModel.SetMinute(minute);
+                ViewModel.RefreshTextDisplay();
                 if (e.ClickCount == 2)
                     ViewModel.IsOpen = false;
             }

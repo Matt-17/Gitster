@@ -145,10 +145,8 @@
                     <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
                         <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged}"
                                  Width="60" Height="30"
-                                 Padding="6,0"
-                                 VerticalContentAlignment="Center"
                                  BorderBrush="{StaticResource BorderTertiary}"
-                                 BorderThickness="0.5"
+                                 BorderThickness="1"
                                  Background="{StaticResource BackgroundPrimary}"
                                  Foreground="{StaticResource TextPrimary}"/>
                         <ComboBox ItemsSource="{Binding UnitOptions}"

@@ -12,6 +12,11 @@
     <UserControl.Resources>
         <converters:DateDisplayConverter x:Key="DateCellConverter"/>
         <converters:DateDisplayConverter x:Key="DateTooltipConverter" Invert="True"/>
+        <Geometry x:Key="HistoryEditMessageGlyph">M4,5 H16 M4,10 H14 M4,15 H11</Geometry>
+        <Geometry x:Key="HistoryEditAuthorGlyph">M10,4 A3,3 0 1 1 10,10 A3,3 0 1 1 10,4 M4,17 C5,13 15,13 16,17</Geometry>
+        <Geometry x:Key="HistoryEditTimeGlyph">M10,3 A7,7 0 1 1 10,17 A7,7 0 1 1 10,3 M10,6 V10 L13,12</Geometry>
+        <Geometry x:Key="HistoryEditFileGlyph">M6,3 H12 L16,7 V17 H6 Z M12,3 V7 H16</Geometry>
+        <Geometry x:Key="HistoryEditTransitiveGlyph">M4,10 H15 M11,6 L15,10 L11,14</Geometry>
 
         <Style x:Key="CommitItemStyle" TargetType="ListViewItem">
             <Setter Property="Background" Value="Transparent"/>
@@ -46,6 +51,12 @@
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsHistoryEditTransitive}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentInfoBackground}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsHistoryEditDirect}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentWarningBackground}"/>
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundSecondary}"/>
                             </Trigger>
@@ -192,13 +203,14 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="62"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="142"/>
                         <ColumnDefinition Width="104"/>
                         <ColumnDefinition Width="68"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="1"
+                    <TextBlock Grid.Column="2"
                                Text="{Binding Message}"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Center"
@@ -215,6 +227,7 @@
             <Grid Height="24">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="28"/>
+                    <ColumnDefinition Width="62"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="142"/>
                     <ColumnDefinition Width="104"/>
@@ -269,35 +282,88 @@
                     </Ellipse>
                 </Grid>
 
-                <TextBlock Grid.Column="1" Text="{Binding Message}" VerticalAlignment="Center"
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,5,0"
+                            ToolTip="{Binding HistoryEditTooltip}">
+                    <Path Width="12"
+                          Height="12"
+                          Stretch="Uniform"
+                          Stroke="{StaticResource AccentWarning}"
+                          StrokeThickness="1.6"
+                          Fill="Transparent"
+                          Data="{StaticResource HistoryEditMessageGlyph}"
+                          Margin="0,0,3,0"
+                          Visibility="{Binding HasPendingMessageChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <Path Width="12"
+                          Height="12"
+                          Stretch="Uniform"
+                          Stroke="{StaticResource AccentWarning}"
+                          StrokeThickness="1.5"
+                          Fill="Transparent"
+                          Data="{StaticResource HistoryEditAuthorGlyph}"
+                          Margin="0,0,3,0"
+                          Visibility="{Binding HasPendingAuthorChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <Path Width="12"
+                          Height="12"
+                          Stretch="Uniform"
+                          Stroke="{StaticResource AccentWarning}"
+                          StrokeThickness="1.5"
+                          Fill="Transparent"
+                          Data="{StaticResource HistoryEditTimeGlyph}"
+                          Margin="0,0,3,0"
+                          Visibility="{Binding HasPendingTimeChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <Path Width="12"
+                          Height="12"
+                          Stretch="Uniform"
+                          Stroke="{StaticResource TextTertiary}"
+                          StrokeThickness="1.4"
+                          Fill="Transparent"
+                          Data="{StaticResource HistoryEditFileGlyph}"
+                          Margin="0,0,3,0"
+                          Visibility="{Binding HasPendingFileChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <Path Width="12"
+                          Height="12"
+                          Stretch="Uniform"
+                          Stroke="{StaticResource AccentBlue}"
+                          StrokeThickness="1.7"
+                          Fill="Transparent"
+                          Data="{StaticResource HistoryEditTransitiveGlyph}"
+                          Margin="0,0,3,0"
+                          Visibility="{Binding IsHistoryEditTransitive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="2" Text="{Binding DisplayMessage}" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" Margin="2,0,8,0"
                            Style="{StaticResource CommitPrimaryTextStyle}"/>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                    <local:Avatar Email="{Binding AuthorEmail}" DisplayName="{Binding AuthorName}"
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <local:Avatar Email="{Binding DisplayAuthorEmail}" DisplayName="{Binding DisplayAuthorName}"
                                   Margin="0,0,5,0"
                                   Enabled="{Binding DataContext.Ui.GravatarEnabled, RelativeSource={RelativeSource AncestorType=ListView}}"/>
-                    <TextBlock Text="{Binding AuthorName}" VerticalAlignment="Center"
+                    <TextBlock Text="{Binding DisplayAuthorName}" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                Style="{StaticResource CommitSecondaryTextStyle}"/>
                 </StackPanel>
-                <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="11"
+                <TextBlock Grid.Column="4" VerticalAlignment="Center" FontSize="11"
                            Style="{StaticResource CommitSecondaryTextStyle}">
                     <TextBlock.Text>
                         <MultiBinding Converter="{StaticResource DateCellConverter}">
-                            <Binding Path="Date"/>
+                            <Binding Path="DisplayDate"/>
                             <Binding Path="DataContext.Ui.UseRelativeDates"
                                      RelativeSource="{RelativeSource AncestorType=ListView}"/>
                         </MultiBinding>
                     </TextBlock.Text>
                     <TextBlock.ToolTip>
                         <MultiBinding Converter="{StaticResource DateTooltipConverter}">
-                            <Binding Path="Date"/>
+                            <Binding Path="DisplayDate"/>
                             <Binding Path="DataContext.Ui.UseRelativeDates"
                                      RelativeSource="{RelativeSource AncestorType=ListView}"/>
                         </MultiBinding>
                     </TextBlock.ToolTip>
                 </TextBlock>
-                <TextBlock Grid.Column="4" Text="{Binding CommitId}" VerticalAlignment="Center"
+                <TextBlock Grid.Column="5" Text="{Binding CommitId}" VerticalAlignment="Center"
                            Style="{StaticResource CommitMonoTextStyle}"/>
             </Grid>
         </DataTemplate>

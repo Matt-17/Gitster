@@ -8,6 +8,12 @@
              d:DataContext="{d:DesignInstance Type=vm:CommitPanelViewModel}"
              Width="440">
     <UserControl.Resources>
+        <Style x:Key="BorderlessTextBox" TargetType="TextBox" BasedOn="{StaticResource GitsterTextBox}">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        </Style>
+
         <!-- A file row: checkbox · badge · path · +/- counts -->
         <DataTemplate x:Key="FileRowTemplate">
             <Grid Height="24">
@@ -83,7 +89,7 @@
                     CornerRadius="6" Padding="2" Margin="0,0,0,6">
                 <Grid>
                     <TextBlock Text="Message (required)" Foreground="{StaticResource TextTertiary}"
-                               Margin="6,4" FontStyle="Italic" IsHitTestVisible="False">
+                               Margin="4,3" FontStyle="Italic" IsHitTestVisible="False">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -97,8 +103,7 @@
                              AcceptsReturn="True" TextWrapping="Wrap"
                              MinHeight="54" MaxHeight="120"
                              VerticalScrollBarVisibility="Auto"
-                             BorderThickness="0" Background="Transparent"
-                             Padding="6,4" Foreground="{StaticResource TextPrimary}"/>
+                             Style="{StaticResource BorderlessTextBox}"/>
                 </Grid>
             </Border>
 

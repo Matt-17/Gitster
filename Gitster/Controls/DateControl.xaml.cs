@@ -81,11 +81,21 @@ public partial class DateControl : UserControl
 
     private void TbDate_GotFocus(object sender, RoutedEventArgs e)
     {
+        if (sender == TbDate)
+            ViewModel.BeginDateTextEdit();
+        else if (sender == TbTime)
+            ViewModel.BeginTimeTextEdit();
+
         // Don't auto-open popup on focus
     }
 
     private void TbDate_LostFocus(object sender, RoutedEventArgs e)
     {
+        if (sender == TbDate)
+            ViewModel.EndDateTextEdit();
+        else if (sender == TbTime)
+            ViewModel.EndTimeTextEdit();
+
         // Popup is configured with StaysOpen=False and closes automatically on outside clicks.
     }
 
@@ -99,6 +109,7 @@ public partial class DateControl : UserControl
                     var be = ((TextBox)sender).GetBindingExpression(TextBox.TextProperty);
                     Debug.Assert(be != null, nameof(be) + " != null");
                     be.UpdateSource();
+                    ViewModel.RefreshTextDisplay();
                     TbDate.SelectAll();
                     ViewModel.IsOpen = false;
                     e.Handled = true;
@@ -117,6 +128,7 @@ public partial class DateControl : UserControl
                 if (TbDate.SelectionLength == TbDate.Text.Length || string.IsNullOrEmpty(TbDate.Text))
                 {
                     ViewModel.SelectedDate = SystemTime.Today;
+                    ViewModel.RefreshTextDisplay();
                     TbDate.SelectAll();
                     e.Handled = true;
                 }
@@ -125,17 +137,20 @@ public partial class DateControl : UserControl
                 if (TbDate.SelectionLength == TbDate.Text.Length || string.IsNullOrEmpty(TbDate.Text))
                 {
                     ViewModel.SelectedDate = SystemTime.Today.AddDays(1);
+                    ViewModel.RefreshTextDisplay();
                     TbDate.SelectAll();
                     e.Handled = true;
                 }
                 break;
             case Key.Up:
                 ViewModel.ChangeDate(1);
+                ViewModel.RefreshTextDisplay();
                 TbDate.SelectAll();
                 e.Handled = true;
                 break;
             case Key.Down:
                 ViewModel.ChangeDate(-1);
+                ViewModel.RefreshTextDisplay();
                 TbDate.SelectAll();
                 e.Handled = true;
                 break;
@@ -152,6 +167,7 @@ public partial class DateControl : UserControl
                     var be = ((TextBox)sender).GetBindingExpression(TextBox.TextProperty);
                     Debug.Assert(be != null, nameof(be) + " != null");
                     be.UpdateSource();
+                    ViewModel.RefreshTextDisplay();
                     TbTime.SelectAll();
                     ViewModel.IsOpen = false;
                     e.Handled = true;
@@ -168,11 +184,13 @@ public partial class DateControl : UserControl
                 break;
             case Key.Up:
                 ViewModel.ChangeMinute(-1);
+                ViewModel.RefreshTextDisplay();
                 TbTime.SelectAll();
                 e.Handled = true;
                 break;
             case Key.Down:
                 ViewModel.ChangeMinute(1);
+                ViewModel.RefreshTextDisplay();
                 TbTime.SelectAll();
                 e.Handled = true;
                 break;
@@ -196,12 +214,14 @@ public partial class DateControl : UserControl
     private void TbDate_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         ViewModel.ChangeDate(Math.Sign(e.Delta));
+        ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }
 
     private void TbTime_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         ViewModel.ChangeMinute(-Math.Sign(e.Delta));
+        ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }
 
@@ -218,6 +238,7 @@ public partial class DateControl : UserControl
         {
             ViewModel.SelectedDate = SystemTime.Today;
         }
+        ViewModel.RefreshTextDisplay();
     }
 
     private void Tomorrow_Click(object sender, RoutedEventArgs e)
@@ -234,5 +255,6 @@ public partial class DateControl : UserControl
         {
             ViewModel.SelectedDate = tomorrow;
         }
+        ViewModel.RefreshTextDisplay();
     }
 }

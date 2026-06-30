@@ -33,7 +33,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0" x:Name="PathBox"
-                     FontSize="13" Padding="6,4"
+                     FontSize="13"
                      Background="{DynamicResource BackgroundSecondary}"
                      Foreground="{DynamicResource TextPrimary}"
                      BorderBrush="{DynamicResource BorderTertiary}"/>
@@ -45,7 +45,7 @@
         <TextBlock Grid.Row="4" Text="Branch"
                    FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
         <TextBox Grid.Row="6" x:Name="BranchBox"
-                 FontSize="13" Padding="6,4"
+                 FontSize="13"
                  Background="{DynamicResource BackgroundSecondary}"
                  Foreground="{DynamicResource TextPrimary}"
                  BorderBrush="{DynamicResource BorderTertiary}"/>

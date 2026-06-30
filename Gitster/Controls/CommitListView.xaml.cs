@@ -34,6 +34,9 @@ public partial class CommitListView : UserControl
         _vm.SelectedCommits = CommitListBox.SelectedItems
             .OfType<CommitItem>()
             .ToList();
+
+        if (_vm.SelectedCommit is not null)
+            CommitListBox.ScrollIntoView(_vm.SelectedCommit);
     }
 
     private void CommitItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)

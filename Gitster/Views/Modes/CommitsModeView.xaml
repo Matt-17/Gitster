@@ -7,6 +7,15 @@
              xmlns:controls="clr-namespace:Gitster.Controls"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
+    <UserControl.InputBindings>
+        <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding CommitListVM.SelectPreviousCommitCommand}"/>
+        <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding CommitListVM.SelectNextCommitCommand}"/>
+        <KeyBinding Key="Prior" Modifiers="Alt" Command="{Binding CommitListVM.SelectPreviousCommitPageCommand}"/>
+        <KeyBinding Key="Next" Modifiers="Alt" Command="{Binding CommitListVM.SelectNextCommitPageCommand}"/>
+        <KeyBinding Key="Home" Modifiers="Alt" Command="{Binding CommitListVM.SelectFirstCommitCommand}"/>
+        <KeyBinding Key="End" Modifiers="Alt" Command="{Binding CommitListVM.SelectLastCommitCommand}"/>
+    </UserControl.InputBindings>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MinWidth="500"/>
@@ -24,11 +33,14 @@
                       ResizeBehavior="PreviousAndNext"/>
 
         <!-- Right: action panel -->
-        <StackPanel Grid.Column="2" Margin="10,10,12,10">
-            <controls:CommitContextCard  DataContext="{Binding CommitListVM}"/>
-            <controls:TimestampEditPanel DataContext="{Binding TimestampEditVM}" Margin="0,8,0,0"/>
-            <controls:AuthorPanel        DataContext="{Binding AuthorPanelVM}"   Margin="0,8,0,0"/>
-            <controls:QuickActionsPanel  DataContext="{Binding QuickActionsVM}"  Margin="0,8,0,0"/>
-        </StackPanel>
+        <ScrollViewer Grid.Column="2"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="10,10,12,10">
+                <controls:HistoryRewriteDraftPanel   DataContext="{Binding HistoryRewriteDraftVM}"/>
+                <controls:CommitContextCard          DataContext="{Binding CommitListVM}"          Margin="0,8,0,0"/>
+                <controls:QuickActionsPanel          DataContext="{Binding QuickActionsVM}"        Margin="0,8,0,0"/>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

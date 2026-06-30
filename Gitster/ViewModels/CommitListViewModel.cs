@@ -18,6 +18,7 @@ namespace Gitster.ViewModels;
 public partial class CommitListViewModel : BaseViewModel
 {
     private const int FilterDebounceMs = 150;
+    private const int PageNavigationCommitCount = 10;
 
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
@@ -153,6 +154,7 @@ public partial class CommitListViewModel : BaseViewModel
                 _allRows = newAllRows;
                 _incomingRows = newIncomingRows;
                 _remoteSets = sets;
+                OnPropertyChanged(nameof(LoadedCommits));
 
                 var remoteRows = BuildRows(FilteredIncoming(), FilteredLocal());
                 ApplyRows(remoteRows, priorSha);
@@ -175,11 +177,84 @@ public partial class CommitListViewModel : BaseViewModel
         _allRows = [];
         _incomingRows = [];
         _remoteSets = null;
+        OnPropertyChanged(nameof(LoadedCommits));
         Items = [];
         SelectedCommit = null;
         HistoryLoading = false;
         HistoryStatusText = string.Empty;
         UpdateFilterStatus();
+    }
+
+    public bool SelectCommitBySha(string? fullSha)
+    {
+        if (string.IsNullOrWhiteSpace(fullSha))
+            return false;
+
+        var match = Items
+            .OfType<CommitItem>()
+            .FirstOrDefault(c => string.Equals(c.FullSha, fullSha, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return false;
+
+        SelectedCommit = match;
+        return true;
+    }
+
+    [RelayCommand]
+    private void SelectPreviousCommit() => SelectCommitOffset(-1);
+
+    [RelayCommand]
+    private void SelectNextCommit() => SelectCommitOffset(1);
+
+    [RelayCommand]
+    private void SelectPreviousCommitPage() => SelectCommitOffset(-PageNavigationCommitCount);
+
+    [RelayCommand]
+    private void SelectNextCommitPage() => SelectCommitOffset(PageNavigationCommitCount);
+
+    [RelayCommand]
+    private void SelectFirstCommit() => SelectCommitBoundary(first: true);
+
+    [RelayCommand]
+    private void SelectLastCommit() => SelectCommitBoundary(first: false);
+
+    private void SelectCommitOffset(int offset)
+    {
+        var commits = Items.OfType<CommitItem>().ToList();
+        if (commits.Count == 0)
+        {
+            SelectedCommit = null;
+            return;
+        }
+
+        var currentIndex = FindSelectedCommitIndex(commits);
+        var targetIndex = currentIndex < 0
+            ? offset < 0 ? commits.Count - 1 : 0
+            : Math.Clamp(currentIndex + offset, 0, commits.Count - 1);
+
+        SelectedCommit = commits[targetIndex];
+    }
+
+    private void SelectCommitBoundary(bool first)
+    {
+        var commits = Items.OfType<CommitItem>().ToList();
+        SelectedCommit = commits.Count == 0
+            ? null
+            : commits[first ? 0 : commits.Count - 1];
+    }
+
+    private int FindSelectedCommitIndex(List<CommitItem> commits)
+    {
+        if (SelectedCommit is null)
+            return -1;
+
+        var selected = SelectedCommit;
+        var index = commits.FindIndex(c => ReferenceEquals(c, selected));
+        if (index >= 0)
+            return index;
+
+        return commits.FindIndex(c =>
+            string.Equals(c.FullSha, selected.FullSha, StringComparison.OrdinalIgnoreCase));
     }
 
     private static CommitItem ToItem(CommitInfo info) => new(
