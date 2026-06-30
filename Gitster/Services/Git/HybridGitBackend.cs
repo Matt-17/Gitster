@@ -51,6 +51,7 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<string> AmendAsync(AmendRequest request)        => _lib.AmendAsync(request);
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => _lib.AmendAuthorAsync(request);
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => _lib.RewriteCommitsAsync(rewrites, branchName);
+    public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => _lib.RemoveFileChangeFromCommitAsync(sha, path, branchName);
     public Task FetchAsync(string remoteName = "origin")        => _lib.FetchAsync(remoteName);
     public Task PullAsync(string remoteName = "origin")         => _lib.PullAsync(remoteName);
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)

@@ -118,6 +118,7 @@ public partial class MainWindowViewModel : BaseViewModel
         };
         CommitListVM = commitListViewModel;
         CommitListVM.PropertyChanged += OnCommitListVmPropertyChanged;
+        CommitListVM.RemoveChangeFromCommitAsync = RemoveChangeFromCommitAsync;
         TimestampEditVM = new TimestampEditViewModel(
             () => CommitListVM.SelectedCommit,
             () => CurrentCommitDetail.CommitDate);
@@ -802,6 +803,78 @@ public partial class MainWindowViewModel : BaseViewModel
             newDate.Minute,
             originalDate.Second,
             offset);
+    }
+
+    private async Task RemoveChangeFromCommitAsync(DiffFileEntry? file)
+    {
+        var selected = CommitListVM.SelectedCommit;
+        if (selected is null || file is null)
+            return;
+
+        if (selected.RemoteState == CommitRemoteState.Incoming)
+        {
+            _windowService.Warning(
+                "Incoming commits are not on the local branch yet. Pull or cherry-pick the commit before editing it.",
+                "Gitster");
+            return;
+        }
+
+        var commitSha = ShortSha(selected.FullSha);
+        var confirmText =
+            $"Remove the change to '{file.Path}' from commit {commitSha}?\n\n" +
+            "This rewrites the selected commit and later commits on this branch. " +
+            "The removed file change will be left staged so you can commit it later.";
+
+        if (selected.RemoteState == CommitRemoteState.OnRemote)
+            confirmText += "\n\nThis commit has already been pushed. Rewriting it will require a force-push.";
+
+        var confirm = _windowService.ShowMessage(
+            confirmText,
+            "Remove change from commit",
+            MessageBoxButton.YesNo,
+            selected.RemoteState == CommitRemoteState.OnRemote ? MessageBoxImage.Warning : MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            var beforeSha = await _gitBackend.GetHeadShaAsync();
+            var branchName = TitleBarVM.CurrentBranch;
+            await _snapshotService.CaptureAsync(_gitBackend, $"Before removing {file.Path} from {commitSha}");
+
+            var afterSha = await _feedbackService.RunAsync(
+                "Remove change from commit",
+                async () =>
+                {
+                    await Task.Run(() => _gitBackend.RemoveFileChangeFromCommitAsync(
+                        selected.FullSha,
+                        file.Path,
+                        branchName));
+                    return await _gitBackend.GetHeadShaAsync();
+                },
+                ShortSha);
+
+            var reflogSelector = await TryGetHeadReflogSelectorAsync();
+
+            await _opsLogService.RecordAsync(new OperationRecord(
+                Id: Guid.NewGuid().ToString(),
+                Timestamp: DateTimeOffset.Now,
+                Kind: OperationKind.HistoryEdit,
+                Description: $"Remove {file.Path} from {commitSha}",
+                BranchName: branchName,
+                BeforeSha: ShortSha(beforeSha),
+                AfterSha: ShortSha(afterSha),
+                ReflogSelector: reflogSelector,
+                Status: OperationStatus.Active));
+
+            ClearPendingHeadRefresh();
+            await RefreshAfterHeadChangeAsync();
+            await CommitPanelVM.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Remove change from commit failed:\n{ex.Message}", "Gitster");
+        }
     }
 
     [RelayCommand]

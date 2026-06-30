@@ -168,6 +168,79 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task RemoveFileChangeFromCommit_AddedFile_RemovesFromCommitAndLeavesFileStaged()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var target = repo.Commit("add foo", "foo.bar", "foo");
+        var headBefore = repo.Commit("other work", "other.txt", "other");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RemoveFileChangeFromCommitAsync(target, "foo.bar");
+
+        using var check = new Repository(repo.Path);
+        Assert.IsFalse(check.Info.IsHeadDetached);
+        Assert.AreNotEqual(headBefore, check.Head.Tip!.Sha, "descendant HEAD should be rewritten");
+        Assert.IsNull(check.Head.Tip.Tree["foo.bar"], "rewritten branch history should no longer contain the added file");
+        Assert.IsNotNull(check.Head.Tip.Tree["other.txt"], "unrelated descendant content should be replayed");
+
+        var rewrittenTarget = check.Head.Tip.Parents.Single();
+        Assert.AreEqual("add foo", rewrittenTarget.MessageShort);
+        Assert.IsNull(rewrittenTarget.Tree["foo.bar"], "selected commit should no longer contain the added file");
+
+        var status = check.RetrieveStatus(new StatusOptions { IncludeUntracked = true });
+        var foo = status.Single(e => e.FilePath == "foo.bar");
+        Assert.IsTrue((foo.State & FileStatus.NewInIndex) != 0, "removed change should be staged as an add");
+        Assert.IsFalse((foo.State & FileStatus.NewInWorkdir) != 0, "removed change should not also be unstaged");
+        Assert.AreEqual("foo", System.IO.File.ReadAllText(System.IO.Path.Combine(repo.Path, "foo.bar")));
+    }
+
+    [TestMethod]
+    public async Task RemoveFileChangeFromCommit_ModifiedFile_RestoresCommitAndLeavesModificationStaged()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "tracked.txt", "one");
+        var target = repo.Commit("modify tracked", "tracked.txt", "two");
+        repo.Commit("other work", "other.txt", "other");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RemoveFileChangeFromCommitAsync(target, "tracked.txt");
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual("one", ((Blob)check.Head.Tip!["tracked.txt"].Target).GetContentText());
+        Assert.AreEqual("two", System.IO.File.ReadAllText(System.IO.Path.Combine(repo.Path, "tracked.txt")));
+
+        var status = check.RetrieveStatus();
+        var tracked = status.Single(e => e.FilePath == "tracked.txt");
+        Assert.IsTrue((tracked.State & FileStatus.ModifiedInIndex) != 0, "removed modification should be staged");
+        Assert.IsFalse((tracked.State & FileStatus.ModifiedInWorkdir) != 0, "removed modification should not also be unstaged");
+    }
+
+    [TestMethod]
+    public async Task RemoveFileChangeFromCommit_LaterCommitTouchesSamePath_ThrowsAndLeavesHeadUnchanged()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var target = repo.Commit("add foo", "foo.bar", "one");
+        var headBefore = repo.Commit("modify foo", "foo.bar", "two");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.RemoveFileChangeFromCommitAsync(target, "foo.bar"));
+
+        StringAssert.Contains(ex.Message, "later commit");
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(headBefore, check.Head.Tip!.Sha);
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    [TestMethod]
     public async Task ResetMixed_MovesHeadAndKeepsWorkingTreeChanges()
     {
         using var repo = new GitTestRepo();

@@ -57,6 +57,24 @@ public partial class CommitListViewModel : BaseViewModel
     [RelayCommand]
     private void FocusSearch() => FocusSearchRequested?.Invoke();
 
+    public Func<DiffFileEntry?, Task>? RemoveChangeFromCommitAsync { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanRemoveChangeFromCommit))]
+    private async Task RemoveChangeFromCommit(DiffFileEntry? file)
+    {
+        if (RemoveChangeFromCommitAsync is null)
+            return;
+
+        await RemoveChangeFromCommitAsync(file);
+    }
+
+    private bool CanRemoveChangeFromCommit(DiffFileEntry? file) =>
+        RemoveChangeFromCommitAsync is not null
+        && !DiffLoading
+        && file is not null
+        && SelectedCommit is not null
+        && SelectedCommit.RemoteState != CommitRemoteState.Incoming;
+
     [ObservableProperty]
     public partial CommitItem? SelectedCommit { get; set; }
 
@@ -96,7 +114,11 @@ public partial class CommitListViewModel : BaseViewModel
         : DiffHeader;
 
     partial void OnDiffHeaderChanged(string value) => OnPropertyChanged(nameof(DiffHeaderDisplay));
-    partial void OnDiffLoadingChanged(bool value) => OnPropertyChanged(nameof(DiffHeaderDisplay));
+    partial void OnDiffLoadingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(DiffHeaderDisplay));
+        RemoveChangeFromCommitCommand.NotifyCanExecuteChanged();
+    }
 
     public void UpdateDiff(string header, List<DiffFileEntry> files,
         CommitRemoteState remoteState = CommitRemoteState.LocalOnly)
@@ -398,7 +420,11 @@ public partial class CommitListViewModel : BaseViewModel
 
     private sealed record BuiltCommitRows(IReadOnlyList<object> Items, int LocalCount, int IncomingCount);
 
-    partial void OnSelectedCommitChanged(CommitItem? value) => _ = LoadDiffAsync(value);
+    partial void OnSelectedCommitChanged(CommitItem? value)
+    {
+        RemoveChangeFromCommitCommand.NotifyCanExecuteChanged();
+        _ = LoadDiffAsync(value);
+    }
 
     private async Task LoadDiffAsync(CommitItem? commit)
     {

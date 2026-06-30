@@ -37,6 +37,7 @@ public interface IGitBackend
     Task<string> AmendAsync(AmendRequest request);
     Task AmendAuthorAsync(AmendAuthorRequest request);
     Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null);
+    Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null);
     Task FetchAsync(string remoteName = "origin");
     Task PullAsync(string remoteName = "origin");
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal);

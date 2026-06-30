@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 using Gitster.Models;
 
@@ -64,6 +65,16 @@ public partial class DiffView : UserControl, INotifyPropertyChanged
         set => SetValue(SelectedFileProperty, value);
     }
 
+    public static readonly DependencyProperty RemoveChangeFromCommitCommandProperty =
+        DependencyProperty.Register(nameof(RemoveChangeFromCommitCommand), typeof(ICommand), typeof(DiffView),
+            new PropertyMetadata(null));
+
+    public ICommand? RemoveChangeFromCommitCommand
+    {
+        get => (ICommand?)GetValue(RemoveChangeFromCommitCommandProperty);
+        set => SetValue(RemoveChangeFromCommitCommandProperty, value);
+    }
+
     public static readonly DependencyProperty FileTreeSplitterKeyProperty =
         DependencyProperty.Register(nameof(FileTreeSplitterKey), typeof(string), typeof(DiffView),
             new PropertyMetadata(string.Empty));
@@ -91,6 +102,27 @@ public partial class DiffView : UserControl, INotifyPropertyChanged
 
         if (e.NewValue is DiffTreeNode { File: { } file })
             SelectedFile = file;
+        else if (e.NewValue is DiffTreeNode)
+            SelectedFile = null;
+    }
+
+    private void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is TreeViewItem item)
+        {
+            item.Focus();
+            item.IsSelected = true;
+        }
+    }
+
+    private void FileTreeView_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (SelectedFile is null ||
+            RemoveChangeFromCommitCommand is null ||
+            !RemoveChangeFromCommitCommand.CanExecute(SelectedFile))
+        {
+            e.Handled = true;
+        }
     }
 
     private void RebuildFileTree()

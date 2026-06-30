@@ -652,6 +652,172 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.CompletedTask;
     }
 
+    public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new ArgumentException("Path is required.", nameof(path));
+
+        using var repo = OpenRepository();
+        var branch = AttachBranchForHistoryRewrite(repo, branchName, "remove a file change from a commit");
+        var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+        var normalizedPath = NormalizeRepoPath(path);
+
+        EnsureCleanWorkingTree(repo, "remove a file change from a commit");
+
+        var firstParentChain = GetFirstParentChainOldestFirst(branchTip);
+        var targetIndex = firstParentChain.FindIndex(c => ShaMatches(c, sha));
+        if (targetIndex < 0)
+            throw new InvalidOperationException(
+                "The selected commit is not on the current branch's first-parent history.");
+
+        var affectedCommits = firstParentChain.Skip(targetIndex).ToList();
+        var mergeCommit = affectedCommits.FirstOrDefault(c => c.Parents.Count() > 1);
+        if (mergeCommit is not null)
+            throw new InvalidOperationException(
+                $"Cannot remove a file change through merge commit {ShortSha(mergeCommit.Sha)}.");
+
+        var targetCommit = firstParentChain[targetIndex];
+        if (!CommitTouchesPath(repo, targetCommit, normalizedPath))
+            throw new InvalidOperationException(
+                $"Commit {ShortSha(targetCommit.Sha)} does not change '{normalizedPath}'.");
+
+        var laterTouch = affectedCommits
+            .Skip(1)
+            .FirstOrDefault(c => CommitTouchesPath(repo, c, normalizedPath));
+        if (laterTouch is not null)
+            throw new InvalidOperationException(
+                $"Cannot remove '{normalizedPath}' because later commit {ShortSha(laterTouch.Sha)} also changes it.");
+
+        var mapping = new Dictionary<string, Commit>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < firstParentChain.Count; i++)
+        {
+            var oldCommit = firstParentChain[i];
+            if (i < targetIndex)
+            {
+                mapping[oldCommit.Sha] = oldCommit;
+                continue;
+            }
+
+            var oldParents = oldCommit.Parents.ToList();
+            var newParents = oldParents
+                .Select(p => mapping.TryGetValue(p.Sha, out var mapped) ? mapped : p)
+                .ToList();
+
+            var oldParentTree = oldParents.FirstOrDefault()?.Tree;
+            var newParentTree = newParents.FirstOrDefault()?.Tree;
+            var excludedPath = i == targetIndex ? normalizedPath : null;
+            var newTree = BuildReplayedTree(repo, oldParentTree, oldCommit.Tree, newParentTree, excludedPath);
+
+            var newCommit = repo.ObjectDatabase.CreateCommit(
+                oldCommit.Author,
+                oldCommit.Committer,
+                oldCommit.Message,
+                newTree,
+                newParents,
+                prettifyMessage: false);
+
+            mapping[oldCommit.Sha] = newCommit;
+        }
+
+        if (mapping.TryGetValue(branchTip.Sha, out var newHead))
+            repo.Refs.UpdateTarget(branch.Reference, newHead.Id, $"remove {normalizedPath} from {ShortSha(targetCommit.Sha)}");
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    private static Tree BuildReplayedTree(
+        Repository repo,
+        Tree? oldParentTree,
+        Tree oldCommitTree,
+        Tree? newParentTree,
+        string? excludedPath)
+    {
+        var definition = newParentTree is null
+            ? new TreeDefinition()
+            : TreeDefinition.From(newParentTree);
+
+        foreach (var change in repo.Diff.Compare<TreeChanges>(oldParentTree, oldCommitTree))
+        {
+            if (excludedPath is not null && ChangeTouchesPath(change, excludedPath))
+                continue;
+
+            ApplyTreeChange(definition, oldCommitTree, change);
+        }
+
+        return repo.ObjectDatabase.CreateTree(definition);
+    }
+
+    private static void ApplyTreeChange(TreeDefinition definition, Tree oldCommitTree, TreeEntryChanges change)
+    {
+        var path = NormalizeRepoPath(change.Path);
+
+        if (change.Status == ChangeKind.Deleted)
+        {
+            definition.Remove(path);
+            return;
+        }
+
+        if (change.Status == ChangeKind.Renamed && !string.IsNullOrWhiteSpace(change.OldPath))
+            definition.Remove(NormalizeRepoPath(change.OldPath));
+
+        var entry = oldCommitTree[path]
+            ?? throw new InvalidOperationException($"Could not find tree entry for '{path}'.");
+        definition.Add(path, entry);
+    }
+
+    private static bool CommitTouchesPath(Repository repo, Commit commit, string normalizedPath)
+    {
+        var parent = commit.Parents.FirstOrDefault();
+        return repo.Diff.Compare<TreeChanges>(parent?.Tree, commit.Tree)
+            .Any(change => ChangeTouchesPath(change, normalizedPath));
+    }
+
+    private static bool ChangeTouchesPath(TreeEntryChanges change, string normalizedPath) =>
+        PathMatches(change.Path, normalizedPath)
+        || (!string.IsNullOrWhiteSpace(change.OldPath) && PathMatches(change.OldPath, normalizedPath));
+
+    private static bool PathMatches(string path, string normalizedPath) =>
+        string.Equals(NormalizeRepoPath(path), normalizedPath, StringComparison.Ordinal);
+
+    private static List<Commit> GetFirstParentChainOldestFirst(Commit tip)
+    {
+        var commits = new List<Commit>();
+        Commit? current = tip;
+        while (current is not null)
+        {
+            commits.Add(current);
+            current = current.Parents.FirstOrDefault();
+        }
+
+        commits.Reverse();
+        return commits;
+    }
+
+    private static void EnsureCleanWorkingTree(Repository repo, string operation)
+    {
+        var status = repo.RetrieveStatus(new StatusOptions
+        {
+            IncludeUntracked = true,
+            RecurseUntrackedDirs = true,
+        });
+
+        if (status.Any(e => (e.State & FileStatus.Ignored) == 0))
+            throw new InvalidOperationException(
+                $"Cannot {operation} while the working tree has uncommitted changes. Commit or stash them first.");
+    }
+
+    private static bool ShaMatches(Commit commit, string sha) =>
+        commit.Sha.Equals(sha, StringComparison.OrdinalIgnoreCase)
+        || commit.Sha.StartsWith(sha, StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeRepoPath(string path) =>
+        path.Replace('\\', '/').Trim('/');
+
+    private static string ShortSha(string sha) =>
+        sha.Length >= 7 ? sha[..7] : sha;
+
     public Task<string> AmendAsync(AmendRequest request)
     {
         using var repo = OpenRepository();
