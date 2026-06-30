@@ -490,6 +490,7 @@
         <local:DiffView Grid.Row="3"
                         Header="{Binding DiffHeaderDisplay}"
                         Files="{Binding DiffFiles}"
+                        RemoveChangeFromCommitCommand="{Binding RemoveChangeFromCommitCommand}"
                         FileTreeSplitterKey="CommitListView.DiffFileTreeWidth"/>
     </Grid>
 </UserControl>

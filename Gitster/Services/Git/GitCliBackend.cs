@@ -382,6 +382,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task<string> AmendAsync(AmendRequest request)        => NS<string>();
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => NSVoid();
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => NSVoid();
+    public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => NSVoid();
     public Task FetchAsync(string remoteName = "origin")        => NSVoid();
     public Task PullAsync(string remoteName = "origin")         => NSVoid();
 
