@@ -19,6 +19,7 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
 {
     private readonly IGitBackend _git;
     private FileSystemWatcher? _indexWatcher;
+    private FileSystemWatcher? _gitWatcher;
     private FileSystemWatcher? _workingDirWatcher;
     private readonly Timer _debounceTimer;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -35,6 +36,9 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string? _repositoryPath;
+
+    [ObservableProperty]
+    private int _gitMetadataVersion;
 
     public RepositoryStateService(IGitBackend git)
     {
@@ -66,6 +70,20 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 EnableRaisingEvents = true,
             };
             _indexWatcher.Changed += OnIndexChanged;
+        }
+
+        if (Directory.Exists(gitDir))
+        {
+            _gitWatcher = new FileSystemWatcher(gitDir)
+            {
+                IncludeSubdirectories = true,
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                EnableRaisingEvents = true,
+            };
+            _gitWatcher.Changed += OnGitMetadataChanged;
+            _gitWatcher.Created += OnGitMetadataChanged;
+            _gitWatcher.Deleted += OnGitMetadataChanged;
+            _gitWatcher.Renamed += OnGitMetadataChanged;
         }
 
         _workingDirWatcher = new FileSystemWatcher(repoPath)
@@ -122,6 +140,8 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 "Checking working tree state.",
                 25));
 
+            var priorSnapshot = _lastSnapshot;
+            var hadPendingGitMetadataChange = _pendingGitMetadataChange;
             var result = await Task.Run(async () =>
             {
                 var state = await _git.GetWorkingTreeStateAsync();
@@ -129,6 +149,9 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 var snapshot = CaptureSnapshot(repoPath);
                 return (state, branch, snapshot);
             });
+            var gitMetadataChanged = hadPendingGitMetadataChange
+                || (priorSnapshot is not null
+                    && !string.Equals(result.snapshot.GitToken, priorSnapshot.GitToken, StringComparison.Ordinal));
 
             progress?.Report(new OperationProgress(
                 "Refreshing repository",
@@ -139,6 +162,8 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
             {
                 WorkingTreeState = result.state;
                 CurrentBranch = result.branch.Name;
+                if (gitMetadataChanged)
+                    GitMetadataVersion++;
             });
 
             _lastSnapshot = result.snapshot;
@@ -166,6 +191,15 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
         RequestRefresh();
     }
 
+    private void OnGitMetadataChanged(object sender, FileSystemEventArgs e)
+    {
+        if (!IsInterestingGitMetadataPath(e.FullPath))
+            return;
+
+        _pendingGitMetadataChange = true;
+        RequestRefresh();
+    }
+
     private void OnWorkingDirChanged(object sender, FileSystemEventArgs e)
     {
         if (e.FullPath.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
@@ -186,8 +220,21 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
         _indexWatcher?.Dispose();
         _indexWatcher = null;
 
+        _gitWatcher?.Dispose();
+        _gitWatcher = null;
+
         _workingDirWatcher?.Dispose();
         _workingDirWatcher = null;
+    }
+
+    private static bool IsInterestingGitMetadataPath(string path)
+    {
+        var normalized = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        return normalized.EndsWith(Path.DirectorySeparatorChar + "HEAD", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(Path.DirectorySeparatorChar + "FETCH_HEAD", StringComparison.OrdinalIgnoreCase)
+            || normalized.EndsWith(Path.DirectorySeparatorChar + "packed-refs", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains(Path.DirectorySeparatorChar + "refs" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains(Path.DirectorySeparatorChar + "logs" + Path.DirectorySeparatorChar + "HEAD", StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()

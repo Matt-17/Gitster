@@ -6,6 +6,16 @@
              x:Name="Root"
              mc:Ignorable="d"
              Height="28">
+    <UserControl.Resources>
+        <Style x:Key="SearchInputTextBox" TargetType="TextBox" BasedOn="{StaticResource GitsterTextBox}">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        </Style>
+    </UserControl.Resources>
+
     <Border Background="{StaticResource BackgroundPrimary}"
             BorderBrush="{StaticResource BorderTertiary}"
             BorderThickness="0.5"
@@ -48,9 +58,7 @@
 
             <TextBox x:Name="Input" Grid.Column="1"
                      Text="{Binding Text, ElementName=Root, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                     BorderThickness="0" Background="Transparent"
-                     VerticalContentAlignment="Center"
-                     Foreground="{StaticResource TextPrimary}"/>
+                     Style="{StaticResource SearchInputTextBox}"/>
 
             <ContentPresenter Grid.Column="2"
                               Content="{Binding TrailingContent, ElementName=Root}"

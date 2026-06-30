@@ -32,7 +32,6 @@
         <TextBox Grid.Row="2"
                  x:Name="MessageTextBox"
                  FontSize="13"
-                 Padding="6,4"
                  Background="{DynamicResource BackgroundSecondary}"
                  Foreground="{DynamicResource TextPrimary}"
                  BorderBrush="{DynamicResource BorderTertiary}"/>

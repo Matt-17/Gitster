@@ -25,7 +25,7 @@
         <TextBlock Grid.Row="0" Text="Branch name"
                    FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
         <TextBox Grid.Row="2" x:Name="NameBox"
-                 FontSize="13" Padding="6,4"
+                 FontSize="13"
                  Background="{DynamicResource BackgroundSecondary}"
                  Foreground="{DynamicResource TextPrimary}"
                  BorderBrush="{DynamicResource BorderTertiary}"/>

@@ -9,31 +9,22 @@
              d:DataContext="{d:DesignInstance Type=vm:QuickActionsViewModel}">
 
     <Border Style="{StaticResource PanelCard}">
-        <StackPanel>
+        <Expander IsExpanded="False">
+            <Expander.Header>
+                <StackPanel Orientation="Horizontal">
+                    <Path Width="12" Height="12" Stretch="Uniform"
+                          Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
+                          Fill="Transparent"
+                          Data="M13,2 L7,12 L11,12 L7,22 L17,10 L13,10 Z"
+                          VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="More actions"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondary}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Expander.Header>
 
-            <!-- Header -->
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <Path Width="12" Height="12" Stretch="Uniform"
-                      Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
-                      Fill="Transparent"
-                      Data="M13,2 L7,12 L11,12 L7,22 L17,10 L13,10 Z"
-                      VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBlock Text="More actions"
-                           FontSize="11"
-                           Foreground="{StaticResource TextSecondary}"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <!-- 2×2 action grid (expanded to 2×3 for Squash) -->
-            <UniformGrid Rows="3" Columns="2">
-                <Button Content="Reword"
-                        Command="{Binding RewordCommand}"
-                        ToolTipService.ShowOnDisabled="True"
-                        Style="{StaticResource GhostButton}"
-                        Height="32" Margin="0,0,4,4"
-                        HorizontalAlignment="Stretch">
-                    <Button.ToolTip>Reword the selected commit's message</Button.ToolTip>
-                </Button>
+            <UniformGrid Rows="2" Columns="2" Margin="0,8,0,0">
                 <Button Content="Cherry-pick"
                         Command="{Binding CherryPickCommand}"
                         ToolTipService.ShowOnDisabled="True"
@@ -42,13 +33,6 @@
                         HorizontalAlignment="Stretch">
                     <Button.ToolTip>Cherry-pick a commit from another branch</Button.ToolTip>
                 </Button>
-                <Button Content="Author"
-                        Command="{Binding ChangeAuthorCommand}"
-                        ToolTip="Coming in Phase 2"
-                        ToolTipService.ShowOnDisabled="True"
-                        Style="{StaticResource GhostButton}"
-                        Height="32" Margin="0,0,4,4"
-                        HorizontalAlignment="Stretch"/>
                 <Button Content="Fixup"
                         helper:Capability.Requires="FixupAutosquash"
                         Command="{Binding FixupCommand}"
@@ -58,36 +42,23 @@
                         HorizontalAlignment="Stretch">
                     <Button.ToolTip>Stage fixup into the selected commit (requires Git CLI)</Button.ToolTip>
                 </Button>
-                <Button Content="Squash"
-                        Command="{Binding SquashSelectedCommand}"
+                <Button Content="To branch..."
+                        Command="{Binding CommitToBranchCommand}"
                         ToolTipService.ShowOnDisabled="True"
                         Style="{StaticResource GhostButton}"
                         Height="32" Margin="0,0,4,4"
                         HorizontalAlignment="Stretch">
-                    <Button.ToolTip>Squash selected commits into one (select 2+ in the list)</Button.ToolTip>
-                </Button>
-            </UniformGrid>
-
-            <!-- Branch actions (Phase 3) -->
-            <UniformGrid Rows="1" Columns="2" Margin="0,4,0,0">
-                <Button Content="To branch…"
-                        Command="{Binding CommitToBranchCommand}"
-                        ToolTipService.ShowOnDisabled="True"
-                        Style="{StaticResource GhostButton}"
-                        Height="32" Margin="0,0,4,0"
-                        HorizontalAlignment="Stretch">
                     <Button.ToolTip>Commit your changes onto another branch without switching</Button.ToolTip>
                 </Button>
-                <Button Content="Snapshot…"
+                <Button Content="Snapshot..."
                         Command="{Binding SnapshotToBranchCommand}"
                         ToolTipService.ShowOnDisabled="True"
                         Style="{StaticResource GhostButton}"
-                        Height="32" Margin="0,0,4,0"
+                        Height="32" Margin="0,0,4,4"
                         HorizontalAlignment="Stretch">
                     <Button.ToolTip>Save the current state as a named branch</Button.ToolTip>
                 </Button>
             </UniformGrid>
-
-        </StackPanel>
+        </Expander>
     </Border>
 </UserControl>

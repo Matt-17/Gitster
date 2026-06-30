@@ -28,10 +28,10 @@
                            TextWrapping="Wrap"
                            TextTrimming="CharacterEllipsis"
                            MaxHeight="39"
-                           ToolTip="{Binding SelectedCommit.Message}">
+                           ToolTip="{Binding SelectedCommit.DisplayMessage}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
-                            <Setter Property="Text"      Value="{Binding SelectedCommit.Message}"/>
+                            <Setter Property="Text"      Value="{Binding SelectedCommit.DisplayMessage}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                             <Setter Property="FontSize"   Value="14"/>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -48,7 +48,7 @@
                 </TextBlock>
                 <Button Grid.Column="1" Style="{StaticResource CopyGlyphButton}"
                         VerticalAlignment="Top"
-                        ToolTip="Copy full message" Tag="{Binding SelectedCommit.Message}" Click="CopyMessage_Click"
+                        ToolTip="Copy message" Tag="{Binding SelectedCommit.DisplayMessage}" Click="CopyMessage_Click"
                         Visibility="{Binding SelectedCommit, Converter={StaticResource NullToCollapsedConverter}}">
                     <Path Width="11" Height="11" Stretch="Uniform" Fill="Transparent"
                           Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5" Data="{StaticResource CopyGlyph}"/>
@@ -61,10 +61,10 @@
                 <!-- Author -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
                     <local:Avatar Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"
-                                  Email="{Binding SelectedCommit.AuthorEmail}"
-                                  DisplayName="{Binding SelectedCommit.AuthorName}"
+                                  Email="{Binding SelectedCommit.DisplayAuthorEmail}"
+                                  DisplayName="{Binding SelectedCommit.DisplayAuthorName}"
                                   Enabled="{Binding Ui.GravatarEnabled}"/>
-                    <TextBlock Text="{Binding SelectedCommit.AuthorName}" FontSize="12"
+                    <TextBlock Text="{Binding SelectedCommit.DisplayAuthorName}" FontSize="12"
                                Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                 </StackPanel>
 
@@ -130,7 +130,7 @@
                 <TextBlock FontSize="11" Foreground="{StaticResource TextTertiary}">
                     <TextBlock.Text>
                         <MultiBinding Converter="{StaticResource CardDateConverter}">
-                            <Binding Path="SelectedCommit.Date"/>
+                            <Binding Path="SelectedCommit.DisplayDate"/>
                             <Binding Path="Ui.UseRelativeDates"/>
                         </MultiBinding>
                     </TextBlock.Text>

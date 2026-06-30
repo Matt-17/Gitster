@@ -29,7 +29,6 @@
                  IsReadOnly="True" AcceptsReturn="True"
                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                  FontFamily="{DynamicResource FontFamilyMono}" FontSize="12"
-                 Padding="8"
                  Background="{DynamicResource BackgroundSecondary}"
                  Foreground="{DynamicResource TextPrimary}"
                  BorderBrush="{DynamicResource BorderTertiary}"/>

@@ -9,7 +9,9 @@
              xmlns:viewModels="clr-namespace:Gitster.ViewModels"
              mc:Ignorable="d" 
              d:DataContext="{d:DesignInstance Type=viewModels:DateControlViewModel}"
-             d:DesignWidth="300" HorizontalAlignment="Stretch">
+             d:DesignWidth="300" HorizontalAlignment="Stretch"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True">
     <UserControl.Resources>
         <Style x:Key="GhostIconButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -41,22 +43,35 @@
             <Setter Property="Height" Value="24"/>
             <Setter Property="Margin" Value="2,0,0,0"/>
         </Style>
+
+        <Style x:Key="DatePartTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource GitsterTextBox}">
+            <Setter Property="Padding" Value="0,1"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontFamily" Value="{DynamicResource FontFamilyUi}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
     </UserControl.Resources>
     <StackPanel x:Name="LayoutRoot" Orientation="Horizontal">
         <Border x:Name="InputFrame"
                 Height="30"
                 Background="{DynamicResource BackgroundPrimary}"
-                Padding="8,0"
-                CornerRadius="4"
+                Padding="6,0"
+                CornerRadius="{DynamicResource TextInputCornerRadius}"
+                SnapsToDevicePixels="True"
                 VerticalAlignment="Center">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
-                    <Setter Property="BorderThickness" Value="0.5"/>
+                    <Setter Property="BorderThickness" Value="1"/>
                     <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderSecondary}"/>
+                        </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
                             <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
-                            <Setter Property="BorderThickness" Value="1.5"/>
                         </Trigger>
                         <DataTrigger Binding="{Binding ElementName=TbDate, Path=(Validation.HasError)}" Value="True">
                             <Setter Property="BorderBrush" Value="{DynamicResource AccentDanger}"/>
@@ -75,19 +90,15 @@
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="TbDate" Grid.Column="0" 
                          Text="{Binding DateText, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
-                         MinWidth="70" Padding="2,1"
-                         FontFamily="{DynamicResource FontFamilyUi}"
-                         Foreground="{DynamicResource TextPrimary}"
+                         MinWidth="70"
                          AutomationProperties.Name="Date"
                          PreviewMouseDoubleClick="TbDate_MouseDoubleClick" 
                          PreviewKeyDown="TbDate_PreviewKeyDown" 
                          PreviewMouseWheel="TbDate_PreviewMouseWheel"
                          GotKeyboardFocus="TbDate_GotFocus"  
-                         LostKeyboardFocus="TbDate_LostFocus" 
-                         BorderThickness="0" Background="Transparent"
-                         VerticalAlignment="Center" VerticalContentAlignment="Center">
+                         LostKeyboardFocus="TbDate_LostFocus">
                     <TextBox.Style>
-                        <Style TargetType="TextBox">
+                        <Style TargetType="TextBox" BasedOn="{StaticResource DatePartTextBoxStyle}">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
@@ -102,19 +113,15 @@
                 </TextBox>
                 <TextBox x:Name="TbTime" Grid.Column="1" 
                          Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
-                         MinWidth="45" Padding="2,1"
-                         FontFamily="{DynamicResource FontFamilyUi}"
-                         Foreground="{DynamicResource TextPrimary}"
+                         MinWidth="45"
                          AutomationProperties.Name="Time"
                          PreviewMouseDoubleClick="TbDate_MouseDoubleClick" 
                          PreviewKeyDown="TbTime_PreviewKeyDown" 
                          PreviewMouseWheel="TbTime_PreviewMouseWheel"
                          GotKeyboardFocus="TbDate_GotFocus"  
-                         LostKeyboardFocus="TbDate_LostFocus" 
-                         BorderThickness="0" Background="Transparent"
-                         VerticalAlignment="Center" VerticalContentAlignment="Center">
+                         LostKeyboardFocus="TbDate_LostFocus">
                     <TextBox.Style>
-                        <Style TargetType="TextBox">
+                        <Style TargetType="TextBox" BasedOn="{StaticResource DatePartTextBoxStyle}">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.DateTime}">

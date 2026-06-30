@@ -30,6 +30,7 @@
     <sys:Double  x:Key="PaddingLg">14</sys:Double>
     <sys:Double  x:Key="RadiusMd">8</sys:Double>
     <sys:Double  x:Key="RadiusLg">12</sys:Double>
+    <CornerRadius x:Key="TextInputCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="CornerRadiusMd">8</CornerRadius>
     <CornerRadius x:Key="CornerRadiusLg">12</CornerRadius>
 
@@ -40,5 +41,57 @@
     <!-- ── Typography ────────────────────────────────────────────── -->
     <FontFamily x:Key="FontFamilyUi">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="FontFamilyMono">Cascadia Mono, JetBrains Mono, Consolas</FontFamily>
+
+    <Style x:Key="GitsterTextBox" TargetType="{x:Type TextBox}">
+        <Setter Property="Background" Value="{DynamicResource BackgroundPrimary}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource FontFamilyUi}"/>
+        <Setter Property="Padding" Value="4,1"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TextBox}">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource TextInputCornerRadius}"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource BorderSecondary}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                        </Trigger>
+                        <Trigger Property="Validation.HasError" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentDanger}"/>
+                        </Trigger>
+                        <Trigger Property="AcceptsReturn" Value="True">
+                            <Setter Property="Padding" Value="4,3"/>
+                            <Setter Property="VerticalContentAlignment" Value="Top"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource SoftDisabledBackground}"/>
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource GitsterTextBox}"/>
 
 </ResourceDictionary>

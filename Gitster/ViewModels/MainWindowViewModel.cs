@@ -52,6 +52,7 @@ public partial class MainWindowViewModel : BaseViewModel
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
     public TimestampEditViewModel TimestampEditVM { get; }
+    public HistoryRewriteDraftViewModel HistoryRewriteDraftVM { get; }
     public QuickActionsViewModel QuickActionsVM { get; }
     public UndoBarViewModel UndoBarVM { get; }
     public StatusBarViewModel StatusBarVM { get; }
@@ -125,6 +126,19 @@ public partial class MainWindowViewModel : BaseViewModel
             () => CommitListVM.SelectedCommit,
             () => CommitListVM.SelectedCommits,
             async () => await UpdateElementsAsync());
+        HistoryRewriteDraftVM = new HistoryRewriteDraftViewModel(
+            _gitBackend,
+            _feedbackService,
+            _opsLogService,
+            _snapshotService,
+            _windowService,
+            () => TitleBarVM.CurrentBranch,
+            async preferredSelectionSha =>
+            {
+                ClearPendingHeadRefresh();
+                await RefreshAfterHeadChangeAsync();
+                CommitListVM.SelectCommitBySha(preferredSelectionSha);
+            });
         UndoBarVM = undoBarViewModel;
         UndoBarVM.AfterUndoAsync = async progress =>
         {
@@ -271,7 +285,14 @@ public partial class MainWindowViewModel : BaseViewModel
         // Diff loading lives in CommitListViewModel now (lazy + cancellable, A0.3). The main
         // window only mirrors the selection for the edit/author panels.
         if (e.PropertyName == nameof(CommitListViewModel.SelectedCommit))
+        {
             SelectedCommit = CommitListVM.SelectedCommit;
+            HistoryRewriteDraftVM.SetSelectedCommit(CommitListVM.SelectedCommit);
+        }
+        else if (e.PropertyName == nameof(CommitListViewModel.LoadedCommits))
+        {
+            HistoryRewriteDraftVM.SetCommits(CommitListVM.LoadedCommits);
+        }
     }
 
     [RelayCommand]
@@ -1303,6 +1324,8 @@ public partial class MainWindowViewModel : BaseViewModel
         Remotes.Clear();
         TitleBarVM.Clear();
         CommitListVM.ClearList();
+        HistoryRewriteDraftVM.SetSelectedCommit(null);
+        HistoryRewriteDraftVM.SetCommits([]);
     }
 
     private async Task RefreshSidebarBadgesAsync()
@@ -1393,6 +1416,12 @@ public partial class MainWindowViewModel : BaseViewModel
         // The commit panel mirrors working-tree changes live while it is open (A2).
         if (e.PropertyName == nameof(RepositoryStateService.WorkingTreeState) && CommitPanelVM.IsOpen)
             _ = CommitPanelVM.LoadAsync();
+
+        if (e.PropertyName == nameof(RepositoryStateService.GitMetadataVersion))
+        {
+            QueueHeadRefresh();
+            return;
+        }
 
         if (e.PropertyName != nameof(RepositoryStateService.CurrentBranch))
             return;
