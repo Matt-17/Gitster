@@ -294,10 +294,16 @@
                        Visibility="{Binding IsBlame, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
         </Grid>
 
-        <GridSplitter Grid.Row="3" HorizontalAlignment="Stretch" Background="{StaticResource BorderTertiary}"/>
+        <GridSplitter Grid.Row="3"
+                      HorizontalAlignment="Stretch"
+                      Background="{StaticResource BorderTertiary}"
+                      helper:PersistedGridSplitter.Key="SearchMode.DiffHeight"
+                      helper:PersistedGridSplitter.DefinitionKind="Row"
+                      helper:PersistedGridSplitter.TargetIndex="4"/>
 
         <!-- ── Shared diff view (B7), for commit-list / compare / blame selection ── -->
         <controls:DiffView Grid.Row="4" Header="{Binding DiffHeader}" Files="{Binding DiffFiles}"
+                           FileTreeSplitterKey="SearchMode.DiffFileTreeWidth"
                            Visibility="{Binding IsRangeDiff, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
     </Grid>
 </UserControl>

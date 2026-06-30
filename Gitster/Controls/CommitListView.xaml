@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:Gitster.Controls"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:converters="clr-namespace:Gitster.Converters"
+             xmlns:helper="clr-namespace:Gitster.Views.Helper"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:CommitListViewModel}">
 
@@ -481,8 +482,14 @@
         <GridSplitter Grid.Row="2"
                       HorizontalAlignment="Stretch"
                       Background="{StaticResource BorderTertiary}"
-                      ResizeBehavior="PreviousAndNext"/>
+                      ResizeBehavior="PreviousAndNext"
+                      helper:PersistedGridSplitter.Key="CommitListView.DiffHeight"
+                      helper:PersistedGridSplitter.DefinitionKind="Row"
+                      helper:PersistedGridSplitter.TargetIndex="3"/>
 
-        <local:DiffView Grid.Row="3" Header="{Binding DiffHeaderDisplay}" Files="{Binding DiffFiles}"/>
+        <local:DiffView Grid.Row="3"
+                        Header="{Binding DiffHeaderDisplay}"
+                        Files="{Binding DiffFiles}"
+                        FileTreeSplitterKey="CommitListView.DiffFileTreeWidth"/>
     </Grid>
 </UserControl>
