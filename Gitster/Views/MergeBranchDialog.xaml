@@ -1,0 +1,113 @@
+<Window x:Class="Gitster.Views.MergeBranchDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Merge branch"
+        Width="520" Height="360"
+        MinWidth="460" MinHeight="320"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource BackgroundPrimary}">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="18"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Merge source"
+                   FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+
+        <Border Grid.Row="2"
+                Padding="10,8"
+                Background="{DynamicResource BackgroundSecondary}"
+                BorderBrush="{DynamicResource BorderTertiary}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="SourceBranchText"
+                           Grid.Column="0"
+                           FontFamily="{DynamicResource FontFamilyMono}"
+                           FontSize="13"
+                           Foreground="{DynamicResource TextPrimary}"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="1"
+                           Text=" into "
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"
+                           Margin="10,0"/>
+                <TextBlock x:Name="TargetBranchText"
+                           Grid.Column="2"
+                           FontFamily="{DynamicResource FontFamilyMono}"
+                           FontSize="13"
+                           Foreground="{DynamicResource AccentBlue}"
+                           TextTrimming="CharacterEllipsis"/>
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="4" Text="Strategy"
+                   FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+
+        <StackPanel Grid.Row="6">
+            <RadioButton x:Name="FastForwardOnlyRadio"
+                         GroupName="strategy"
+                         IsChecked="True"
+                         Margin="0,0,0,10"
+                         Foreground="{DynamicResource TextPrimary}">
+                <StackPanel>
+                    <TextBlock Text="Fast-forward only" FontSize="13"/>
+                    <TextBlock Text="Move the current branch pointer only when no merge commit is needed."
+                               FontSize="11" Foreground="{DynamicResource TextTertiary}"
+                               TextWrapping="Wrap" Margin="0,2,0,0"/>
+                </StackPanel>
+            </RadioButton>
+
+            <RadioButton x:Name="DefaultRadio"
+                         GroupName="strategy"
+                         Margin="0,0,0,10"
+                         Foreground="{DynamicResource TextPrimary}">
+                <StackPanel>
+                    <TextBlock Text="Default" FontSize="13"/>
+                    <TextBlock Text="Use the repository default; normally fast-forward when possible."
+                               FontSize="11" Foreground="{DynamicResource TextTertiary}"
+                               TextWrapping="Wrap" Margin="0,2,0,0"/>
+                </StackPanel>
+            </RadioButton>
+
+            <RadioButton x:Name="NoFastForwardRadio"
+                         GroupName="strategy"
+                         Foreground="{DynamicResource TextPrimary}">
+                <StackPanel>
+                    <TextBlock Text="No fast-forward" FontSize="13"/>
+                    <TextBlock Text="Always create a merge commit, even when a fast-forward is possible."
+                               FontSize="11" Foreground="{DynamicResource TextTertiary}"
+                               TextWrapping="Wrap" Margin="0,2,0,0"/>
+                </StackPanel>
+            </RadioButton>
+        </StackPanel>
+
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Style="{DynamicResource GhostButton}"
+                    Width="80"
+                    Margin="0,0,8,0"
+                    Click="Cancel_Click"/>
+            <Button Content="Merge"
+                    Style="{DynamicResource PrimaryButton}"
+                    Width="90"
+                    IsDefault="True"
+                    Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
