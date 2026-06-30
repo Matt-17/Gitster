@@ -88,6 +88,7 @@ public sealed class HybridGitBackend : IGitBackend
     public Task RenameBranchAsync(string oldName, string newName)             => _lib.RenameBranchAsync(oldName, newName);
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)    => _lib.CommitToBranchAsync(request);
     public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted) => _lib.CreateSnapshotBranchAsync(branchName, includeUncommitted);
+    public Task<ArchiveResult> ArchiveSourceZipAsync(ArchiveRequest request, CancellationToken ct = default) => _cli.ArchiveSourceZipAsync(request, ct);
 
     // ── Phase 4: Search & Analysis (CLI for pickaxe/regex/range-diff/blame) ─
     public Task<IReadOnlyList<CommitInfo>> PickaxeSearchAsync(string term, string? path, CancellationToken ct = default) => _cli.PickaxeSearchAsync(term, path, ct);

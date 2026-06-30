@@ -1,4 +1,9 @@
+using System.IO;
+using System.IO.Compression;
+
 using Gitster.Services.Git;
+
+using LibGit2Sharp;
 
 namespace Gitster.Tests;
 
@@ -111,9 +116,214 @@ public sealed class GitCliBackendTests
         CollectionAssert.Contains(AllMessages(repo), "feature squashed");
     }
 
+    [TestMethod]
+    public async Task ArchiveSourceZip_Head_CreatesZipWithPrefixAndTrackedFiles()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var head = repo.Commit("initial", "tracked.txt", "hello");
+        var output = TempZipPath();
+
+        try
+        {
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            var result = await backend.ArchiveSourceZipAsync(new ArchiveRequest("HEAD", output, "head-export"));
+            var entries = ReadZipEntries(output);
+
+            Assert.AreEqual(System.IO.Path.GetFullPath(output), result.OutputPath);
+            Assert.AreEqual(head, result.TreeishSha);
+            Assert.IsTrue(result.SizeBytes > 0);
+            Assert.AreEqual("hello", entries["head-export/tracked.txt"]);
+        }
+        finally
+        {
+            DeleteIfExists(output);
+        }
+    }
+
+    [TestMethod]
+    public async Task ArchiveSourceZip_OlderCommit_UsesThatCommitTreeAndExcludesLaterFiles()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var older = repo.Commit("older", "old.txt", "old");
+        repo.Commit("newer", "new.txt", "new");
+        var output = TempZipPath();
+
+        try
+        {
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.ArchiveSourceZipAsync(new ArchiveRequest(older, output, "old-export"));
+            var entries = ReadZipEntries(output);
+
+            Assert.AreEqual("old", entries["old-export/old.txt"]);
+            Assert.IsFalse(entries.ContainsKey("old-export/new.txt"));
+        }
+        finally
+        {
+            DeleteIfExists(output);
+        }
+    }
+
+    [TestMethod]
+    public async Task ArchiveSourceZip_OtherBranch_ExportsBranchFilesAndLeavesHeadUnchanged()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var currentHead = repo.Head();
+
+        using (var r = new Repository(repo.Path))
+        {
+            var originalBranch = r.Head.FriendlyName;
+            var branch = r.CreateBranch("feature/archive");
+            Commands.Checkout(r, branch);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature.txt"), "feature");
+            Commands.Stage(r, "feature.txt");
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            r.Commit("feature work", sig, sig);
+            Commands.Checkout(r, r.Branches[originalBranch]);
+        }
+
+        var output = TempZipPath();
+        try
+        {
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.ArchiveSourceZipAsync(new ArchiveRequest("feature/archive", output, "branch-export"));
+            var entries = ReadZipEntries(output);
+
+            Assert.AreEqual(currentHead, repo.Head(), "archiving another branch must not move HEAD");
+            Assert.AreEqual("feature", entries["branch-export/feature.txt"]);
+            Assert.IsFalse(entries.ContainsKey("branch-export/.git/HEAD"));
+        }
+        finally
+        {
+            DeleteIfExists(output);
+        }
+    }
+
+    [TestMethod]
+    public async Task ArchiveSourceZip_DirtyWorkingTree_ExportsCommittedContentOnly()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("initial", "tracked.txt", "committed");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "tracked.txt"), "dirty");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "untracked.txt"), "untracked");
+        var output = TempZipPath();
+
+        try
+        {
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.ArchiveSourceZipAsync(new ArchiveRequest("HEAD", output, "dirty-export"));
+            var entries = ReadZipEntries(output);
+
+            Assert.AreEqual("committed", entries["dirty-export/tracked.txt"]);
+            Assert.IsFalse(entries.ContainsKey("dirty-export/untracked.txt"));
+        }
+        finally
+        {
+            DeleteIfExists(output);
+        }
+    }
+
+    [TestMethod]
+    public async Task ArchiveSourceZip_InvalidRef_FailsAndDoesNotCreateArchive()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("initial", "tracked.txt", "hello");
+        var output = TempZipPath();
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.ArchiveSourceZipAsync(new ArchiveRequest("missing-ref", output, "bad-export")));
+        Assert.IsFalse(System.IO.File.Exists(output));
+    }
+
+    [TestMethod]
+    public async Task ArchiveSourceZip_InvalidOutputPath_FailsAndCleansTemporaryArchive()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("initial", "tracked.txt", "hello");
+        var parent = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "gitster-archive-invalid-" + Guid.NewGuid().ToString("N"));
+        var invalidOutput = System.IO.Path.Combine(parent, "existing-directory");
+        Directory.CreateDirectory(invalidOutput);
+
+        try
+        {
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+                () => backend.ArchiveSourceZipAsync(new ArchiveRequest("HEAD", invalidOutput, "bad-output")));
+
+            Assert.IsTrue(Directory.Exists(invalidOutput), "invalid archive output must not delete the target directory");
+            Assert.AreEqual(0, Directory.EnumerateFiles(parent, ".gitster-archive-*.tmp").Count());
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(parent, recursive: true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
     private static List<string> AllMessages(GitTestRepo repo)
     {
-        using var r = new LibGit2Sharp.Repository(repo.Path);
+        using var r = new Repository(repo.Path);
         return r.Commits.Select(c => c.MessageShort).ToList();
+    }
+
+    private static string TempZipPath() =>
+        System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "gitster-archive-test-" + Guid.NewGuid().ToString("N") + ".zip");
+
+    private static Dictionary<string, string> ReadZipEntries(string path)
+    {
+        using var archive = ZipFile.OpenRead(path);
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name))
+                continue;
+
+            using var stream = entry.Open();
+            using var reader = new StreamReader(stream);
+            result[entry.FullName] = reader.ReadToEnd();
+        }
+
+        return result;
+    }
+
+    private static void DeleteIfExists(string path)
+    {
+        try
+        {
+            if (System.IO.File.Exists(path))
+                System.IO.File.Delete(path);
+        }
+        catch
+        {
+        }
     }
 }

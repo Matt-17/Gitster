@@ -1,3 +1,5 @@
+using System.IO;
+
 using Gitster.Models;
 
 namespace Gitster.Services.Git;
@@ -17,7 +19,7 @@ public sealed class GitCliBackend : IGitBackend
         GitCli.IsAvailable
             ? GitCapabilities.FixupAutosquash | GitCapabilities.InteractiveRebase | GitCapabilities.Worktrees
               | GitCapabilities.PickaxeSearch | GitCapabilities.DiffRegexSearch
-              | GitCapabilities.RangeDiff | GitCapabilities.BlameFollow
+              | GitCapabilities.RangeDiff | GitCapabilities.BlameFollow | GitCapabilities.SourceArchive
             : GitCapabilities.None;
 
     public Task OpenAsync(string path)
@@ -433,6 +435,97 @@ public sealed class GitCliBackend : IGitBackend
 
     // Reword for HEAD is NOT routed here — HybridGitBackend sends it to LibGit2Backend
     public Task RewordCommitHeadAsync(string newMessage) => NSVoid();
+
+    // -- Source archive -----------------------------------------------------
+
+    public async Task<ArchiveResult> ArchiveSourceZipAsync(ArchiveRequest request, CancellationToken ct = default)
+    {
+        EnsurePath();
+        EnsureCli();
+
+        if (string.IsNullOrWhiteSpace(request.TreeishSha))
+            throw new ArgumentException("Archive ref cannot be empty.", nameof(request));
+        if (string.IsNullOrWhiteSpace(request.OutputPath))
+            throw new ArgumentException("Archive output path cannot be empty.", nameof(request));
+
+        var outputPath = Path.GetFullPath(request.OutputPath);
+        var outputDirectory = Path.GetDirectoryName(outputPath);
+        if (string.IsNullOrWhiteSpace(outputDirectory))
+            throw new InvalidOperationException("Archive output path must include a directory.");
+
+        Directory.CreateDirectory(outputDirectory);
+
+        var resolvedSha = await ResolveArchiveCommitAsync(request.TreeishSha, ct);
+        var prefix = NormalizeArchivePrefix(request.Prefix);
+        var tempPath = Path.Combine(outputDirectory, $".gitster-archive-{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            var args = new List<string>
+            {
+                "archive",
+                "--format=zip",
+                "--output",
+                tempPath,
+            };
+
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                args.Add("--prefix");
+                args.Add(prefix);
+            }
+
+            args.Add(resolvedSha);
+
+            var archive = await GitCli.RunAsync(
+                RepositoryPath,
+                args,
+                new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" },
+                ct);
+
+            if (!archive.Success)
+                throw new InvalidOperationException($"Archive failed:\n{archive.Output}");
+
+            try
+            {
+                File.Move(tempPath, outputPath, overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Could not write archive '{outputPath}':\n{ex.Message}",
+                    ex);
+            }
+
+            var size = new FileInfo(outputPath).Length;
+            return new ArchiveResult(outputPath, resolvedSha, size);
+        }
+        catch
+        {
+            GitCli.CleanupTemp(tempPath);
+            throw;
+        }
+    }
+
+    private async Task<string> ResolveArchiveCommitAsync(string treeish, CancellationToken ct)
+    {
+        var result = await GitCli.RunAsync(
+            RepositoryPath,
+            ["rev-parse", "--verify", $"{treeish}^{{commit}}"],
+            new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" },
+            ct);
+
+        if (!result.Success)
+            throw new InvalidOperationException($"Could not resolve archive ref '{treeish}':\n{result.Output}");
+
+        return result.Stdout.Trim();
+    }
+
+    private static string NormalizeArchivePrefix(string prefix)
+    {
+        var normalized = prefix.Trim().Replace('\\', '/').Trim('/');
+        return normalized.Length == 0 ? string.Empty : normalized + "/";
+    }
 
     // ── Phase 3: Worktrees (Step D) ─────────────────────────────────────────
 

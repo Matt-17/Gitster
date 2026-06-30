@@ -7,6 +7,7 @@
        xmlns:models="clr-namespace:Gitster.Models"
        xmlns:controls="clr-namespace:Gitster.Controls"
        xmlns:modes="clr-namespace:Gitster.Views.Modes"
+       xmlns:helper="clr-namespace:Gitster.Views.Helper"
        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
        d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
        mc:Ignorable="d"
@@ -133,6 +134,9 @@
 
                     <MenuItem Header="_Repository" Style="{StaticResource ChromeMenuItem}">
                         <MenuItem Header="Commit..." Command="{Binding OpenCommitPanelCommand}" InputGestureText="Ctrl+K"/>
+                        <MenuItem Header="Archive current HEAD..."
+                                  helper:Capability.Requires="SourceArchive"
+                                  Command="{Binding ArchiveHeadCommand}"/>
                         <Separator/>
                         <MenuItem Header="Fetch"   Command="{Binding FetchCommand}" InputGestureText="F5"/>
                         <MenuItem Header="Pull"    Command="{Binding PullCommand}"/>
