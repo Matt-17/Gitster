@@ -12,9 +12,10 @@ public partial class ToolResultDialog : Window
 
         var success = exitCode == 0;
         StatusIcon.Text = success ? "✓" : "!";
+        var resources = Application.Current?.Resources;
         StatusIcon.Foreground = success
-            ? (Brush)(Application.Current.Resources["AccentSuccess"] ?? Brushes.ForestGreen)
-            : (Brush)(Application.Current.Resources["AccentDanger"] ?? Brushes.IndianRed);
+            ? (Brush)(resources?["AccentSuccess"] ?? Brushes.ForestGreen)
+            : (Brush)(resources?["AccentDanger"] ?? Brushes.IndianRed);
         StatusText.Text = success ? "Finished successfully" : $"Exited with code {exitCode}";
         OutputBox.Text = string.IsNullOrWhiteSpace(output) ? "(no output)" : output;
     }

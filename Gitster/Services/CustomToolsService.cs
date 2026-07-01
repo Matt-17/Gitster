@@ -21,7 +21,7 @@ public sealed record ToolRunResult(int ExitCode, string Output)
 /// Git's native <c>[guitool "name"]</c> sections plus Gitster's own JSON stores at
 /// <c>%AppData%/Gitster/custom-tools.json</c> (global) and <c>.git/gitster/custom-tools.json</c> (repo).
 /// </summary>
-public sealed class CustomToolsService
+public sealed class CustomToolsService : ICustomToolsService
 {
     private string? _repoPath;
     private string? _repoGitDir;
