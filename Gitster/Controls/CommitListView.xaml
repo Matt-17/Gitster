@@ -115,8 +115,8 @@
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="Padding" Value="5,0"/>
             <Setter Property="CornerRadius" Value="3"/>
-            <Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource AccentWarning}"/>
+            <Setter Property="Background" Value="{StaticResource BackgroundPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderSecondary}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static git:CommitRefKind.RemoteBranch}">
@@ -124,10 +124,36 @@
                     <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource AccentSuccess}"/>
+                    <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CommitRefLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static git:CommitRefKind.RemoteBranch}">
+                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CommitRefOverflowStyle" TargetType="Border">
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
         <Style x:Key="SectionHeaderItemStyle" TargetType="ListViewItem">
@@ -340,8 +366,8 @@
 
                 <DockPanel Grid.Column="2" LastChildFill="True" Margin="2,0,8,0" VerticalAlignment="Center">
                     <ItemsControl DockPanel.Dock="Left"
-                                  ItemsSource="{Binding RefLabels}"
-                                  Visibility="{Binding HasRefLabels, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                  ItemsSource="{Binding VisibleRefLabels}"
+                                  Visibility="{Binding HasVisibleRefLabels, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal"/>
@@ -349,16 +375,24 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Style="{StaticResource CommitRefLabelStyle}">
+                                <Border Style="{StaticResource CommitRefLabelStyle}"
+                                        ToolTip="{Binding Name}">
                                     <TextBlock Text="{Binding Name}"
-                                               FontSize="10"
-                                               TextTrimming="CharacterEllipsis"
-                                               VerticalAlignment="Center"
-                                               Foreground="{StaticResource TextPrimary}"/>
+                                               Style="{StaticResource CommitRefLabelTextStyle}"/>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Border DockPanel.Dock="Left"
+                            Style="{StaticResource CommitRefOverflowStyle}"
+                            ToolTip="{Binding RefLabelsTooltip}"
+                            Visibility="{Binding HasHiddenRefLabels, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="{Binding HiddenRefLabelText}"
+                                   FontSize="10"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource TextSecondary}"/>
+                    </Border>
                     <TextBlock Text="{Binding DisplayMessage}" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                Style="{StaticResource CommitPrimaryTextStyle}"/>

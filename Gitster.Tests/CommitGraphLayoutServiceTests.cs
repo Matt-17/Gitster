@@ -80,6 +80,19 @@ public sealed class CommitGraphLayoutServiceTests
         Assert.AreEqual("feature/test", rows["c"].RefLabels[0].Name);
     }
 
+    [TestMethod]
+    public void Layout_DisconnectedTips_WrapsColorIndexWithinSharedPalette()
+    {
+        var rows = Layout(Enumerable
+            .Range(0, CommitGraphPalette.Count + 2)
+            .Select(i => new CommitGraphNode($"c{i}", [], Array.Empty<CommitRefLabel>()))
+            .ToArray());
+
+        Assert.IsTrue(rows.Values.All(r => r.NodeColorIndex >= 0));
+        Assert.IsTrue(rows.Values.All(r => r.NodeColorIndex < CommitGraphPalette.Count));
+        Assert.AreEqual(rows["c0"].NodeColorIndex, rows[$"c{CommitGraphPalette.Count}"].NodeColorIndex);
+    }
+
     private static IReadOnlyDictionary<string, CommitGraphRow> Layout(params CommitGraphNode[] nodes) =>
         new CommitGraphLayoutService().Layout(nodes);
 

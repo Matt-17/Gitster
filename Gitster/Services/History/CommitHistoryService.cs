@@ -857,9 +857,15 @@ public sealed class CommitHistoryService
     private static IReadOnlyList<Branch> GetTimelineBranches(Repository repo) =>
         repo.Branches
             .Where(b => b.Tip != null)
+            .Where(b => !IsRemoteHeadAlias(b))
             .OrderBy(b => b.IsRemote)
             .ThenBy(b => b.FriendlyName, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private static bool IsRemoteHeadAlias(Branch branch) =>
+        branch.IsRemote
+        && (branch.CanonicalName.EndsWith("/HEAD", StringComparison.OrdinalIgnoreCase)
+            || branch.FriendlyName.EndsWith("/HEAD", StringComparison.OrdinalIgnoreCase));
 
     private static IReadOnlyDictionary<string, IReadOnlyList<CommitRefLabel>> BuildBranchLabelMap(Repository repo)
     {
@@ -887,11 +893,19 @@ public sealed class CommitHistoryService
         return labels.ToDictionary(
             kv => kv.Key,
             kv => (IReadOnlyList<CommitRefLabel>)kv.Value
-                .OrderBy(l => l.Kind == CommitRefKind.RemoteBranch)
+                .OrderBy(l => RefLabelSortOrder(l.Kind))
                 .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             StringComparer.OrdinalIgnoreCase);
     }
+
+    private static int RefLabelSortOrder(CommitRefKind kind) => kind switch
+    {
+        CommitRefKind.CurrentBranch => 0,
+        CommitRefKind.LocalBranch => 1,
+        CommitRefKind.RemoteBranch => 2,
+        _ => 3,
+    };
 
     private static string Short(string sha) =>
         sha.Length >= 7 ? sha[..7] : sha;

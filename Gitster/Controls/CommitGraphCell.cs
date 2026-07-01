@@ -13,17 +13,9 @@ public sealed class CommitGraphCell : FrameworkElement
     private const double OutgoingMarkerRadius = 2.1;
     private const double LeftPadding = 6;
 
-    private static readonly Brush[] Palette =
-    [
-        Brush("#007ACC"),
-        Brush("#D97706"),
-        Brush("#16A34A"),
-        Brush("#9333EA"),
-        Brush("#DC2626"),
-        Brush("#0891B2"),
-        Brush("#DB2777"),
-        Brush("#64748B"),
-    ];
+    private static readonly Brush[] Palette = CommitGraphPalette.HexColors
+        .Select(Brush)
+        .ToArray();
     private static readonly Brush SyncedFill = Brush("#FFFFFF");
     private static readonly Brush LocalOnlyBrush = Brush("#D97706");
 
