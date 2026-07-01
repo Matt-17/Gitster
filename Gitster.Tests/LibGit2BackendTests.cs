@@ -241,6 +241,27 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task RemoveFileChangeFromCommit_DirtyWorkingTree_ThrowsAndLeavesHeadUnchanged()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var target = repo.Commit("add foo", "foo.bar", "foo");
+        var headBefore = repo.Commit("other work", "other.txt", "other");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "dirty.txt"), "dirty");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.RemoveFileChangeFromCommitAsync(target, "foo.bar"));
+
+        StringAssert.Contains(ex.Message, "uncommitted changes");
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(headBefore, check.Head.Tip!.Sha);
+        Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(repo.Path, "dirty.txt")));
+    }
+
+    [TestMethod]
     public async Task ResetMixed_MovesHeadAndKeepsWorkingTreeChanges()
     {
         using var repo = new GitTestRepo();

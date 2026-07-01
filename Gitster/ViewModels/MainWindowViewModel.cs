@@ -830,6 +830,9 @@ public partial class MainWindowViewModel : BaseViewModel
             return;
         }
 
+        if (!await EnsureCleanWorkingTreeBeforeRemovingChangeAsync())
+            return;
+
         var commitSha = ShortSha(selected.FullSha);
         var confirmText =
             $"Remove the change to '{file.Path}' from commit {commitSha}?\n\n" +
@@ -886,6 +889,31 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             _windowService.Error($"Remove change from commit failed:\n{ex.Message}", "Gitster");
         }
+    }
+
+    private async Task<bool> EnsureCleanWorkingTreeBeforeRemovingChangeAsync()
+    {
+        WorkingTreeStatus status;
+        try
+        {
+            status = await _gitBackend.GetWorkingTreeStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(
+                $"Could not check working-tree state before removing a change from a commit:\n{ex.Message}",
+                "Gitster");
+            return false;
+        }
+
+        if (status.Staged.Count == 0 && status.Unstaged.Count == 0)
+            return true;
+
+        _windowService.Warning(
+            "Commit, stash, or discard your current changes before rewriting history.\n\n" +
+            "Removing a change from an older commit rewrites this branch, then leaves that removed file change staged for a later commit.",
+            "Working tree has uncommitted changes");
+        return false;
     }
 
     [RelayCommand]
