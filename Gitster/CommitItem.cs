@@ -12,6 +12,8 @@ namespace Gitster;
 /// </summary>
 public partial class CommitItem : ObservableObject
 {
+    public const int MaxVisibleRefLabels = 3;
+
     public CommitItem(
         string message,
         DateTime date,
@@ -33,7 +35,11 @@ public partial class CommitItem : ObservableObject
         RemoteState = remoteState;
         OrphanedPairSha = orphanedPairSha;
         ParentShas = parentShas ?? Array.Empty<string>();
-        RefLabels = refLabels ?? Array.Empty<CommitRefLabel>();
+        RefLabels = refLabels?.ToArray() ?? Array.Empty<CommitRefLabel>();
+        VisibleRefLabels = RefLabels.Take(MaxVisibleRefLabels).ToArray();
+        HiddenRefLabelCount = Math.Max(RefLabels.Count - VisibleRefLabels.Count, 0);
+        HiddenRefLabelText = HiddenRefLabelCount > 0 ? $"+{HiddenRefLabelCount}" : string.Empty;
+        RefLabelsTooltip = string.Join(", ", RefLabels.Select(l => l.Name));
     }
 
     public string Message { get; }
@@ -45,6 +51,12 @@ public partial class CommitItem : ObservableObject
     public IReadOnlyList<string> ParentShas { get; }
     public IReadOnlyList<CommitRefLabel> RefLabels { get; }
     public bool HasRefLabels => RefLabels.Count > 0;
+    public IReadOnlyList<CommitRefLabel> VisibleRefLabels { get; }
+    public bool HasVisibleRefLabels => VisibleRefLabels.Count > 0;
+    public int HiddenRefLabelCount { get; }
+    public bool HasHiddenRefLabels => HiddenRefLabelCount > 0;
+    public string HiddenRefLabelText { get; }
+    public string RefLabelsTooltip { get; }
 
     public string DisplayMessage => PendingMessage ?? Message;
     public DateTime DisplayDate => PendingDate ?? Date;

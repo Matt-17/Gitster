@@ -2,8 +2,6 @@ namespace Gitster.Services.History;
 
 public sealed class CommitGraphLayoutService
 {
-    private const int PaletteSize = 8;
-
     public IReadOnlyDictionary<string, CommitGraphRow> Layout(IReadOnlyList<CommitGraphNode> commits)
     {
         var visible = commits
@@ -176,7 +174,7 @@ public sealed class CommitGraphLayoutService
     private static bool SameSha(string left, string right) =>
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
-    private static int NextColor(int current) => (current + 1) % PaletteSize;
+    private static int NextColor(int current) => (current + 1) % CommitGraphPalette.Count;
 
     private sealed record ActiveLane(string Sha, int ColorIndex);
 

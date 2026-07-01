@@ -153,7 +153,70 @@ public sealed class CommitHistoryServiceTests
             progress: null,
             scope: HistoryScope.AllBranches);
 
-        Assert.IsTrue(secondRows.Any(r => r.Message == "feature work 2"));
+        var newFeatureRow = secondRows.Single(r => r.Message == "feature work 2");
+        Assert.IsTrue(newFeatureRow.RefLabels!.Any(l => l.Name == "feature"));
+
+        var oldFeatureRow = secondRows.Single(r => r.Message == "feature work");
+        Assert.IsFalse(oldFeatureRow.RefLabels!.Any(l => l.Name == "feature"));
+    }
+
+    [TestMethod]
+    public async Task EnsureCompleteAsync_AllBranches_LabelsCurrentLocalAndRemoteRefsInDeterministicOrder()
+    {
+        using var repo = new GitTestRepo();
+        var tip = repo.Commit("tip", "a.txt", "1");
+        string currentBranch;
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            r.CreateBranch("release", r.Head.Tip);
+            AddRemoteTrackingRef(r, "origin/main", tip);
+            AddRemoteTrackingRef(r, "origin/HEAD", tip);
+        }
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path, HistoryScope.AllBranches);
+        var rows = await history.EnsureCompleteAsync(
+            progress: null,
+            scope: HistoryScope.AllBranches);
+
+        var labels = rows.Single(r => r.FullSha == tip).RefLabels!;
+        CollectionAssert.AreEqual(
+            new[] { currentBranch, "release", "origin/main" },
+            labels.Select(l => l.Name).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { CommitRefKind.CurrentBranch, CommitRefKind.LocalBranch, CommitRefKind.RemoteBranch },
+            labels.Select(l => l.Kind).ToArray());
+        Assert.IsTrue(labels[0].IsCurrent);
+        Assert.IsFalse(labels.Any(l =>
+            l.Name.Equals("origin", StringComparison.OrdinalIgnoreCase)
+            || l.Name.EndsWith("/HEAD", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [TestMethod]
+    public async Task EnsureCompleteAsync_CurrentBranch_DoesNotAttachBranchRefLabels()
+    {
+        using var repo = new GitTestRepo();
+        var tip = repo.Commit("tip", "a.txt", "1");
+        using (var r = new Repository(repo.Path))
+        {
+            r.CreateBranch("release", r.Head.Tip);
+            AddRemoteTrackingRef(r, "origin/main", tip);
+        }
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path, HistoryScope.CurrentBranch);
+        var rows = await history.EnsureCompleteAsync(
+            progress: null,
+            scope: HistoryScope.CurrentBranch);
+
+        Assert.AreEqual(0, rows.Single(r => r.FullSha == tip).RefLabels!.Count);
     }
 
     private static void BlankGraphColumns(string cachePath)
@@ -169,6 +232,14 @@ public sealed class CommitHistoryServiceTests
     {
         using var repo = new Repository(repoPath);
         Commands.Checkout(repo, repo.Branches[branchName]);
+    }
+
+    private static void AddRemoteTrackingRef(Repository repo, string name, string sha)
+    {
+        var canonicalName = name.StartsWith("refs/", StringComparison.Ordinal)
+            ? name
+            : $"refs/remotes/{name}";
+        repo.Refs.Add(canonicalName, sha, allowOverwrite: true);
     }
 
     private sealed class TempCacheDir : IDisposable

@@ -33,7 +33,7 @@ Das positioniert Gitster bewusst gegen die Marktentwicklung der letzten Jahre: G
 ## Was Gitster nicht werden soll
 
 - Kein vollständiger Merge-Konflikt-Editor
-- Kein Ersatz für `git log --graph` mit voll ausgebauten Multi-Branch-Linien (vereinfachte Single-Branch-Linie ist okay)
+- Kein Ersatz für spezialisierte Graph-Analyse-Tools; Gitster zeigt Branch-/Merge-Historie bewusst kompakt in der Commit-Liste, nicht als eigenes Explorer-Produkt
 - Keine Cloud-Integration, keine Issue-Tracker-Anbindung, kein PR-Workflow
 - Keine KI-Features (keine generierten Commit-Messages, keine Branch-Namen-Vorschläge, kein Agent-Modus)
 - Keine Repository-Verwaltung (Clone, Init, Repository-Settings jenseits von Config-Healthcheck)
@@ -151,7 +151,7 @@ Bevor Gitster destruktive Operationen über mehrere Commits hinweg anbietet, bra
 - ✅ **„Selected commit"-Label entfernen** – Die Card ist durch ihre Position und Inhalt selbsterklärend. Label entfernt.
 - ✅ **DateControl mit Akzent-Border zurück** – Die ursprüngliche Akzent-Border war im Tool-Kontext richtig; aktuell zu blass.
 - ✅ **Topologische Commit-Sortierung als Default** – Statt nach Date (das bei manipulierten Timestamps Parent vor Child stellen kann). Date-Sort bleibt optional mit Hinweis.
-- ✅ **Simple Single-Branch-Graph** – Vertikale Linie + Punkte in einer schmalen Spalte links der Commit-Liste. Volle Multi-Branch-Visualisierung ist Backlog.
+- ✅ **Branch-/Merge-Graph in der Commit-Liste** – Schmale Graph-Spalte mit Lanes, Merge-Kanten, Scope-Umschaltung `Current branch` / `All branches` und kompakten Branch-/Remote-Labels an Branch-Tips.
 - ✅ **Visualisierung verwaister Hash-Paare (Detection + ↔ Indikator)** – Wenn ein Synced-Commit lokal amendet wird, taucht der alte Hash als Incoming und der neue als Outgoing auf. Gitster erkennt das Paar anhand desselben Tree-SHA und zeigt ein ↔-Badge mit Tooltip: „Same commit, rewritten. Push (force-with-lease) to replace the remote copy." Der visuelle Verbindungsstrich zwischen den Zeilen ist als TODO markiert.
 - ✅ **Git-Config Gesundheitscheck-Inhalt** – Sieben Empfehlungen: `diff.algorithm=histogram`, `fetch.prune=true`, `rerere.enabled=true`, `push.autoSetupRemote=true`, `branch.sort=-committerdate`, `init.defaultBranch=main`, `pull.rebase=true` (markiert als „opinionated").
 - ✅ **Detached HEAD klar anzeigen** – Im TitleBar und StatusBar: „detached @ {sha}" statt „(no branch)", um Detached-HEAD-Zustand eindeutig kenntlich zu machen.
@@ -265,7 +265,7 @@ Diese Entscheidung kommt später. Phase 1 ist hier explizit minimal.
 - **.gitignore-Template-Auswahl** – Integration von [github/gitignore](https://github.com/github/gitignore) für sinnvolle Vorlagen pro Sprache/Framework. Sinnvoll auch außerhalb des Empty-Repo-Falls — z. B. „add Python-Template to existing .gitignore".
 
 ### Visualisierung
-- **Multi-Branch-Graph** – Vollständige Branch-Linien-Darstellung mit Parallel-Branches, Merges, Rebases. Phase 1 hat nur die Single-Branch-Spine.
+- **Graph-Analyse über die Commit-Liste hinaus** – Optionale spätere Detailansicht für komplexe Ref-/Rebase-/Reachability-Fragen. Die grundlegende Multi-Branch-Lane-Darstellung ist bereits in der Commit-Liste umgesetzt.
 - **Gravatar-Avatare** – Kleine Avatare neben Autor-Namen in der Commit-Liste. Über E-Mail-Hash an Gravatar (opt-in, da Privacy-relevant).
 
 ### Erweiterte Repo-Hygiene
