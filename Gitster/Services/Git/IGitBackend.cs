@@ -41,6 +41,7 @@ public interface IGitBackend
     Task FetchAsync(string remoteName = "origin");
     Task PullAsync(string remoteName = "origin");
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal);
+    Task PushThroughCommitAsync(string commitSha, string remoteName = "origin");
 
     Task<string> GetReflogSelectorForHeadAsync();
     Task ResetMixedAsync(string targetReference, string? branchName = null);

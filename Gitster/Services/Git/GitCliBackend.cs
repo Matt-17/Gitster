@@ -405,6 +405,52 @@ public sealed class GitCliBackend : IGitBackend
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
     }
 
+    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+    {
+        EnsurePath();
+        EnsureCli();
+
+        if (string.IsNullOrWhiteSpace(commitSha))
+            throw new ArgumentException("Commit SHA is required.", nameof(commitSha));
+
+        var branch = await GitCli.RunAsync(RepositoryPath, ["symbolic-ref", "HEAD"]);
+        if (!branch.Success)
+            throw new InvalidOperationException("Check out a local branch before pushing through a commit.");
+
+        var targetRef = branch.Stdout.Trim();
+        var resolved = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{commitSha}^{{commit}}"]);
+        if (!resolved.Success)
+            throw new InvalidOperationException($"Commit not found: {commitSha}");
+
+        var resolvedSha = resolved.Stdout.Trim();
+        var ancestor = await GitCli.RunAsync(RepositoryPath, ["merge-base", "--is-ancestor", resolvedSha, "HEAD"]);
+        if (!ancestor.Success)
+            throw new InvalidOperationException("The selected commit is not on the current branch.");
+
+        var remote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+        var r = await GitCli.RunAsync(
+            RepositoryPath,
+            ["push", remote, $"{resolvedSha}:{targetRef}"],
+            new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" });
+        if (!r.Success)
+            throw new InvalidOperationException($"Push failed:\n{r.Output}");
+
+        await UpdateTrackingRefAfterPushAsync(remote, resolvedSha);
+    }
+
+    private async Task UpdateTrackingRefAfterPushAsync(string remoteName, string commitSha)
+    {
+        var upstream = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--symbolic-full-name", "@{u}"]);
+        if (!upstream.Success)
+            return;
+
+        var upstreamRef = upstream.Stdout.Trim();
+        if (!upstreamRef.StartsWith($"refs/remotes/{remoteName}/", StringComparison.Ordinal))
+            return;
+
+        await GitCli.RunAsync(RepositoryPath, ["update-ref", upstreamRef, commitSha]);
+    }
+
     public async Task<HistoryStitchResult> StitchHistoryAsync(string sourceRef)
     {
         EnsurePath();

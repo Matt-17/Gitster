@@ -279,6 +279,48 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task PushThroughCommit_LocalOnlyCommit_PushesSelectedCommitOnly()
+    {
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        var remotePath = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "gitster-remote-" + Guid.NewGuid().ToString("N")[..12]);
+        Repository.Init(remotePath, isBare: true);
+
+        try
+        {
+            string branchName;
+            using (var setup = new Repository(repo.Path))
+            {
+                branchName = setup.Head.FriendlyName;
+                var remote = setup.Network.Remotes.Add("origin", remotePath);
+                setup.Network.Push(remote, $"{baseSha}:{setup.Head.CanonicalName}", new PushOptions());
+                Commands.Fetch(setup, remote.Name, remote.FetchRefSpecs.Select(x => x.Specification), null, "fetch origin");
+                setup.Branches.Update(setup.Head, b => b.TrackedBranch = $"refs/remotes/origin/{branchName}");
+            }
+
+            var selected = repo.Commit("selected", "selected.txt", "selected");
+            var newer = repo.Commit("newer", "newer.txt", "newer");
+
+            var backend = new LibGit2Backend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.PushThroughCommitAsync(selected);
+
+            using var local = new Repository(repo.Path);
+            using var remoteRepo = new Repository(remotePath);
+            Assert.AreEqual(newer, local.Head.Tip!.Sha, "partial push must not move local HEAD");
+            Assert.AreEqual(selected, local.Head.TrackedBranch.Tip!.Sha, "tracking ref should reflect the partial push");
+            Assert.AreEqual(selected, remoteRepo.Branches[branchName].Tip!.Sha, "remote branch should stop at the selected commit");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
     public async Task ResetMixed_FromDetachedHead_ReattachesRequestedBranch()
     {
         using var repo = new GitTestRepo();
@@ -497,5 +539,15 @@ public sealed class LibGit2BackendTests
         Assert.AreEqual(currentBranch, check.Head.FriendlyName);
         Assert.AreEqual(beforeHead, check.Head.Tip!.Sha);
         Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    private static void DeleteDirectoryIfExists(string path)
+    {
+        if (!System.IO.Directory.Exists(path))
+            return;
+
+        foreach (var file in System.IO.Directory.EnumerateFiles(path, "*", System.IO.SearchOption.AllDirectories))
+            System.IO.File.SetAttributes(file, System.IO.FileAttributes.Normal);
+        System.IO.Directory.Delete(path, recursive: true);
     }
 }
