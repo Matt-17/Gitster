@@ -17,4 +17,18 @@ public sealed record CommitInfo(
     string AuthorEmail = "",
     CommitRemoteState RemoteState = CommitRemoteState.LocalOnly,
     string FullSha = "",
-    string? OrphanedPairSha = null);
+    string? OrphanedPairSha = null,
+    IReadOnlyList<string>? ParentShas = null,
+    IReadOnlyList<CommitRefLabel>? RefLabels = null);
+
+public enum CommitRefKind
+{
+    CurrentBranch,
+    LocalBranch,
+    RemoteBranch,
+}
+
+public sealed record CommitRefLabel(
+    string Name,
+    CommitRefKind Kind,
+    bool IsCurrent = false);

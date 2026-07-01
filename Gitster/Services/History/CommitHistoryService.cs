@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 using Gitster.Models;
 using Gitster.Services.Git;
@@ -21,6 +22,8 @@ public sealed class CommitHistoryService
     private readonly string _cacheRoot;
     private readonly string _dbPath;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<CommitRefLabel>> EmptyRefLabels =
+        new Dictionary<string, IReadOnlyList<CommitRefLabel>>(StringComparer.OrdinalIgnoreCase);
 
     private HistoryContext? _context;
 
@@ -39,8 +42,15 @@ public sealed class CommitHistoryService
         _dbPath = Path.Combine(_cacheRoot, "history.sqlite");
     }
 
+    public Task OpenAsync(
+        string repoPath,
+        CancellationToken ct,
+        IProgress<RepositoryLoadProgress>? progress = null) =>
+        OpenAsync(repoPath, HistoryScope.CurrentBranch, ct, progress);
+
     public async Task OpenAsync(
         string repoPath,
+        HistoryScope scope = HistoryScope.CurrentBranch,
         CancellationToken ct = default,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
@@ -58,7 +68,7 @@ public sealed class CommitHistoryService
                     "Checking cached branch state."));
                 EnsureDatabase();
                 using var repo = new Repository(repoPath);
-                var context = BuildContext(repo);
+                var context = BuildContext(repo, scope);
                 using var conn = OpenConnection();
 
                 var existing = GetBranchState(conn, context);
@@ -66,9 +76,26 @@ public sealed class CommitHistoryService
 
                 if (existing != null
                     && existing.CachedCount > 0
+                    && HistoryRowsNeedGraphUpgrade(conn, context))
+                {
+                    DeleteRows(conn, context);
+                    UpsertBranch(conn, context, isComplete: false, cachedCount: 0);
+                    existing = existing with { IsComplete = false, CachedCount = 0 };
+                }
+
+                if (existing != null
+                    && existing.CachedCount > 0
                     && !string.Equals(existing.HeadSha, context.HeadSha, StringComparison.OrdinalIgnoreCase))
                 {
-                    ValidateHeadChange(conn, repo, context, existing, ct, progress);
+                    if (scope == HistoryScope.CurrentBranch)
+                    {
+                        ValidateHeadChange(conn, repo, context, existing, ct, progress);
+                    }
+                    else
+                    {
+                        DeleteRows(conn, context);
+                        UpsertBranch(conn, context, isComplete: false, cachedCount: 0);
+                    }
                 }
 
                 _context = context;
@@ -84,14 +111,15 @@ public sealed class CommitHistoryService
         CommitQuery query,
         int offset,
         int count,
+        HistoryScope scope = HistoryScope.CurrentBranch,
         CancellationToken ct = default,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
-        await EnsureContextAsync(ct);
+        await EnsureContextAsync(scope, ct);
 
         if (!query.IsEmpty)
         {
-            var all = await SearchAsync(query, int.MaxValue, ct);
+            var all = await SearchAsync(query, int.MaxValue, scope, ct);
             return all.Skip(offset).Take(count).ToList();
         }
 
@@ -110,12 +138,19 @@ public sealed class CommitHistoryService
         }
     }
 
+    public Task<IReadOnlyList<CommitHistoryRow>> SearchAsync(
+        CommitQuery query,
+        int maxResults,
+        CancellationToken ct) =>
+        SearchAsync(query, maxResults, HistoryScope.CurrentBranch, ct);
+
     public async Task<IReadOnlyList<CommitHistoryRow>> SearchAsync(
         CommitQuery query,
         int maxResults,
+        HistoryScope scope = HistoryScope.CurrentBranch,
         CancellationToken ct = default)
     {
-        await EnsureCompleteAsync(progress: null, ct);
+        await EnsureCompleteAsync(progress: null, ct, scope);
 
         await _gate.WaitAsync(ct);
         try
@@ -136,9 +171,10 @@ public sealed class CommitHistoryService
 
     public async Task<IReadOnlyList<CommitHistoryRow>> EnsureCompleteAsync(
         IProgress<RepositoryLoadProgress>? progress,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        HistoryScope scope = HistoryScope.CurrentBranch)
     {
-        await EnsureContextAsync(ct);
+        await EnsureContextAsync(scope, ct);
 
         return await Task.Run(() =>
         {
@@ -160,7 +196,7 @@ public sealed class CommitHistoryService
                 }
 
                 using var repo = new Repository(context.RepoPath);
-                var rows = WalkRows(repo, int.MaxValue, ct, progress);
+                var rows = WalkRows(repo, context, int.MaxValue, ct, progress);
                 ReplaceRows(conn, context, rows, isComplete: true);
                 return rows;
             }
@@ -173,7 +209,7 @@ public sealed class CommitHistoryService
 
     public async Task<IReadOnlyList<AuthorEntry>> GetAuthorsAsync(CancellationToken ct = default)
     {
-        await EnsureContextAsync(ct);
+        await EnsureContextAsync(HistoryScope.CurrentBranch, ct);
 
         await _gate.WaitAsync(ct);
         try
@@ -223,7 +259,7 @@ public sealed class CommitHistoryService
 
     public async Task ApplyRemoteSetsAsync(RemoteSets sets, CancellationToken ct = default)
     {
-        await EnsureContextAsync(ct);
+        await EnsureContextAsync(HistoryScope.CurrentBranch, ct);
 
         await _gate.WaitAsync(ct);
         try
@@ -309,7 +345,7 @@ public sealed class CommitHistoryService
         if (state?.IsComplete == true || (state?.CachedCount ?? 0) >= requiredCount)
             return;
 
-        var rows = WalkRows(repo, requiredCount, ct, progress);
+        var rows = WalkRows(repo, context, requiredCount, ct, progress);
         var isComplete = rows.Count < requiredCount;
         ReplaceRows(conn, context, rows, isComplete);
     }
@@ -332,7 +368,7 @@ public sealed class CommitHistoryService
         var prefix = new List<CommitHistoryRow>();
         int? foundSequence = null;
         int scanned = 0;
-        foreach (var commit in QueryHead(repo))
+        foreach (var commit in QueryCommits(repo, context))
         {
             ct.ThrowIfCancellationRequested();
             scanned++;
@@ -350,7 +386,7 @@ public sealed class CommitHistoryService
                 break;
             }
 
-            prefix.Add(ToRow(commit, prefix.Count));
+            prefix.Add(ToRow(commit, prefix.Count, EmptyRefLabels));
         }
 
         if (foundSequence.HasValue)
@@ -454,10 +490,11 @@ public sealed class CommitHistoryService
         insert.CommandText = """
             INSERT OR REPLACE INTO history_commits
                 (repo_key, branch_name, sequence, full_sha, short_sha, message, author_name,
-                 author_email, author_date_ticks, tree_sha, remote_state, orphaned_pair_sha)
+                 author_email, author_date_ticks, tree_sha, remote_state, orphaned_pair_sha,
+                 parent_shas, ref_labels)
             VALUES
                 ($repo, $branch, $sequence, $full, $short, $message, $author, $email,
-                 $date, $tree, $remote, $orphan);
+                 $date, $tree, $remote, $orphan, $parents, $refs);
             """;
         insert.Parameters.AddWithValue("$repo", context.RepoKey);
         insert.Parameters.AddWithValue("$branch", context.BranchName);
@@ -471,6 +508,8 @@ public sealed class CommitHistoryService
         var tree = insert.Parameters.Add("$tree", SqliteType.Text);
         var remote = insert.Parameters.Add("$remote", SqliteType.Integer);
         var orphan = insert.Parameters.Add("$orphan", SqliteType.Text);
+        var parents = insert.Parameters.Add("$parents", SqliteType.Text);
+        var refs = insert.Parameters.Add("$refs", SqliteType.Text);
 
         foreach (var row in rows)
         {
@@ -484,20 +523,26 @@ public sealed class CommitHistoryService
             tree.Value = row.TreeSha;
             remote.Value = (int)row.RemoteState;
             orphan.Value = (object?)row.OrphanedPairSha ?? DBNull.Value;
+            parents.Value = Serialize(row.ParentShas ?? Array.Empty<string>());
+            refs.Value = Serialize(row.RefLabels ?? Array.Empty<CommitRefLabel>());
             insert.ExecuteNonQuery();
         }
     }
 
     private List<CommitHistoryRow> WalkRows(
         Repository repo,
+        HistoryContext context,
         int maxCount,
         CancellationToken ct,
         IProgress<RepositoryLoadProgress>? progress)
     {
         var totalCount = maxCount == int.MaxValue
-            ? CountHeadCommits(repo, ct, progress)
+            ? CountCommits(repo, context, ct, progress)
             : maxCount;
         var rows = new List<CommitHistoryRow>(maxCount == int.MaxValue ? Math.Max(totalCount, 1) : maxCount);
+        var refLabels = context.Scope == HistoryScope.AllBranches
+            ? BuildBranchLabelMap(repo)
+            : EmptyRefLabels;
 
         progress?.Report(new RepositoryLoadProgress(
             "Loading history",
@@ -505,10 +550,10 @@ public sealed class CommitHistoryService
             0,
             TotalCommitCount: totalCount));
 
-        foreach (var commit in QueryHead(repo))
+        foreach (var commit in QueryCommits(repo, context))
         {
             ct.ThrowIfCancellationRequested();
-            rows.Add(ToRow(commit, rows.Count));
+            rows.Add(ToRow(commit, rows.Count, refLabels));
             if (rows.Count % 100 == 0)
             {
                 progress?.Report(new RepositoryLoadProgress(
@@ -529,8 +574,9 @@ public sealed class CommitHistoryService
         return rows;
     }
 
-    private static int CountHeadCommits(
+    private static int CountCommits(
         Repository repo,
+        HistoryContext context,
         CancellationToken ct,
         IProgress<RepositoryLoadProgress>? progress)
     {
@@ -539,7 +585,7 @@ public sealed class CommitHistoryService
             "Counting commits for determinate progress."));
 
         var count = 0;
-        foreach (var _ in QueryHead(repo))
+        foreach (var _ in QueryCommits(repo, context))
         {
             ct.ThrowIfCancellationRequested();
             count++;
@@ -555,8 +601,27 @@ public sealed class CommitHistoryService
         return count;
     }
 
-    private static IEnumerable<Commit> QueryHead(Repository repo)
+    private static IEnumerable<Commit> QueryCommits(Repository repo, HistoryContext context)
     {
+        if (context.Scope == HistoryScope.AllBranches)
+        {
+            var tips = GetTimelineBranches(repo)
+                .Select(b => b.Tip)
+                .Where(c => c != null)
+                .Cast<Commit>()
+                .DistinctBy(c => c.Sha)
+                .ToList();
+
+            if (tips.Count == 0)
+                return [];
+
+            return repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = tips,
+            });
+        }
+
         if (repo.Head?.Tip == null)
             return [];
 
@@ -567,7 +632,10 @@ public sealed class CommitHistoryService
         });
     }
 
-    private static CommitHistoryRow ToRow(Commit commit, int sequence) => new(
+    private static CommitHistoryRow ToRow(
+        Commit commit,
+        int sequence,
+        IReadOnlyDictionary<string, IReadOnlyList<CommitRefLabel>> refLabels) => new(
         sequence,
         commit.Id.Sha,
         commit.Id.Sha.Length >= 7 ? commit.Id.Sha[..7] : commit.Id.Sha,
@@ -577,7 +645,11 @@ public sealed class CommitHistoryService
         commit.Author.Email ?? string.Empty,
         commit.Tree?.Sha ?? string.Empty,
         CommitRemoteState.OnRemote,
-        null);
+        null,
+        commit.Parents.Select(p => p.Id.Sha).ToList(),
+        refLabels.TryGetValue(commit.Id.Sha, out var labels)
+            ? labels
+            : Array.Empty<CommitRefLabel>());
 
     private IReadOnlyList<CommitHistoryRow> ReadRows(
         SqliteConnection conn,
@@ -588,7 +660,7 @@ public sealed class CommitHistoryService
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT sequence, full_sha, short_sha, message, author_date_ticks, author_name,
-                   author_email, tree_sha, remote_state, orphaned_pair_sha
+                   author_email, tree_sha, remote_state, orphaned_pair_sha, parent_shas, ref_labels
             FROM history_commits
             WHERE repo_key = $repo AND branch_name = $branch
             ORDER BY sequence
@@ -616,7 +688,9 @@ public sealed class CommitHistoryService
         reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
         reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
         (CommitRemoteState)reader.GetInt32(8),
-        reader.IsDBNull(9) ? null : reader.GetString(9));
+        reader.IsDBNull(9) ? null : reader.GetString(9),
+        reader.IsDBNull(10) ? Array.Empty<string>() : DeserializeList<string>(reader.GetString(10)),
+        reader.IsDBNull(11) ? Array.Empty<CommitRefLabel>() : DeserializeList<CommitRefLabel>(reader.GetString(11)));
 
     private Dictionary<string, int> ReadCachedSequences(SqliteConnection conn, HistoryContext context)
     {
@@ -647,6 +721,20 @@ public sealed class CommitHistoryService
         cmd.Parameters.AddWithValue("$repo", context.RepoKey);
         cmd.Parameters.AddWithValue("$branch", context.BranchName);
         return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private bool HistoryRowsNeedGraphUpgrade(SqliteConnection conn, HistoryContext context)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*)
+            FROM history_commits
+            WHERE repo_key = $repo AND branch_name = $branch
+              AND (parent_shas = '' OR ref_labels = '');
+            """;
+        cmd.Parameters.AddWithValue("$repo", context.RepoKey);
+        cmd.Parameters.AddWithValue("$branch", context.BranchName);
+        return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
     }
 
     private BranchState? GetBranchState(SqliteConnection conn, HistoryContext context)
@@ -705,31 +793,104 @@ public sealed class CommitHistoryService
         cmd.ExecuteNonQuery();
     }
 
-    private async Task EnsureContextAsync(CancellationToken ct)
+    private void DeleteRows(SqliteConnection conn, HistoryContext context)
     {
-        if (_context != null)
+        using var delete = conn.CreateCommand();
+        delete.CommandText = """
+            DELETE FROM history_commits
+            WHERE repo_key = $repo AND branch_name = $branch;
+            """;
+        delete.Parameters.AddWithValue("$repo", context.RepoKey);
+        delete.Parameters.AddWithValue("$branch", context.BranchName);
+        delete.ExecuteNonQuery();
+    }
+
+    private async Task EnsureContextAsync(HistoryScope scope, CancellationToken ct)
+    {
+        if (_context != null
+            && _context.Scope == scope
+            && string.Equals(_context.RepoPath, _git.RepositoryPath, StringComparison.OrdinalIgnoreCase))
             return;
 
         if (string.IsNullOrWhiteSpace(_git.RepositoryPath))
             throw new InvalidOperationException("No repository is open.");
 
-        await OpenAsync(_git.RepositoryPath, ct);
+        await OpenAsync(_git.RepositoryPath, scope, ct);
     }
 
     private HistoryContext RequireContext() =>
         _context ?? throw new InvalidOperationException("No repository is open.");
 
-    private static HistoryContext BuildContext(Repository repo)
+    private static HistoryContext BuildContext(Repository repo, HistoryScope scope)
     {
         var workDir = repo.Info.WorkingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var gitDir = repo.Info.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var repoKey = Sha256($"{gitDir.ToLowerInvariant()}|{workDir.ToLowerInvariant()}");
+        if (scope == HistoryScope.AllBranches)
+        {
+            var fingerprint = BuildAllBranchesFingerprint(repo);
+            return new HistoryContext(
+                repoKey,
+                workDir,
+                gitDir,
+                "scope:all-branches",
+                fingerprint,
+                null,
+                scope);
+        }
+
         var headSha = repo.Head.Tip?.Sha ?? string.Empty;
         var branchName = repo.Info.IsHeadDetached
             ? $"detached:{Short(headSha)}"
             : repo.Head.FriendlyName;
         var upstreamSha = repo.Head.TrackedBranch?.Tip?.Sha;
-        var repoKey = Sha256($"{gitDir.ToLowerInvariant()}|{workDir.ToLowerInvariant()}");
-        return new HistoryContext(repoKey, workDir, gitDir, branchName, headSha, upstreamSha);
+        return new HistoryContext(repoKey, workDir, gitDir, branchName, headSha, upstreamSha, scope);
+    }
+
+    private static string BuildAllBranchesFingerprint(Repository repo)
+    {
+        var entries = GetTimelineBranches(repo)
+            .Select(b => $"{b.CanonicalName}:{b.Tip?.Sha ?? string.Empty}");
+        return Sha256(string.Join("|", entries));
+    }
+
+    private static IReadOnlyList<Branch> GetTimelineBranches(Repository repo) =>
+        repo.Branches
+            .Where(b => b.Tip != null)
+            .OrderBy(b => b.IsRemote)
+            .ThenBy(b => b.FriendlyName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<CommitRefLabel>> BuildBranchLabelMap(Repository repo)
+    {
+        var labels = new Dictionary<string, List<CommitRefLabel>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var branch in GetTimelineBranches(repo))
+        {
+            var sha = branch.Tip?.Sha;
+            if (string.IsNullOrWhiteSpace(sha))
+                continue;
+
+            if (!labels.TryGetValue(sha, out var commitLabels))
+            {
+                commitLabels = [];
+                labels[sha] = commitLabels;
+            }
+
+            commitLabels.Add(new CommitRefLabel(
+                branch.FriendlyName,
+                branch.IsRemote
+                    ? CommitRefKind.RemoteBranch
+                    : branch.IsCurrentRepositoryHead ? CommitRefKind.CurrentBranch : CommitRefKind.LocalBranch,
+                branch.IsCurrentRepositoryHead));
+        }
+
+        return labels.ToDictionary(
+            kv => kv.Key,
+            kv => (IReadOnlyList<CommitRefLabel>)kv.Value
+                .OrderBy(l => l.Kind == CommitRefKind.RemoteBranch)
+                .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static string Short(string sha) =>
@@ -769,6 +930,8 @@ public sealed class CommitHistoryService
                 tree_sha TEXT NOT NULL,
                 remote_state INTEGER NOT NULL,
                 orphaned_pair_sha TEXT NULL,
+                parent_shas TEXT NOT NULL DEFAULT '',
+                ref_labels TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY(repo_key, branch_name, full_sha)
             );
 
@@ -779,6 +942,28 @@ public sealed class CommitHistoryService
                 ON history_commits(repo_key, branch_name, author_name, author_email);
             """;
         cmd.ExecuteNonQuery();
+        EnsureColumn("history_commits", "parent_shas", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn("history_commits", "ref_labels", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private void EnsureColumn(string tableName, string columnName, string definition)
+    {
+        using var conn = OpenConnection();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var pragma = conn.CreateCommand())
+        {
+            pragma.CommandText = $"PRAGMA table_info({tableName});";
+            using var reader = pragma.ExecuteReader();
+            while (reader.Read())
+                columns.Add(reader.GetString(1));
+        }
+
+        if (columns.Contains(columnName))
+            return;
+
+        using var alter = conn.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {definition};";
+        alter.ExecuteNonQuery();
     }
 
     private SqliteConnection OpenConnection()
@@ -792,6 +977,26 @@ public sealed class CommitHistoryService
         var conn = new SqliteConnection(builder.ToString());
         conn.Open();
         return conn;
+    }
+
+    private static string Serialize<T>(IReadOnlyList<T> values) =>
+        JsonSerializer.Serialize(values);
+
+    private static IReadOnlyList<T> DeserializeList<T>(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return Array.Empty<T>();
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<T>>(json) is { } values
+                ? values
+                : Array.Empty<T>();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<T>();
+        }
     }
 
     private static string Sha256(string value)
@@ -809,7 +1014,8 @@ public sealed class CommitHistoryService
         string GitDir,
         string BranchName,
         string HeadSha,
-        string? UpstreamSha);
+        string? UpstreamSha,
+        HistoryScope Scope);
 
     private sealed record BranchState(
         string HeadSha,

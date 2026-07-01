@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Services.Git;
+using Gitster.Services.History;
 
 namespace Gitster;
 
@@ -19,7 +20,9 @@ public partial class CommitItem : ObservableObject
         string authorEmail = "",
         CommitRemoteState remoteState = CommitRemoteState.LocalOnly,
         string fullSha = "",
-        string? orphanedPairSha = null)
+        string? orphanedPairSha = null,
+        IReadOnlyList<string>? parentShas = null,
+        IReadOnlyList<CommitRefLabel>? refLabels = null)
     {
         Message = message;
         Date = date;
@@ -29,6 +32,8 @@ public partial class CommitItem : ObservableObject
         FullSha = string.IsNullOrEmpty(fullSha) ? commitId : fullSha;
         RemoteState = remoteState;
         OrphanedPairSha = orphanedPairSha;
+        ParentShas = parentShas ?? Array.Empty<string>();
+        RefLabels = refLabels ?? Array.Empty<CommitRefLabel>();
     }
 
     public string Message { get; }
@@ -37,6 +42,9 @@ public partial class CommitItem : ObservableObject
     public string AuthorName { get; }
     public string AuthorEmail { get; }
     public string FullSha { get; }
+    public IReadOnlyList<string> ParentShas { get; }
+    public IReadOnlyList<CommitRefLabel> RefLabels { get; }
+    public bool HasRefLabels => RefLabels.Count > 0;
 
     public string DisplayMessage => PendingMessage ?? Message;
     public DateTime DisplayDate => PendingDate ?? Date;
@@ -60,6 +68,9 @@ public partial class CommitItem : ObservableObject
 
     /// <summary>True when this commit and its orphaned pair (same tree, rewritten) are both visible.</summary>
     public bool IsOrphanedPair => OrphanedPairSha != null;
+
+    [ObservableProperty]
+    public partial CommitGraphRow GraphRow { get; set; } = CommitGraphRow.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayMessage))]

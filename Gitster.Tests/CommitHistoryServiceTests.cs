@@ -3,6 +3,8 @@ using System.IO;
 using Gitster.Services.Git;
 using Gitster.Services.History;
 using Gitster.Services.Search;
+using LibGit2Sharp;
+using Microsoft.Data.Sqlite;
 
 namespace Gitster.Tests;
 
@@ -73,6 +75,100 @@ public sealed class CommitHistoryServiceTests
         CollectionAssert.AreEqual(
             new[] { "feature gamma", "feature alpha" },
             matches.Select(r => r.Message).ToArray());
+    }
+
+    [TestMethod]
+    public async Task EnsureCompleteAsync_StoresParentShas()
+    {
+        using var repo = new GitTestRepo();
+        var c1 = repo.Commit("c1", "a.txt", "1");
+        repo.Commit("c2", "a.txt", "2");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+        var rows = await history.EnsureCompleteAsync(progress: null);
+
+        CollectionAssert.AreEqual(new[] { c1 }, rows[0].ParentShas!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenExistingCacheHasBlankGraphColumns_RebuildsRows()
+    {
+        using var repo = new GitTestRepo();
+        var c1 = repo.Commit("c1", "a.txt", "1");
+        repo.Commit("c2", "a.txt", "2");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+        await history.EnsureCompleteAsync(progress: null);
+        BlankGraphColumns(cache.Path);
+
+        await history.OpenAsync(repo.Path);
+        var rows = await history.EnsureCompleteAsync(progress: null);
+
+        CollectionAssert.AreEqual(new[] { c1 }, rows[0].ParentShas!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task EnsureCompleteAsync_AllBranches_RebuildsWhenBranchTipMoves()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "a.txt", "1");
+        string main;
+        using (var r = new Repository(repo.Path))
+        {
+            main = r.Head.FriendlyName;
+            r.CreateBranch("feature", r.Head.Tip);
+            Commands.Checkout(r, r.Branches["feature"]);
+        }
+
+        repo.Commit("feature work", "feature.txt", "1");
+        Checkout(repo.Path, main);
+        repo.Commit("main work", "main.txt", "1");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path, HistoryScope.AllBranches);
+        var firstRows = await history.EnsureCompleteAsync(
+            progress: null,
+            scope: HistoryScope.AllBranches);
+
+        var featureRow = firstRows.Single(r => r.Message == "feature work");
+        Assert.IsTrue(featureRow.RefLabels!.Any(l => l.Name == "feature"));
+
+        Checkout(repo.Path, "feature");
+        repo.Commit("feature work 2", "feature.txt", "2");
+        Checkout(repo.Path, main);
+
+        await history.OpenAsync(repo.Path, HistoryScope.AllBranches);
+        var secondRows = await history.EnsureCompleteAsync(
+            progress: null,
+            scope: HistoryScope.AllBranches);
+
+        Assert.IsTrue(secondRows.Any(r => r.Message == "feature work 2"));
+    }
+
+    private static void BlankGraphColumns(string cachePath)
+    {
+        using var conn = new SqliteConnection($"Data Source={Path.Combine(cachePath, "history.sqlite")}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE history_commits SET parent_shas = '', ref_labels = '';";
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void Checkout(string repoPath, string branchName)
+    {
+        using var repo = new Repository(repoPath);
+        Commands.Checkout(repo, repo.Branches[branchName]);
     }
 
     private sealed class TempCacheDir : IDisposable

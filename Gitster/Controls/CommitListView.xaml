@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:Gitster.Controls"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:converters="clr-namespace:Gitster.Converters"
+             xmlns:git="clr-namespace:Gitster.Services.Git"
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:CommitListViewModel}">
@@ -57,14 +58,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListViewItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="Transparent"
-                                BorderThickness="0"
-                                Padding="{TemplateBinding Padding}"
-                                SnapsToDevicePixels="True">
-                            <ContentPresenter VerticalAlignment="Center"/>
-                        </Border>
+                        <Grid SnapsToDevicePixels="True">
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsHistoryEditTransitive}" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentInfoBackground}"/>
@@ -76,10 +77,8 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundSecondary}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBlue}"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="White"/>
-                                <Setter TargetName="Bd" Property="BorderThickness" Value="3,0,0,0"/>
-                                <Setter Property="Foreground" Value="White"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -91,7 +90,7 @@
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}" Value="True">
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -100,7 +99,7 @@
             <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}" Value="True">
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -108,6 +107,27 @@
         <Style x:Key="CommitMonoTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CommitSecondaryTextStyle}">
             <Setter Property="FontFamily" Value="{StaticResource FontFamilyMono}"/>
             <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <Style x:Key="CommitRefLabelStyle" TargetType="Border">
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="MaxWidth" Value="120"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentWarning}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static git:CommitRefKind.RemoteBranch}">
+                    <Setter Property="Background" Value="{StaticResource AccentInfoBackground}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentSuccess}"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="SectionHeaderItemStyle" TargetType="ListViewItem">
@@ -217,13 +237,16 @@
                     TextElement.FontFamily="{StaticResource FontFamilyUi}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="28"/>
-                        <ColumnDefinition Width="62"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="142"/>
                         <ColumnDefinition Width="104"/>
                         <ColumnDefinition Width="68"/>
                     </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Width="{Binding DataContext.GraphColumnWidth, RelativeSource={RelativeSource AncestorType=ListView}}"/>
 
                     <TextBlock Grid.Column="2"
                                Text="{Binding Message}"
@@ -241,60 +264,24 @@
         <DataTemplate x:Key="CommitRowTemplate">
             <Grid Height="24">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="28"/>
-                    <ColumnDefinition Width="62"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="142"/>
                     <ColumnDefinition Width="104"/>
                     <ColumnDefinition Width="68"/>
                 </Grid.ColumnDefinitions>
 
-                <Grid Grid.Column="0">
-                    <Rectangle Width="1.5" HorizontalAlignment="Center" VerticalAlignment="Stretch">
-                        <Rectangle.Style>
-                            <Style TargetType="Rectangle">
-                                <Setter Property="Fill" Value="{StaticResource TextTertiary}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
-                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="NoTrackingBranch">
-                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="Incoming">
-                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Rectangle.Style>
-                    </Rectangle>
+                <Grid Grid.Column="0"
+                      Width="{Binding DataContext.GraphColumnWidth, RelativeSource={RelativeSource AncestorType=ListView}}"
+                      ClipToBounds="True">
+                    <local:CommitGraphCell GraphRow="{Binding GraphRow}"
+                                           RemoteState="{Binding RemoteState}"
+                                           IsSelectedRow="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}"/>
                     <TextBlock Text="*" FontSize="8" HorizontalAlignment="Right" VerticalAlignment="Top"
                                Margin="0,1,0,0" Foreground="{StaticResource AccentWarning}"
                                ToolTip="Same commit, rewritten. Push (force-with-lease) to replace the remote copy."
                                Visibility="{Binding IsOrphanedPair, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Ellipse Width="8" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Ellipse.Style>
-                            <Style TargetType="Ellipse">
-                                <Setter Property="Fill" Value="{StaticResource TextTertiary}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="Incoming">
-                                        <Setter Property="Fill" Value="{StaticResource AccentBlue}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="LocalOnly">
-                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="NoTrackingBranch">
-                                        <Setter Property="Fill" Value="{StaticResource AccentWarning}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding RemoteState}" Value="OnRemote">
-                                        <Setter Property="Fill" Value="{StaticResource BackgroundPrimary}"/>
-                                        <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
-                                        <Setter Property="StrokeThickness" Value="1.5"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Ellipse.Style>
-                    </Ellipse>
                 </Grid>
 
                 <StackPanel Grid.Column="1"
@@ -302,7 +289,8 @@
                             VerticalAlignment="Center"
                             HorizontalAlignment="Left"
                             Margin="0,0,5,0"
-                            ToolTip="{Binding HistoryEditTooltip}">
+                            ToolTip="{Binding HistoryEditTooltip}"
+                            Visibility="{Binding HasAnyHistoryEditIcon, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Path Width="12"
                           Height="12"
                           Stretch="Uniform"
@@ -350,9 +338,31 @@
                           Visibility="{Binding IsHistoryEditTransitive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </StackPanel>
 
-                <TextBlock Grid.Column="2" Text="{Binding DisplayMessage}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" Margin="2,0,8,0"
-                           Style="{StaticResource CommitPrimaryTextStyle}"/>
+                <DockPanel Grid.Column="2" LastChildFill="True" Margin="2,0,8,0" VerticalAlignment="Center">
+                    <ItemsControl DockPanel.Dock="Left"
+                                  ItemsSource="{Binding RefLabels}"
+                                  Visibility="{Binding HasRefLabels, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource CommitRefLabelStyle}">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="10"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding DisplayMessage}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Style="{StaticResource CommitPrimaryTextStyle}"/>
+                </DockPanel>
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <local:Avatar Email="{Binding DisplayAuthorEmail}" DisplayName="{Binding DisplayAuthorName}"
                                   Margin="0,0,5,0"
@@ -408,6 +418,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <local:SearchBox Grid.Column="0"
@@ -416,7 +427,17 @@
                                      Placeholder="Search commits"
                                      ToolTip="Examples: author:Name  message:&quot;fix bug&quot;  sha:abc  after:2026-01-01"/>
 
-                    <Border Grid.Column="1"
+                    <ComboBox Grid.Column="1"
+                              Width="132"
+                              Height="28"
+                              Margin="8,0,0,0"
+                              ItemsSource="{Binding ScopeOptions}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Scope"
+                              SelectedValue="{Binding SelectedScope, Mode=TwoWay}"
+                              ToolTip="History scope"/>
+
+                    <Border Grid.Column="2"
                             MinWidth="84"
                             Height="24"
                             Margin="8,2,0,2"
@@ -433,7 +454,7 @@
                                    Foreground="{StaticResource TextSecondary}"/>
                     </Border>
 
-                    <Button Grid.Column="2"
+                    <Button Grid.Column="3"
                             Width="28" Height="28" Margin="6,0,0,0"
                             Command="{Binding ClearAllFiltersCommand}"
                             ToolTip="Reset filter"
@@ -473,8 +494,8 @@
             </ListView.ItemsPanel>
 
             <ListView.Resources>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#007ACC"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F1F1F"/>
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE4F7"/>
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1F1F1F"/>
             </ListView.Resources>
