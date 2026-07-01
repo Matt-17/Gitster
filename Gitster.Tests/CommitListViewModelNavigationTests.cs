@@ -110,6 +110,14 @@ public sealed class CommitListViewModelNavigationTests
         Assert.AreSame(first, vm.SelectedCommit);
     }
 
+    [TestMethod]
+    public void GraphColumnWidthForLaneCount_WithDenseGraph_ExpandsBeyondCompactColumn()
+    {
+        Assert.AreEqual(28, CommitListViewModel.GraphColumnWidthForLaneCount(1));
+        Assert.AreEqual(62, CommitListViewModel.GraphColumnWidthForLaneCount(5));
+        Assert.AreEqual(240, CommitListViewModel.GraphColumnWidthForLaneCount(80));
+    }
+
     private static CommitListViewModel CreateViewModel()
     {
         var git = Substitute.For<IGitBackend>();

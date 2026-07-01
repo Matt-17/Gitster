@@ -137,7 +137,8 @@ public sealed class LibGit2Backend : IGitBackend
             incomingCommits = incoming.Select(c => new CommitInfo(
                 c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
                 c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
-                CommitRemoteState.Incoming, c.Id.Sha)).ToList();
+                CommitRemoteState.Incoming, c.Id.Sha,
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList())).ToList();
         }
 
         IEnumerable<Commit> commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
@@ -178,7 +179,8 @@ public sealed class LibGit2Backend : IGitBackend
                     c.Author.Name ?? string.Empty,
                     c.Author.Email ?? string.Empty,
                     remoteState,
-                    c.Id.Sha);
+                    c.Id.Sha,
+                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList());
             })
             .ToList();
 
@@ -271,7 +273,8 @@ public sealed class LibGit2Backend : IGitBackend
                 c.Author.Name ?? string.Empty,
                 c.Author.Email ?? string.Empty,
                 CommitRemoteState.OnRemote,
-                c.Id.Sha);
+                c.Id.Sha,
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList());
 
             // Periodically yield the thread so cancellation stays responsive on huge repos.
             if ((++counter & 1023) == 0)
@@ -335,7 +338,8 @@ public sealed class LibGit2Backend : IGitBackend
                 incoming.Add(new CommitInfo(
                     c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
                     c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
-                    CommitRemoteState.Incoming, c.Id.Sha));
+                    CommitRemoteState.Incoming, c.Id.Sha,
+                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()));
 
             // Orphaned hash-pair detection: an incoming commit whose tree matches an
             // outgoing commit is the pre-amend copy still on the remote.
@@ -1074,7 +1078,8 @@ public sealed class LibGit2Backend : IGitBackend
                 c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha,
                 c.MessageShort,
                 c.Author.When.DateTime,
-                c.Author.Name ?? string.Empty))
+                c.Author.Name ?? string.Empty,
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()))
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
     }
@@ -1506,7 +1511,8 @@ public sealed class LibGit2Backend : IGitBackend
                 c.Author.Name ?? string.Empty,
                 c.Author.Email ?? string.Empty,
                 CommitRemoteState.LocalOnly,
-                c.Id.Sha))
+                c.Id.Sha,
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()))
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
     }
@@ -2049,7 +2055,8 @@ public sealed class LibGit2Backend : IGitBackend
 
         static CommitInfo ToInfo(Commit c) => new(
             c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha, c.MessageShort, c.Author.When.DateTime,
-            c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty, CommitRemoteState.LocalOnly, c.Id.Sha);
+            c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty, CommitRemoteState.LocalOnly, c.Id.Sha,
+            ParentShas: c.Parents.Select(p => p.Id.Sha).ToList());
     }
 
     /// <summary>Resolves a SHA, local branch, tag or origin/&lt;branch&gt; to a commit.</summary>

@@ -12,7 +12,9 @@ public sealed record CommitHistoryRow(
     string AuthorEmail,
     string TreeSha,
     CommitRemoteState RemoteState,
-    string? OrphanedPairSha)
+    string? OrphanedPairSha,
+    IReadOnlyList<string>? ParentShas = null,
+    IReadOnlyList<CommitRefLabel>? RefLabels = null)
 {
     public CommitInfo ToCommitInfo() => new(
         ShortSha,
@@ -22,7 +24,9 @@ public sealed record CommitHistoryRow(
         AuthorEmail,
         RemoteState,
         FullSha,
-        OrphanedPairSha);
+        OrphanedPairSha,
+        ParentShas ?? Array.Empty<string>(),
+        RefLabels ?? Array.Empty<CommitRefLabel>());
 
     public CommitItem ToCommitItem() => new(
         Message,
@@ -32,5 +36,7 @@ public sealed record CommitHistoryRow(
         AuthorEmail,
         RemoteState,
         FullSha,
-        OrphanedPairSha);
+        OrphanedPairSha,
+        ParentShas ?? Array.Empty<string>(),
+        RefLabels ?? Array.Empty<CommitRefLabel>());
 }

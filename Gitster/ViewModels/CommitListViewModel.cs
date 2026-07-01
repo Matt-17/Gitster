@@ -19,9 +19,14 @@ public partial class CommitListViewModel : BaseViewModel
 {
     private const int FilterDebounceMs = 150;
     private const int PageNavigationCommitCount = 10;
+    private const double GraphColumnMinWidth = 28;
+    private const double GraphColumnMaxWidth = 240;
+    private const double GraphColumnPadding = 12;
+    private const double GraphLaneSpacing = 10;
 
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
+    private readonly CommitGraphLayoutService _graphLayout = new();
 
     /// <summary>Shared UI preferences (date display mode, gravatar) for row bindings.</summary>
     public Gitster.Services.UiPreferencesService Ui { get; }
@@ -49,13 +54,31 @@ public partial class CommitListViewModel : BaseViewModel
     [ObservableProperty]
     public partial IReadOnlyList<object> Items { get; set; } = [];
 
+    [ObservableProperty]
+    public partial double GraphColumnWidth { get; set; } = GraphColumnMinWidth;
+
     /// <summary>All cached commits for the current local branch, newest first.</summary>
     public IReadOnlyList<CommitItem> LoadedCommits => _allRows;
 
     public event Action? FocusSearchRequested;
 
+    public IReadOnlyList<HistoryScopeOption> ScopeOptions { get; } =
+    [
+        new(HistoryScope.CurrentBranch, "Current branch"),
+        new(HistoryScope.AllBranches, "All branches"),
+    ];
+
+    [ObservableProperty]
+    public partial HistoryScope SelectedScope { get; set; } = HistoryScope.CurrentBranch;
+
     [RelayCommand]
     private void FocusSearch() => FocusSearchRequested?.Invoke();
+
+    partial void OnSelectedScopeChanged(HistoryScope value)
+    {
+        if (!string.IsNullOrWhiteSpace(_git.RepositoryPath))
+            _ = LoadAsync();
+    }
 
     public Func<DiffFileEntry?, Task>? RemoveChangeFromCommitAsync { get; set; }
 
@@ -150,26 +173,32 @@ public partial class CommitListViewModel : BaseViewModel
                 return;
             }
 
-            await _history.OpenAsync(_git.RepositoryPath, ct, progress);
+            var scope = SelectedScope;
+            await _history.OpenAsync(_git.RepositoryPath, scope, ct, progress);
 
             progress?.Report(new RepositoryLoadProgress(
                 "Loading full history",
                 "Preparing virtualized commit rows."));
-            var rows = await _history.EnsureCompleteAsync(progress, ct);
+            var rows = await _history.EnsureCompleteAsync(progress, ct, scope);
             if (ct.IsCancellationRequested) return;
 
             var newAllRows = rows.Select(r => r.ToCommitItem()).ToList();
 
-            progress?.Report(new RepositoryLoadProgress(
-                "Computing remote state",
-                "Checking incoming and outgoing commits.",
-                newAllRows.Count));
-            var sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
-            if (ct.IsCancellationRequested) return;
+            RemoteSets sets = RemoteSets.Empty;
+            var newIncomingRows = new List<CommitItem>();
+            if (scope == HistoryScope.CurrentBranch)
+            {
+                progress?.Report(new RepositoryLoadProgress(
+                    "Computing remote state",
+                    "Checking incoming and outgoing commits.",
+                    newAllRows.Count));
+                sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
+                if (ct.IsCancellationRequested) return;
 
-            await _history.ApplyRemoteSetsAsync(sets, ct);
-            ApplyRemoteSets(sets, newAllRows);
-            var newIncomingRows = sets.Incoming.Select(ToItem).ToList();
+                await _history.ApplyRemoteSetsAsync(sets, ct);
+                ApplyRemoteSets(sets, newAllRows);
+                newIncomingRows = sets.Incoming.Select(ToItem).ToList();
+            }
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
@@ -201,6 +230,7 @@ public partial class CommitListViewModel : BaseViewModel
         _remoteSets = null;
         OnPropertyChanged(nameof(LoadedCommits));
         Items = [];
+        GraphColumnWidth = GraphColumnMinWidth;
         SelectedCommit = null;
         HistoryLoading = false;
         HistoryStatusText = string.Empty;
@@ -287,7 +317,9 @@ public partial class CommitListViewModel : BaseViewModel
         info.AuthorEmail,
         info.RemoteState,
         info.FullSha,
-        info.OrphanedPairSha);
+        info.OrphanedPairSha,
+        info.ParentShas,
+        info.RefLabels);
 
     private void ApplyRemoteSets(RemoteSets sets, IEnumerable<CommitItem> rows)
     {
@@ -363,6 +395,12 @@ public partial class CommitListViewModel : BaseViewModel
 
     private BuiltCommitRows BuildRows(List<CommitItem> incoming, List<CommitItem> local)
     {
+        if (SelectedScope == HistoryScope.AllBranches)
+        {
+            ApplyGraphRows(local);
+            return new BuiltCommitRows(local.Cast<object>().ToList(), local.Count, 0);
+        }
+
         int outgoingCount = 0;
         for (int i = 0; i < local.Count; i++)
             if (IsOutgoing(local[i])) outgoingCount++;
@@ -379,22 +417,59 @@ public partial class CommitListViewModel : BaseViewModel
             if (incoming.Count == 0)
                 result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no incoming commits"));
             else
+            {
+                ApplyGraphRows(incoming);
                 result.AddRange(incoming);
+            }
         }
 
         if (local.Count > 0 || hasRemote)
             result.Add(new CommitSectionHeader(CommitSectionKind.LocalOutgoing, outgoingCount));
 
+        ApplyGraphRows(local);
         result.AddRange(local);
         return new BuiltCommitRows(result, local.Count, incoming.Count);
     }
 
+    private void ApplyGraphRows(IReadOnlyList<CommitItem> commits)
+    {
+        var graphRows = _graphLayout.Layout(commits
+            .Select(c => new CommitGraphNode(c.FullSha, c.ParentShas, c.RefLabels))
+            .ToList());
+
+        foreach (var commit in commits)
+            commit.GraphRow = graphRows.TryGetValue(commit.FullSha, out var row)
+                ? row
+                : CommitGraphRow.Empty;
+    }
+
     private void ApplyRows(BuiltCommitRows rows, string? priorSha)
     {
+        UpdateGraphColumnWidth(rows.Items);
         Items = rows.Items;
         UpdateFilterStatus();
         HistoryStatusText = StatusForRows(rows.LocalCount, rows.IncomingCount);
         SelectAfterRebuild(priorSha);
+    }
+
+    private void UpdateGraphColumnWidth(IReadOnlyList<object> items)
+    {
+        var maxLaneCount = items
+            .OfType<CommitItem>()
+            .Select(c => c.GraphRow.LaneCount)
+            .DefaultIfEmpty(1)
+            .Max();
+
+        GraphColumnWidth = GraphColumnWidthForLaneCount(maxLaneCount);
+    }
+
+    public static double GraphColumnWidthForLaneCount(int laneCount)
+    {
+        var safeLaneCount = Math.Max(1, laneCount);
+        return Math.Clamp(
+            GraphColumnPadding + (safeLaneCount * GraphLaneSpacing),
+            GraphColumnMinWidth,
+            GraphColumnMaxWidth);
     }
 
     private void SelectAfterRebuild(string? priorSha)
@@ -413,6 +488,13 @@ public partial class CommitListViewModel : BaseViewModel
     private string StatusForRows(int localCount, int incomingCount)
     {
         var count = HasActiveFilters ? localCount + incomingCount : _allRows.Count;
+        if (SelectedScope == HistoryScope.AllBranches)
+        {
+            return HasActiveFilters
+                ? $"{count:N0} matching commit{(count == 1 ? "" : "s")}"
+                : $"{count:N0} commit{(count == 1 ? "" : "s")} across branches";
+        }
+
         return HasActiveFilters
             ? $"{count:N0} matching commit{(count == 1 ? "" : "s")}"
             : $"{count:N0} commit{(count == 1 ? "" : "s")}";
@@ -469,3 +551,5 @@ public partial class CommitListViewModel : BaseViewModel
     [RelayCommand]
     private void ClearAllFilters() => FilterText = string.Empty;
 }
+
+public sealed record HistoryScopeOption(HistoryScope Scope, string Label);
