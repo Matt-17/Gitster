@@ -31,6 +31,20 @@
             <Setter Property="ContextMenu">
                 <Setter.Value>
                     <ContextMenu DataContext="{Binding PlacementTarget, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Push through this commit"
+                                  Command="{Binding Tag.PushThroughCommitCommand}"
+                                  CommandParameter="{Binding DataContext}">
+                            <MenuItem.Style>
+                                <Style TargetType="MenuItem">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DataContext.RemoteState}" Value="LocalOnly">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </MenuItem.Style>
+                        </MenuItem>
                         <MenuItem Header="Reset branch here (--mixed, keep changes)"
                                   Command="{Binding Tag.ResetToCommitMixedCommand}"
                                   CommandParameter="{Binding DataContext}"/>

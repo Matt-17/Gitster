@@ -873,20 +873,44 @@ public sealed class LibGit2Backend : IGitBackend
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
     {
         using var repo = OpenRepository();
-        _ = ResolveRemote(repo, remoteName);
+        var remote = ResolveRemote(repo, remoteName);
+        var branch = GetCurrentLocalBranch(repo, "push");
 
         // libgit2 has no real force-with-lease — HybridGitBackend routes that to the CLI.
         // Here a lease request degrades to a plain force (the prior behaviour) when no CLI.
         if (mode == PushMode.Force || mode == PushMode.ForceWithLease)
         {
-            var pushRefSpec = $"+{repo.Head.CanonicalName}:{repo.Head.CanonicalName}";
-            repo.Network.Push(repo.Network.Remotes[remoteName], pushRefSpec, new PushOptions());
+            var pushRefSpec = $"+{branch.CanonicalName}:{branch.CanonicalName}";
+            repo.Network.Push(remote, pushRefSpec, new PushOptions());
         }
         else
         {
-            repo.Network.Push(repo.Head, new PushOptions());
+            repo.Network.Push(branch, new PushOptions());
         }
 
+        if (branch.Tip is { } tip)
+            UpdateTrackingBranchAfterPush(repo, branch, remote, tip);
+
+        return Task.CompletedTask;
+    }
+
+    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+    {
+        if (string.IsNullOrWhiteSpace(commitSha))
+            throw new ArgumentException("Commit SHA is required.", nameof(commitSha));
+
+        using var repo = OpenRepository();
+        var remote = ResolveRemote(repo, remoteName);
+        var branch = GetCurrentLocalBranch(repo, "push through a commit");
+        var commit = repo.Lookup<Commit>(commitSha)
+            ?? throw new InvalidOperationException($"Commit not found: {commitSha}");
+
+        if (!IsReachableFrom(repo, branch.Tip, commit))
+            throw new InvalidOperationException("The selected commit is not on the current branch.");
+
+        var pushRefSpec = $"{commit.Id.Sha}:{branch.CanonicalName}";
+        repo.Network.Push(remote, pushRefSpec, new PushOptions());
+        UpdateTrackingBranchAfterPush(repo, branch, remote, commit);
         return Task.CompletedTask;
     }
 
@@ -983,6 +1007,29 @@ public sealed class LibGit2Backend : IGitBackend
             throw new InvalidOperationException($"Cannot {operation} because the current branch is not a local branch.");
 
         return branch;
+    }
+
+    private static bool IsReachableFrom(Repository repo, Commit? source, Commit target)
+    {
+        if (source is null)
+            return false;
+
+        return repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+        {
+            IncludeReachableFrom = source,
+        }).Any(c => string.Equals(c.Sha, target.Sha, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void UpdateTrackingBranchAfterPush(Repository repo, Branch branch, Remote remote, Commit commit)
+    {
+        var tracked = branch.TrackedBranch;
+        if (tracked?.Reference is null)
+            return;
+
+        if (!string.Equals(tracked.RemoteName, remote.Name, StringComparison.Ordinal))
+            return;
+
+        repo.Refs.UpdateTarget(tracked.Reference, commit.Id, $"push through {ShortSha(commit.Sha)}");
     }
 
     private static void EnsureAttachedHead(Repository repo, string operation)

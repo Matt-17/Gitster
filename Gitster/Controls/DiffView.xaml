@@ -164,6 +164,7 @@
         </Style>
 
         <Style TargetType="{x:Type TreeViewItem}">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>

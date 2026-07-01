@@ -60,6 +60,17 @@ public sealed class HybridGitBackend : IGitBackend
         => mode == PushMode.ForceWithLease && GitCli.IsAvailable
             ? _cli.PushAsync(remoteName, mode)
             : _lib.PushAsync(remoteName, mode);
+    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+    {
+        if (!GitCli.IsAvailable)
+            await GitCli.DetectAsync();
+
+        if (!GitCli.IsAvailable)
+            throw new InvalidOperationException(
+                "Push through commit requires the Git command-line tool. Install Git for Windows and restart Gitster.");
+
+        await _cli.PushThroughCommitAsync(commitSha, remoteName);
+    }
     public Task<string> GetReflogSelectorForHeadAsync()         => _lib.GetReflogSelectorForHeadAsync();
     public Task ResetMixedAsync(string targetReference, string? branchName = null) => _lib.ResetMixedAsync(targetReference, branchName);
     public Task ResetHardAsync(string targetReference, string? branchName = null)  => _lib.ResetHardAsync(targetReference, branchName);

@@ -40,6 +40,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly StashNameService _stashNameService;
     private readonly CustomToolsService _customToolsService;
     private readonly UiPreferencesService _uiPreferences;
+    private readonly CapabilityService _capabilityService;
     private CancellationTokenSource? _repoSwitchCts;
     private int _headRefreshRequestVersion;
     private bool _headRefreshRequested;
@@ -103,9 +104,11 @@ public partial class MainWindowViewModel : BaseViewModel
         _stashNameService = stashNameService;
         _customToolsService = customToolsService;
         _uiPreferences = uiPreferences;
+        _capabilityService = capabilityService;
         PersistedGridSplitter.Initialize(_uiPreferences);
 
         Capability.Initialize(capabilityService);
+        capabilityService.PropertyChanged += OnCapabilityServicePropertyChanged;
 
         SelectedCommitDetail = new CommitDetailViewModel();
         CurrentCommitDetail = new CommitDetailViewModel();
@@ -268,6 +271,7 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         OnPropertyChanged(nameof(CanAmendSelectedCommit));
         ArchiveHeadCommand.NotifyCanExecuteChanged();
+        PushThroughCommitCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnFolderPathChanged(string value)
@@ -288,6 +292,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
         OnPropertyChanged(nameof(IsAmendUnsafe));
         OnPropertyChanged(nameof(CanAmendSelectedCommit));
+        PushThroughCommitCommand.NotifyCanExecuteChanged();
         _ = AuthorPanelVM.LoadFromCommitAsync(value);
     }
 
@@ -524,6 +529,12 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             _windowService.Error($"Archive failed:\n{ex.Message}", "Gitster");
         }
+    }
+
+    private void OnCapabilityServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CapabilityService.IsGitCliAvailable))
+            PushThroughCommitCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanArchiveHead() => IsGoButtonEnabled;
@@ -1033,6 +1044,38 @@ public partial class MainWindowViewModel : BaseViewModel
 
     [RelayCommand]
     private Task Push(string? remoteName) => PushWithModeAsync(remoteName, PushMode.Normal);
+
+    [RelayCommand(CanExecute = nameof(CanPushThroughCommit))]
+    private async Task PushThroughCommit(CommitItem? commit)
+    {
+        if (!CanPushThroughCommit(commit))
+        {
+            var message = !_capabilityService.IsGitCliAvailable
+                ? "Push through commit requires the Git command-line tool. Install Git for Windows and restart Gitster."
+                : "Only local-only commits can be pushed through this action.";
+            _windowService.Warning(message, "Gitster");
+            return;
+        }
+
+        try
+        {
+            var remote = ActiveRemote(null);
+            var shortSha = ShortSha(commit!.FullSha);
+            await _feedbackService.RunAsync(
+                $"Push through {shortSha}",
+                () => _gitBackend.PushThroughCommitAsync(commit.FullSha, remote));
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Error pushing through commit: {ex.Message}", "Gitster");
+        }
+    }
+
+    private bool CanPushThroughCommit(CommitItem? commit) =>
+        IsGoButtonEnabled
+        && _capabilityService.IsGitCliAvailable
+        && commit?.RemoteState == CommitRemoteState.LocalOnly;
 
     [RelayCommand]
     private Task PushForceWithLease(string? remoteName) => PushWithModeAsync(remoteName, PushMode.ForceWithLease);
