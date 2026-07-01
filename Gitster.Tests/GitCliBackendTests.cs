@@ -286,6 +286,203 @@ public sealed class GitCliBackendTests
         }
     }
 
+    [TestMethod]
+    public async Task StitchHistory_SquashedBranch_CreatesOursMergeAndBackup()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var fixture = CreateSquashedFeatureFixture(repo);
+        var fingerprintBefore = WorkingTreeFingerprint(repo.Path);
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        var result = await backend.StitchHistoryAsync(fixture.SourceBranch);
+
+        using var check = new Repository(repo.Path);
+        var merge = check.Head.Tip!;
+        var parents = merge.Parents.ToList();
+
+        Assert.AreEqual(fixture.SourceBranch, result.SourceRef);
+        Assert.AreEqual(fixture.SourceTip, result.SourceTipSha);
+        Assert.AreEqual(fixture.CurrentBranch, result.TargetBranch);
+        Assert.AreEqual(2, parents.Count, "stitch must create a two-parent merge commit");
+        Assert.AreEqual(fixture.HeadBeforeStitch, parents[0].Sha, "first parent should be the pre-stitch target HEAD");
+        Assert.AreEqual(fixture.SourceTip, parents[1].Sha, "second parent should be the stitched source tip");
+        Assert.AreEqual(fixture.HeadTreeBeforeStitch, merge.Tree.Sha, "ours merge must keep the target tree unchanged");
+        Assert.AreEqual(fixture.HeadBeforeStitch, check.Branches[result.BackupBranch]!.Tip!.Sha);
+
+        var sourceTip = check.Lookup<Commit>(fixture.SourceTip)!;
+        var mergeBase = check.ObjectDatabase.FindMergeBase(sourceTip, merge);
+        Assert.AreEqual(fixture.SourceTip, mergeBase!.Sha, "source tip should become reachable from HEAD");
+        Assert.AreEqual(fingerprintBefore, WorkingTreeFingerprint(repo.Path), "working tree and index should stay clean");
+    }
+
+    [TestMethod]
+    public async Task StitchHistory_DirtyWorkingTree_ThrowsAndLeavesHeadUnchanged()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var fixture = CreateSquashedFeatureFixture(repo);
+        System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "dirty.txt"), "dirty");
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.StitchHistoryAsync(fixture.SourceBranch));
+
+        StringAssert.Contains(ex.Message, "uncommitted changes");
+        Assert.AreEqual(fixture.HeadBeforeStitch, repo.Head());
+    }
+
+    [TestMethod]
+    public async Task StitchHistory_DetachedHead_Throws()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var fixture = CreateSquashedFeatureFixture(repo);
+
+        using (var r = new Repository(repo.Path))
+        {
+            Commands.Checkout(r, r.Lookup<Commit>(fixture.HeadBeforeStitch)!);
+            Assert.IsTrue(r.Info.IsHeadDetached);
+        }
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.StitchHistoryAsync(fixture.SourceBranch));
+
+        StringAssert.Contains(ex.Message, "Check out a local branch");
+    }
+
+    [TestMethod]
+    public async Task StitchHistory_MissingSource_Throws()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.StitchHistoryAsync("missing/source"));
+
+        StringAssert.Contains(ex.Message, "was not found");
+    }
+
+    [TestMethod]
+    public async Task StitchHistory_CurrentBranchSource_Throws()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        string current;
+        using (var r = new Repository(repo.Path))
+            current = r.Head.FriendlyName;
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.StitchHistoryAsync(current));
+
+        StringAssert.Contains(ex.Message, "not the current branch");
+    }
+
+    [TestMethod]
+    public async Task StitchHistory_AlreadyReachableSource_Throws()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        using (var r = new Repository(repo.Path))
+            r.CreateBranch("old/history", r.Lookup<Commit>(baseSha));
+        repo.Commit("main work", "main.txt", "main");
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.StitchHistoryAsync("old/history"));
+
+        StringAssert.Contains(ex.Message, "already reachable");
+    }
+
+    [TestMethod]
+    public async Task PreviewHistoryStitch_SquashedBranch_ReportsUniqueCommitsAndSquashMatch()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var fixture = CreateSquashedFeatureFixture(repo);
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var preview = await backend.PreviewHistoryStitchAsync(fixture.SourceBranch);
+
+        Assert.IsTrue(preview.CanExecute, string.Join(Environment.NewLine, preview.Blocks));
+        Assert.AreEqual(fixture.SourceTip, preview.SourceTipSha);
+        Assert.AreEqual(fixture.CurrentBranch, preview.TargetBranch);
+        Assert.AreEqual(2, preview.UniqueSourceCommitCount);
+        Assert.AreEqual(fixture.SquashCommit, preview.SquashMatchSha);
+        Assert.IsFalse(preview.Warnings.Any(w => w.Contains("No exact squash-tree match", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task PreviewHistoryStitch_NoSquashTreeMatch_WarnsButAllows()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+
+        string current;
+        using (var r = new Repository(repo.Path))
+        {
+            current = r.Head.FriendlyName;
+            var feature = r.CreateBranch("old/history", r.Head.Tip);
+            Commands.Checkout(r, feature);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature.txt"), "feature");
+            Commands.Stage(r, "feature.txt");
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            r.Commit("feature work", sig, sig);
+            Commands.Checkout(r, r.Branches[current]);
+        }
+
+        repo.Commit("different main work", "main.txt", "main");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var preview = await backend.PreviewHistoryStitchAsync("old/history");
+
+        Assert.IsTrue(preview.CanExecute, string.Join(Environment.NewLine, preview.Blocks));
+        Assert.IsTrue(preview.Warnings.Any(w => w.Contains("No exact squash-tree match", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task PreviewHistoryStitch_AlreadyReachableSource_Blocks()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        using (var r = new Repository(repo.Path))
+            r.CreateBranch("old/history", r.Lookup<Commit>(baseSha));
+        repo.Commit("main work", "main.txt", "main");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var preview = await backend.PreviewHistoryStitchAsync("old/history");
+
+        Assert.IsFalse(preview.CanExecute);
+        Assert.IsTrue(preview.IsSourceAlreadyReachable);
+        Assert.IsTrue(preview.Blocks.Any(b => b.Contains("already reachable", StringComparison.Ordinal)));
+    }
+
     private static List<string> AllMessages(GitTestRepo repo)
     {
         using var r = new Repository(repo.Path);
@@ -326,4 +523,62 @@ public sealed class GitCliBackendTests
         {
         }
     }
+
+    private static SquashedFeatureFixture CreateSquashedFeatureFixture(GitTestRepo repo)
+    {
+        repo.Commit("base", "base.txt", "base");
+        const string sourceBranch = "feature/stitch";
+        string currentBranch;
+        string sourceTip;
+        string squashCommit;
+
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            var feature = r.CreateBranch(sourceBranch, r.Head.Tip);
+            Commands.Checkout(r, feature);
+
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature-1.txt"), "one");
+            Commands.Stage(r, "feature-1.txt");
+            r.Commit("feature part 1", sig, sig);
+
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature-2.txt"), "two");
+            Commands.Stage(r, "feature-2.txt");
+            sourceTip = r.Commit("feature part 2", sig, sig).Sha;
+
+            Commands.Checkout(r, r.Branches[currentBranch]);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature-1.txt"), "one");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repo.Path, "feature-2.txt"), "two");
+            Commands.Stage(r, ["feature-1.txt", "feature-2.txt"]);
+            squashCommit = r.Commit("squash feature", sig, sig).Sha;
+        }
+
+        var headBeforeStitch = repo.Commit("main after squash", "main.txt", "main");
+        using var check = new Repository(repo.Path);
+        return new SquashedFeatureFixture(
+            currentBranch,
+            sourceBranch,
+            sourceTip,
+            squashCommit,
+            headBeforeStitch,
+            check.Head.Tip!.Tree.Sha);
+    }
+
+    private static string WorkingTreeFingerprint(string repoPath)
+    {
+        using var r = new Repository(repoPath);
+        var entries = r.RetrieveStatus(new StatusOptions { IncludeUntracked = true })
+            .Select(e => $"{e.FilePath}:{e.State}")
+            .OrderBy(s => s, StringComparer.Ordinal);
+        return string.Join("|", entries);
+    }
+
+    private sealed record SquashedFeatureFixture(
+        string CurrentBranch,
+        string SourceBranch,
+        string SourceTip,
+        string SquashCommit,
+        string HeadBeforeStitch,
+        string HeadTreeBeforeStitch);
 }
