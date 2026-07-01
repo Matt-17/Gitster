@@ -4,7 +4,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
-             xmlns:models="clr-namespace:Gitster.Models"
              xmlns:controls="clr-namespace:Gitster.Controls"
              xmlns:converters="clr-namespace:Gitster.Converters"
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
@@ -20,6 +19,11 @@
     <!-- Root grid inherits MainWindowViewModel; swap DataContext for everything inside -->
     <Grid DataContext="{Binding StashesVM}"
           d:DataContext="{d:DesignInstance Type=vm:StashesViewModel}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" MinHeight="180"/>
+            <RowDefinition Height="3"/>
+            <RowDefinition Height="260" MinHeight="120"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MinWidth="320"/>
             <ColumnDefinition Width="4"/>
@@ -27,7 +31,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- ══════════════ Left column ══════════════ -->
-        <Grid Grid.Column="0">
+        <Grid Grid.Row="0" Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -132,7 +136,7 @@
         </Grid>
 
         <!-- Splitter -->
-        <GridSplitter Grid.Column="1"
+        <GridSplitter Grid.Row="0" Grid.Column="1"
                       HorizontalAlignment="Stretch"
                       Background="{StaticResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
@@ -141,7 +145,7 @@
                       helper:PersistedGridSplitter.TargetIndex="2"/>
 
         <!-- ══════════════ Right column ══════════════ -->
-        <ScrollViewer Grid.Column="2"
+        <ScrollViewer Grid.Row="0" Grid.Column="2"
                       VerticalScrollBarVisibility="Auto"
                       Padding="10,10,10,10">
             <StackPanel>
@@ -219,107 +223,24 @@
                                 HorizontalAlignment="Stretch"/>
                     </Grid>
 
-                    <!-- Changed files card -->
-                    <Border Style="{StaticResource PanelCard}">
-                        <StackPanel>
-                            <TextBlock Text="Changed files"
-                                       FontSize="12"
-                                       FontWeight="Medium"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       Margin="0,0,0,6"/>
-
-                            <ItemsControl ItemsSource="{Binding SelectedStash.Files}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type models:StashFileChange}">
-                                        <Grid Margin="0,1">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="18"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- Kind badge -->
-                                            <Border Grid.Column="0"
-                                                    CornerRadius="2"
-                                                    Width="14" Height="14"
-                                                    HorizontalAlignment="Left"
-                                                    VerticalAlignment="Center">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="{StaticResource AccentWarning}"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Kind}"
-                                                                         Value="{x:Static models:StashChangeKind.Added}">
-                                                                <Setter Property="Background" Value="{StaticResource AccentSuccess}"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Kind}"
-                                                                         Value="{x:Static models:StashChangeKind.Deleted}">
-                                                                <Setter Property="Background" Value="{StaticResource AccentDanger}"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Kind}"
-                                                                         Value="{x:Static models:StashChangeKind.Renamed}">
-                                                                <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <TextBlock VerticalAlignment="Center"
-                                                           HorizontalAlignment="Center"
-                                                           FontSize="9"
-                                                           FontWeight="Bold"
-                                                           Foreground="White">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Text" Value="M"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="{x:Static models:StashChangeKind.Added}">
-                                                                    <Setter Property="Text" Value="A"/>
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="{x:Static models:StashChangeKind.Deleted}">
-                                                                    <Setter Property="Text" Value="D"/>
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Kind}"
-                                                                             Value="{x:Static models:StashChangeKind.Renamed}">
-                                                                    <Setter Property="Text" Value="R"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
-
-                                            <!-- File path -->
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{Binding Path}"
-                                                       FontFamily="{StaticResource FontFamilyMono}"
-                                                       FontSize="11"
-                                                       Foreground="{StaticResource TextPrimary}"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       VerticalAlignment="Center"
-                                                       Margin="4,0"/>
-
-                                            <!-- +X −Y stats -->
-                                            <TextBlock Grid.Column="2"
-                                                       FontFamily="{StaticResource FontFamilyMono}"
-                                                       FontSize="11"
-                                                       VerticalAlignment="Center">
-                                                <Run Foreground="{StaticResource AccentSuccess}"
-                                                     Text="{Binding Added, StringFormat='+{0}', Mode=OneWay}"/>
-                                                <Run Foreground="{StaticResource AccentDanger}"
-                                                     Text="{Binding Removed, StringFormat='−{0}', Mode=OneWay}"/>
-                                            </TextBlock>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
+
+        <GridSplitter Grid.Row="1"
+                      Grid.ColumnSpan="3"
+                      HorizontalAlignment="Stretch"
+                      Background="{StaticResource BorderTertiary}"
+                      ResizeBehavior="PreviousAndNext"
+                      helper:PersistedGridSplitter.Key="StashesMode.DiffHeight"
+                      helper:PersistedGridSplitter.DefinitionKind="Row"
+                      helper:PersistedGridSplitter.TargetIndex="2"/>
+
+        <controls:DiffView Grid.Row="2"
+                           Grid.ColumnSpan="3"
+                           Header="{Binding DiffHeaderDisplay}"
+                           Files="{Binding DiffFiles}"
+                           FileTreeSplitterKey="StashesMode.DiffFileTreeWidth"/>
     </Grid>
 </UserControl>
 

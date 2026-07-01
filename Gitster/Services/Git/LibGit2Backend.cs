@@ -1199,26 +1199,43 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.FromResult<IReadOnlyList<StashInfo>>(result);
     }
 
-    public Task<string> GetStashDiffAsync(int stashIndex)
+    public Task<CommitDiff> GetStashDiffAsync(int stashIndex, CancellationToken ct = default)
     {
         using var repo = OpenRepository();
         var stashList = repo.Stashes.ToList();
         if (stashIndex < 0 || stashIndex >= stashList.Count)
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(CommitDiff.Empty);
 
         var stash      = stashList[stashIndex];
         var baseCommit = stash.WorkTree?.Parents.FirstOrDefault();
         if (stash.WorkTree == null || baseCommit == null)
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(CommitDiff.Empty);
 
+        ct.ThrowIfCancellationRequested();
         try
         {
             var patch = repo.Diff.Compare<Patch>(baseCommit.Tree, stash.WorkTree.Tree);
-            return Task.FromResult(patch.Content);
+            var files = patch
+                .Select(e => new DiffFileEntry(e.Path, e.LinesAdded, e.LinesDeleted,
+                    e.Status switch
+                    {
+                        ChangeKind.Added   => "A",
+                        ChangeKind.Deleted => "D",
+                        ChangeKind.Renamed => "R",
+                        _                  => "M",
+                    },
+                    ParseUnifiedDiff(e.Patch)))
+                .ToList();
+
+            return Task.FromResult(new CommitDiff(files, patch.LinesAdded, patch.LinesDeleted));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(CommitDiff.Empty);
         }
     }
 

@@ -66,7 +66,7 @@ public interface IGitBackend
 
     // ── Stash operations (Step A) ───────────────────────────────────────
     Task<IReadOnlyList<StashInfo>> GetStashesAsync();
-    Task<string> GetStashDiffAsync(int stashIndex);
+    Task<CommitDiff> GetStashDiffAsync(int stashIndex, CancellationToken ct = default);
     Task ApplyStashAsync(int stashIndex, bool reinstateIndex = true);
     Task PopStashAsync(int stashIndex, bool reinstateIndex = true);
     Task DropStashAsync(int stashIndex);

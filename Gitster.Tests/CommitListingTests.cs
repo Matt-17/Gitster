@@ -1,3 +1,4 @@
+using Gitster.Models;
 using Gitster.Services.Git;
 using LibGit2Sharp;
 
@@ -119,5 +120,32 @@ public sealed class CommitListingTests
         Assert.AreEqual("a.txt", diff.Files[0].Path);
         Assert.AreEqual("A", diff.Files[0].Status);
         Assert.AreEqual(2, diff.LinesAdded);
+    }
+
+    [TestMethod]
+    public async Task GetStashDiff_TrackedModification_ReturnsStructuredDiff()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "a.txt", "line1\nline2\n");
+        System.IO.File.WriteAllText(
+            System.IO.Path.Combine(repo.Path, "a.txt"),
+            "line1\nline-two\nline3\n");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+        await backend.CreateStashAsync("tracked work", includeUntracked: false);
+
+        var diff = await backend.GetStashDiffAsync(0);
+
+        Assert.AreEqual(1, diff.Files.Count);
+        var file = diff.Files[0];
+        Assert.AreEqual("a.txt", file.Path);
+        Assert.AreEqual("M", file.Status);
+        Assert.AreEqual(2, file.Added);
+        Assert.AreEqual(1, file.Deleted);
+        Assert.IsTrue(file.Lines?.Any(line => line.Kind == DiffLineKind.Hunk) == true);
+        Assert.IsTrue(file.Lines?.Any(line => line.Kind == DiffLineKind.Removed && line.Text == "-line2") == true);
+        Assert.IsTrue(file.Lines?.Any(line => line.Kind == DiffLineKind.Added && line.Text == "+line-two") == true);
+        Assert.IsTrue(file.Lines?.Any(line => line.Kind == DiffLineKind.Added && line.Text == "+line3") == true);
     }
 }
