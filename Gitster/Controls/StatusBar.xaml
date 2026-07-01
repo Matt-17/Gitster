@@ -66,13 +66,46 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock Grid.Column="2" Text="{Binding RepositoryPathDisplay}"
-                       FontFamily="{DynamicResource FontFamilyMono}"
-                       FontSize="11"
-                       Foreground="{DynamicResource TextTertiary}"
-                       VerticalAlignment="Center"
-                       Margin="10,0"
-                       ToolTip="{Binding RepositoryPath}"/>
+            <Button Grid.Column="2" Cursor="Hand" Padding="10,0"
+                    Background="Transparent" BorderThickness="0"
+                    Command="{Binding OpenRepositoryFolderCommand}"
+                    ToolTip="{Binding RepositoryPath}">
+                <Button.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Copy full path"
+                                  Command="{Binding CopyRepositoryPathCommand}"/>
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BackgroundPrimary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Path Width="12" Height="10" Margin="0,0,6,0"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.4"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          VerticalAlignment="Center"
+                          Data="M2,5 V4 C2,3.45 2.45,3 3,3 H6.75 L8.25,4.5 H14 C14.55,4.5 15,4.95 15,5.5 V12 C15,12.55 14.55,13 14,13 H3 C2.45,13 2,12.55 2,12 Z"/>
+                    <TextBlock Text="{Binding RepositoryPathDisplay}"
+                               FontFamily="{DynamicResource FontFamilyMono}"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextTertiary}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
         </Grid>
     </Border>
 </UserControl>
