@@ -54,6 +54,10 @@ public partial class App : Application
 				services.AddSingleton<SourceArchiveService>();
 				services.AddSingleton<StashNameService>();
 				services.AddSingleton<CustomToolsService>();
+				services.AddSingleton<ICustomToolsService>(sp => sp.GetRequiredService<CustomToolsService>());
+				services.AddSingleton<HeadRefreshCoordinator>();
+				services.AddSingleton<RepositorySwitchCoordinator>();
+				services.AddSingleton<CustomToolRunner>();
 				services.AddSingleton<UiPreferencesService>();
 				services.AddSingleton<StatusBarViewModel>();
 				services.AddSingleton<CommitListViewModel>();

@@ -40,17 +40,13 @@ public partial class MainWindowViewModel : BaseViewModel
     private readonly SourceArchiveService _sourceArchiveService;
     private readonly StashNameService _stashNameService;
     private readonly CustomToolsService _customToolsService;
+    private readonly CustomToolRunner _customToolRunner;
     private readonly UiPreferencesService _uiPreferences;
     private readonly CapabilityService _capabilityService;
-    private CancellationTokenSource? _repoSwitchCts;
-    private int _headRefreshRequestVersion;
-    private bool _headRefreshRequested;
-    private bool _headRefreshWorkerRunning;
-    private readonly SemaphoreSlim _headRefreshGate = new(1, 1);
+    private readonly HeadRefreshCoordinator _headRefresh;
+    private readonly RepositorySwitchCoordinator _repositorySwitch;
     private bool _suppressFolderPathChanged;
-    private bool _isSwitchingRepository;
     private bool _initialRepositoryLoadStarted;
-    private string? _loadedRepositoryPath;
     private readonly HashSet<string> _taggedCommitShas = new(StringComparer.OrdinalIgnoreCase);
 
     public TitleBarViewModel TitleBarVM { get; }
@@ -86,6 +82,9 @@ public partial class MainWindowViewModel : BaseViewModel
         SourceArchiveService sourceArchiveService,
         StashNameService stashNameService,
         CustomToolsService customToolsService,
+        CustomToolRunner customToolRunner,
+        HeadRefreshCoordinator headRefresh,
+        RepositorySwitchCoordinator repositorySwitch,
         UiPreferencesService uiPreferences,
         StatusBarViewModel statusBarViewModel,
         CommitListViewModel commitListViewModel,
@@ -105,8 +104,12 @@ public partial class MainWindowViewModel : BaseViewModel
         _sourceArchiveService = sourceArchiveService;
         _stashNameService = stashNameService;
         _customToolsService = customToolsService;
+        _customToolRunner = customToolRunner;
+        _headRefresh = headRefresh;
+        _repositorySwitch = repositorySwitch;
         _uiPreferences = uiPreferences;
         _capabilityService = capabilityService;
+        _headRefresh.Configure(RefreshAfterHeadChangeCoreAsync);
         PersistedGridSplitter.Initialize(_uiPreferences);
 
         Capability.Initialize(capabilityService);
@@ -206,7 +209,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _gitBackend.HeadChanged += (_, _) =>
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                if (!_isSwitchingRepository)
+                if (!_repositorySwitch.IsSwitchingRepository)
                     QueueHeadRefresh();
             });
 
@@ -384,116 +387,23 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     private async Task<bool> SwitchRepositoryAsync(string targetPath, bool recordRecent, bool showLoadingWindow)
-    {
-        if (string.IsNullOrWhiteSpace(targetPath))
-            return false;
+        => await _repositorySwitch.SwitchAsync(
+            new RepositorySwitchRequest(targetPath, recordRecent, showLoadingWindow),
+            new RepositorySwitchCallbacks(
+                CaptureRepositorySwitchState,
+                UpdateElementsCoreAsync,
+                CommitRepositoryPath,
+                RestoreRepositoryAfterCanceledSwitchAsync,
+                ex => _windowService.Error($"Error opening repository:\n{ex.Message}", "Gitster")));
 
-        _repoSwitchCts?.Cancel();
-
-        var previousPath = Path;
-        var previousFolderPath = FolderPath;
-        var previousLoadedPath = _loadedRepositoryPath;
-        using var cts = new CancellationTokenSource();
-        _repoSwitchCts = cts;
-        _isSwitchingRepository = true;
-
-        try
-        {
-            var success = showLoadingWindow
-                ? await RunRepositorySwitchWithDialogAsync(targetPath, cts)
-                : await RunRepositorySwitchAsync(targetPath, cts.Token, progress: null);
-
-            if (_repoSwitchCts != cts)
-                return false;
-
-            if (!success)
-            {
-                await RestoreRepositoryAfterCanceledSwitchAsync(previousPath, previousFolderPath, previousLoadedPath);
-                return false;
-            }
-
-            CommitRepositoryPath(targetPath, recordRecent);
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            if (_repoSwitchCts != cts)
-                return false;
-
-            await RestoreRepositoryAfterCanceledSwitchAsync(previousPath, previousFolderPath, previousLoadedPath);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            if (_repoSwitchCts != cts)
-                return false;
-
-            await RestoreRepositoryAfterCanceledSwitchAsync(previousPath, previousFolderPath, previousLoadedPath);
-            _windowService.Error($"Error opening repository:\n{ex.Message}", "Gitster");
-            return false;
-        }
-        finally
-        {
-            if (_repoSwitchCts == cts)
-            {
-                _repoSwitchCts = null;
-                _isSwitchingRepository = false;
-            }
-        }
-    }
-
-    private async Task<bool> RunRepositorySwitchWithDialogAsync(string targetPath, CancellationTokenSource cts)
-    {
-        var loadingVm = new RepositoryLoadingViewModel(targetPath, cts);
-        var loadingWindow = new RepositoryLoadingWindow(loadingVm);
-        var progress = new Progress<RepositoryLoadProgress>(loadingVm.Report);
-
-        Task<bool>? loadTask = null;
-        loadingWindow.ContentRendered += async (_, _) =>
-        {
-            if (loadTask != null)
-                return;
-
-            await loadingWindow.Dispatcher.InvokeAsync(
-                () => { },
-                DispatcherPriority.ApplicationIdle);
-
-            loadTask = RunRepositorySwitchAsync(targetPath, cts.Token, progress);
-            _ = loadTask.ContinueWith(task =>
-            {
-                Application.Current.Dispatcher.BeginInvoke(() =>
-                {
-                    loadingWindow.Complete(task.Status == TaskStatus.RanToCompletion);
-                });
-            }, CancellationToken.None);
-        };
-
-        var dialogResult = _windowService.ShowDialog(loadingWindow);
-        if (dialogResult != true)
-            cts.Cancel();
-
-        if (loadTask == null)
-            return false;
-
-        await loadTask;
-        return true;
-    }
-
-    private async Task<bool> RunRepositorySwitchAsync(
-        string targetPath,
-        CancellationToken ct,
-        IProgress<RepositoryLoadProgress>? progress)
-    {
-        await UpdateElementsCoreAsync(targetPath, ct, progress);
-        return true;
-    }
+    private RepositorySwitchState CaptureRepositorySwitchState() =>
+        new(Path, FolderPath, _repositorySwitch.LoadedRepositoryPath);
 
     private void CommitRepositoryPath(string targetPath, bool recordRecent)
     {
         _suppressFolderPathChanged = true;
         Path = targetPath;
         FolderPath = targetPath;
-        _loadedRepositoryPath = targetPath;
         _suppressFolderPathChanged = false;
 
         UpdateSettingsPath();
@@ -501,33 +411,29 @@ public partial class MainWindowViewModel : BaseViewModel
             _recentRepos.Record(targetPath);
     }
 
-    private async Task RestoreRepositoryAfterCanceledSwitchAsync(
-        string previousPath,
-        string previousFolderPath,
-        string? previousLoadedPath)
+    private async Task<string?> RestoreRepositoryAfterCanceledSwitchAsync(RepositorySwitchState previousState)
     {
         _suppressFolderPathChanged = true;
-        Path = previousPath;
-        FolderPath = previousFolderPath;
+        Path = previousState.Path;
+        FolderPath = previousState.FolderPath;
         _suppressFolderPathChanged = false;
 
-        if (string.IsNullOrWhiteSpace(previousLoadedPath))
+        if (string.IsNullOrWhiteSpace(previousState.LoadedRepositoryPath))
         {
-            _loadedRepositoryPath = null;
             ClearRepositoryUi();
-            return;
+            return null;
         }
 
         try
         {
-            await UpdateElementsCoreAsync(previousLoadedPath, CancellationToken.None, progress: null);
-            _loadedRepositoryPath = previousLoadedPath;
+            await UpdateElementsCoreAsync(previousState.LoadedRepositoryPath, CancellationToken.None, progress: null);
+            return previousState.LoadedRepositoryPath;
         }
         catch
         {
-            _loadedRepositoryPath = null;
             ClearRepositoryUi();
             // Keep the saved path even if the prior repository cannot be refreshed.
+            return null;
         }
     }
 
@@ -655,10 +561,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     /// <summary>All custom tools (repo-scoped first, then global) for the Tools menu.</summary>
     public IReadOnlyList<Gitster.Models.CustomTool> GetCustomTools()
-    {
-        try { return _customToolsService.GetTools(); }
-        catch { return []; }
-    }
+        => _customToolRunner.GetTools();
 
     [RelayCommand]
     private void ManageTools()
@@ -670,61 +573,14 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public async Task RunCustomToolAsync(Gitster.Models.CustomTool tool)
     {
-        // Resolve a selected commit if the tool needs one.
-        string? revision = null;
-        if (tool.NeedsCommit)
-        {
-            var selected = CommitListVM.SelectedCommit;
-            if (selected is null || string.IsNullOrEmpty(selected.FullSha))
-            {
-                _windowService.Info("Select a commit first — this tool needs one.", tool.Name);
-                return;
-            }
-            revision = selected.FullSha;
-        }
+        var outcome = await _customToolRunner.RunAsync(
+            tool,
+            new CustomToolRunContext(
+                CommitListVM.SelectedCommit?.FullSha,
+                TitleBarVM.CurrentBranch));
 
-        // Ask for $ARGS if the tool prompts.
-        string? args = null;
-        if (!string.IsNullOrEmpty(tool.Prompt))
-        {
-            var input = new Views.TextInputDialog
-            {
-                Title  = tool.Name,
-                Prompt = tool.Prompt!,
-            };
-            if (_windowService.ShowDialog(input) != true) return;
-            args = input.Value;
-        }
-
-        var command = _customToolsService.Substitute(tool.Command, revision, args, TitleBarVM.CurrentBranch);
-
-        // Confirm, showing the exact command that will run.
-        if (!string.IsNullOrEmpty(tool.Confirm))
-        {
-            var prompt = $"{tool.Confirm}\n\nCommand:\n{command}";
-            if (!_windowService.Confirm(prompt, tool.Name))
-                return;
-        }
-
-        // Snapshot before running ANY tool — Gitster can't know what a tool does.
-        _ = _snapshotService.CaptureAsync(_gitBackend, $"Before tool: {tool.Name}");
-
-        try
-        {
-            var result = await _feedbackService.RunAsync(tool.Name,
-                () => _customToolsService.RunAsync(command),
-                r => r.Success ? "completed" : $"exit {r.ExitCode}");
-
-            var dialog = new Views.ToolResultDialog(tool.Name, result.ExitCode, result.Output);
-            _windowService.ShowDialog(dialog);
-
-            // A tool may have changed the repository — refresh.
+        if (outcome == CustomToolRunOutcome.RepositoryMayHaveChanged)
             await UpdateElementsAsync();
-        }
-        catch (Exception ex)
-        {
-            _windowService.Error($"Tool '{tool.Name}' failed:\n{ex.Message}", "Gitster");
-        }
     }
 
     [RelayCommand]
@@ -1527,7 +1383,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public async Task OnWindowActivatedAsync()
     {
-        if (_isSwitchingRepository || !_initialRepositoryLoadStarted)
+        if (_repositorySwitch.IsSwitchingRepository || !_initialRepositoryLoadStarted)
             return;
 
         var changes = await _stateService.GetActivationChangesAsync();
@@ -1597,15 +1453,9 @@ public partial class MainWindowViewModel : BaseViewModel
         CancellationToken ct,
         IProgress<RepositoryLoadProgress> progress)
     {
-        await _headRefreshGate.WaitAsync(ct);
-        try
-        {
-            await UpdateElementsAsync(ct, progress);
-        }
-        finally
-        {
-            _headRefreshGate.Release();
-        }
+        await _headRefresh.RunExclusiveAsync(
+            token => UpdateElementsAsync(token, progress),
+            ct);
     }
 
     private async Task RefreshStateAfterActivationWithDialogAsync()
@@ -1658,68 +1508,18 @@ public partial class MainWindowViewModel : BaseViewModel
         await RefreshSidebarBadgesAsync();
     }
 
-    private void QueueHeadRefresh()
-    {
-        if (_isSwitchingRepository)
-            return;
+    private void QueueHeadRefresh() => _headRefresh.Queue();
 
-        _headRefreshRequested = true;
-        _headRefreshRequestVersion++;
-
-        if (!_headRefreshWorkerRunning)
-            _ = RunQueuedHeadRefreshAsync();
-    }
-
-    private void ClearPendingHeadRefresh()
-    {
-        _headRefreshRequested = false;
-        _headRefreshRequestVersion++;
-    }
-
-    private async Task RunQueuedHeadRefreshAsync()
-    {
-        if (_headRefreshWorkerRunning)
-            return;
-
-        _headRefreshWorkerRunning = true;
-        try
-        {
-            while (!_isSwitchingRepository)
-            {
-                if (!_headRefreshRequested)
-                    return;
-
-                var version = _headRefreshRequestVersion;
-                await Task.Delay(75);
-
-                if (_isSwitchingRepository || !_headRefreshRequested)
-                    return;
-
-                if (version != _headRefreshRequestVersion)
-                    continue;
-
-                _headRefreshRequested = false;
-                await RefreshAfterHeadChangeAsync();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            _headRefreshWorkerRunning = false;
-
-            if (_headRefreshRequested && !_isSwitchingRepository)
-                _ = RunQueuedHeadRefreshAsync();
-        }
-    }
+    private void ClearPendingHeadRefresh() => _headRefresh.ClearPending();
 
     private async Task RefreshAfterHeadChangeAsync(CancellationToken ct = default)
+        => await _headRefresh.RunExclusiveAsync(RefreshAfterHeadChangeCoreAsync, ct);
+
+    private async Task RefreshAfterHeadChangeCoreAsync(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(Path))
             return;
 
-        await _headRefreshGate.WaitAsync(ct);
         try
         {
             await _gitBackend.OpenAsync(Path);
@@ -1743,10 +1543,6 @@ public partial class MainWindowViewModel : BaseViewModel
         catch
         {
             await UpdateElementsAsync(ct);
-        }
-        finally
-        {
-            _headRefreshGate.Release();
         }
     }
 
