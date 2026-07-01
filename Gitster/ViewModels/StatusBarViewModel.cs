@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,11 +14,16 @@ public partial class StatusBarViewModel : BaseViewModel
 {
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
+    private readonly IWindowService _windowService;
 
-    public StatusBarViewModel(RepositoryStateService stateService, OperationFeedbackService feedbackService)
+    public StatusBarViewModel(
+        RepositoryStateService stateService,
+        OperationFeedbackService feedbackService,
+        IWindowService windowService)
     {
         _stateService = stateService;
         _feedbackService = feedbackService;
+        _windowService = windowService;
 
         _stateService.PropertyChanged += OnServiceChanged;
         _feedbackService.PropertyChanged += OnServiceChanged;
@@ -49,13 +56,58 @@ public partial class StatusBarViewModel : BaseViewModel
     public partial Brush FeedbackBrush { get; set; } = Brushes.Gray;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRepositoryPath))]
+    [NotifyCanExecuteChangedFor(nameof(OpenRepositoryFolderCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CopyRepositoryPathCommand))]
     public partial string? RepositoryPath { get; set; }
 
     [ObservableProperty]
     public partial string RepositoryPathDisplay { get; set; } = "";
 
+    public bool HasRepositoryPath => !string.IsNullOrWhiteSpace(RepositoryPath);
+
     [RelayCommand]
     private void DismissFeedback() => _feedbackService.Dismiss();
+
+    [RelayCommand(CanExecute = nameof(HasRepositoryPath))]
+    private void OpenRepositoryFolder()
+    {
+        var path = RepositoryPath;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        if (!Directory.Exists(path))
+        {
+            _windowService.Warning("That repository folder no longer exists.", "Open folder");
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Open folder");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasRepositoryPath))]
+    private void CopyRepositoryPath()
+    {
+        var path = RepositoryPath;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        try
+        {
+            Clipboard.SetText(path);
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Copy path");
+        }
+    }
 
     private void OnServiceChanged(object? sender, PropertyChangedEventArgs e)
     {
