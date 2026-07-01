@@ -5,9 +5,10 @@ using Gitster.Models;
 namespace Gitster.Services.Git;
 
 /// <summary>
-/// Implements only the rebase-class operations that LibGit2Sharp cannot do.
-/// Everything else throws <see cref="NotSupportedException"/> — callers go
-/// through <see cref="HybridGitBackend"/> which routes accordingly.
+/// Implements Git CLI operations, including all server work so authentication
+/// stays with the user's configured Git credential flow. Local operations that
+/// belong to <see cref="LibGit2Backend"/> throw <see cref="NotSupportedException"/>;
+/// callers go through <see cref="HybridGitBackend"/> which routes accordingly.
 /// </summary>
 public sealed class GitCliBackend : IGitBackend
 {
@@ -383,14 +384,43 @@ public sealed class GitCliBackend : IGitBackend
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => NSVoid();
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => NSVoid();
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => NSVoid();
-    public Task FetchAsync(string remoteName = "origin")        => NSVoid();
-    public Task PullAsync(string remoteName = "origin")         => NSVoid();
+
+    // Remote server operations. Keep these on the Git CLI path only.
+    public async Task FetchAsync(string remoteName = "origin")
+    {
+        EnsurePath();
+        EnsureCli();
+
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote);
+
+        var r = await GitCli.RunAsync(RepositoryPath, ["fetch", remote], NoPromptEnvironment());
+        if (!r.Success)
+            throw new InvalidOperationException($"Fetch failed:\n{r.Output}");
+    }
+
+    public async Task PullAsync(string remoteName = "origin")
+    {
+        EnsurePath();
+        EnsureCli();
+
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote);
+
+        var r = await GitCli.RunAsync(RepositoryPath, ["pull", remote], NoPromptEnvironment());
+        if (!r.Success)
+            throw new InvalidOperationException($"Pull failed:\n{r.Output}");
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>Real <c>git push</c> — the only path that can do a true --force-with-lease.</summary>
     public async Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
     {
         EnsurePath();
         EnsureCli();
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote);
 
         var flag = mode switch
         {
@@ -399,10 +429,13 @@ public sealed class GitCliBackend : IGitBackend
             _                       => string.Empty,
         };
 
-        var r = await GitCli.RunAsync(RepositoryPath, $"push {flag}{remoteName} HEAD",
-            new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" });
+        var r = await GitCli.RunAsync(RepositoryPath, $"push {flag}{remote} HEAD", NoPromptEnvironment());
         if (!r.Success)
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
+
+        var head = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", "HEAD"]);
+        if (head.Success)
+            await UpdateTrackingRefAfterPushAsync(remote, head.Stdout.Trim());
     }
 
     public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
@@ -427,11 +460,12 @@ public sealed class GitCliBackend : IGitBackend
         if (!ancestor.Success)
             throw new InvalidOperationException("The selected commit is not on the current branch.");
 
-        var remote = string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName;
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote);
         var r = await GitCli.RunAsync(
             RepositoryPath,
             ["push", remote, $"{resolvedSha}:{targetRef}"],
-            new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" });
+            NoPromptEnvironment());
         if (!r.Success)
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
 
@@ -525,7 +559,54 @@ public sealed class GitCliBackend : IGitBackend
     public Task<string> ResolveRefAsync(string refSpec)         => NS<string>();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string a, string b) => NS<IReadOnlyList<CommitInfo>>();
     public Task<bool> CommitExistsAsync(string sha)             => NS<bool>();
+    public Task CheckoutCommitDetachedAsync(string sha)         => NSVoid();
     public Task CherryPickAsync(string sha)                     => NSVoid();
+    public Task<string> CreateTagAsync(string name, string targetSha) => NS<string>();
+    public async Task<IReadOnlyList<string>> GetTagsForCommitAsync(string sha)
+    {
+        EnsurePath();
+        EnsureCli();
+
+        if (string.IsNullOrWhiteSpace(sha))
+            throw new ArgumentException("Commit SHA is required.", nameof(sha));
+
+        var resolved = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{sha}^{{commit}}"]);
+        if (!resolved.Success)
+            throw new InvalidOperationException($"Commit not found: {sha}");
+
+        var tags = await GitCli.RunAsync(RepositoryPath, ["tag", "--points-at", resolved.Stdout.Trim()]);
+        if (!tags.Success)
+            throw new InvalidOperationException($"Could not list tags for commit:\n{tags.Output}");
+
+        return tags.Stdout
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .OrderBy(t => t, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public async Task PushTagAsync(string tagName, string remoteName = "origin")
+    {
+        EnsurePath();
+        EnsureCli();
+
+        var name = NormalizeTagName(tagName);
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote);
+        var tagRef = $"refs/tags/{name}";
+
+        var verify = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{tagRef}^{{object}}"]);
+        if (!verify.Success)
+            throw new InvalidOperationException($"Tag not found: {name}");
+
+        var push = await GitCli.RunAsync(
+            RepositoryPath,
+            ["push", remote, $"{tagRef}:{tagRef}"],
+            NoPromptEnvironment());
+        if (!push.Success)
+            throw new InvalidOperationException($"Push tag failed:\n{push.Output}");
+    }
+
+    public Task RevertCommitAsync(string sha)                   => NSVoid();
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => NS<Dictionary<string, string>>();
     public Task<int> GetStashCountAsync()                       => NS<int>();
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync()     => NS<IReadOnlyList<StashInfo>>();
@@ -822,6 +903,31 @@ public sealed class GitCliBackend : IGitBackend
             result = result.Replace("--", "-", StringComparison.Ordinal);
 
         return string.IsNullOrWhiteSpace(result) ? "branch" : result;
+    }
+
+    private async Task EnsureRemoteExistsAsync(string remoteName)
+    {
+        var remote = await GitCli.RunAsync(RepositoryPath, ["remote", "get-url", remoteName]);
+        if (!remote.Success)
+            throw new InvalidOperationException($"Remote not found: {remoteName}");
+    }
+
+    private static string NormalizeRemoteName(string remoteName) =>
+        string.IsNullOrWhiteSpace(remoteName) ? "origin" : remoteName.Trim();
+
+    private static Dictionary<string, string> NoPromptEnvironment() =>
+        new() { ["GIT_TERMINAL_PROMPT"] = "0" };
+
+    private static string NormalizeTagName(string tagName)
+    {
+        if (string.IsNullOrWhiteSpace(tagName))
+            throw new ArgumentException("Tag name is required.", nameof(tagName));
+
+        var name = tagName.Trim();
+        const string prefix = "refs/tags/";
+        return name.StartsWith(prefix, StringComparison.Ordinal)
+            ? name[prefix.Length..]
+            : name;
     }
 
     private static string ShortSha(string sha) =>

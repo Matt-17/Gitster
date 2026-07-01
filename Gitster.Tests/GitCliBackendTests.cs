@@ -287,6 +287,178 @@ public sealed class GitCliBackendTests
     }
 
     [TestMethod]
+    public async Task Fetch_RemoteHasNewCommit_UpdatesRemoteTrackingBranchOnly()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            var branch = await AddBareOriginAndPushAsync(repo, remotePath);
+            var remoteTip = await PushCommitFromCloneAsync(remotePath, branch, "remote update", "remote.txt", "remote");
+
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.FetchAsync("origin");
+
+            using var check = new Repository(repo.Path);
+            Assert.AreEqual(baseSha, check.Head.Tip!.Sha, "fetch must not move local HEAD");
+            Assert.AreEqual(remoteTip, check.Branches[$"origin/{branch}"]!.Tip!.Sha);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
+    public async Task Pull_RemoteHasLinearUpdate_FastForwardsCurrentBranch()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            var branch = await AddBareOriginAndPushAsync(repo, remotePath);
+            var remoteTip = await PushCommitFromCloneAsync(remotePath, branch, "remote update", "remote.txt", "remote");
+
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.PullAsync("origin");
+
+            using var check = new Repository(repo.Path);
+            Assert.AreEqual(remoteTip, check.Head.Tip!.Sha);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
+    public async Task Push_LocalCommit_UpdatesRemoteAndTrackingRef()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            var branch = await AddBareOriginAndPushAsync(repo, remotePath);
+            var localTip = repo.Commit("local update", "local.txt", "local");
+
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.PushAsync("origin");
+
+            using var local = new Repository(repo.Path);
+            using var remote = new Repository(remotePath);
+            Assert.AreEqual(localTip, remote.Branches[branch]!.Tip!.Sha);
+            Assert.AreEqual(localTip, local.Head.TrackedBranch.Tip!.Sha);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
+    public async Task PushThroughCommit_LocalOnlyCommit_PushesSelectedCommitOnly()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            var branch = await AddBareOriginAndPushAsync(repo, remotePath);
+            var selected = repo.Commit("selected", "selected.txt", "selected");
+            var newer = repo.Commit("newer", "newer.txt", "newer");
+
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.PushThroughCommitAsync(selected);
+
+            using var local = new Repository(repo.Path);
+            using var remote = new Repository(remotePath);
+            Assert.AreEqual(newer, local.Head.Tip!.Sha, "partial push must not move local HEAD");
+            Assert.AreEqual(selected, local.Head.TrackedBranch.Tip!.Sha, "tracking ref should reflect the partial push");
+            Assert.AreEqual(selected, remote.Branches[branch]!.Tip!.Sha, "remote branch should stop at the selected commit");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
+    public async Task PushTag_PushesSelectedTagToRemote()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        var commit = repo.Commit("tagged", "tagged.txt", "tagged");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            await AddBareOriginAndPushAsync(repo, remotePath);
+            using (var setup = new Repository(repo.Path))
+                setup.Tags.Add("v-test", setup.Lookup<Commit>(commit)!);
+
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.PushTagAsync("v-test");
+
+            using var remote = new Repository(remotePath);
+            var tag = remote.Tags["v-test"];
+            Assert.IsNotNull(tag);
+            Assert.AreEqual(commit, ((Commit)tag!.PeeledTarget).Sha);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
+    public async Task HybridFetch_RemoteHasNewCommit_UsesGitCliServerPath()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            var branch = await AddBareOriginAndPushAsync(repo, remotePath);
+            var remoteTip = await PushCommitFromCloneAsync(remotePath, branch, "remote update", "remote.txt", "remote");
+
+            var backend = new HybridGitBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await backend.FetchAsync("origin");
+
+            using var check = new Repository(repo.Path);
+            Assert.AreEqual(remoteTip, check.Branches[$"origin/{branch}"]!.Tip!.Sha);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
     public async Task StitchHistory_SquashedBranch_CreatesOursMergeAndBackup()
     {
         await EnsureGitAsync();
@@ -489,6 +661,70 @@ public sealed class GitCliBackendTests
         return r.Commits.Select(c => c.MessageShort).ToList();
     }
 
+    private static async Task<string> AddBareOriginAndPushAsync(GitTestRepo repo, string remotePath)
+    {
+        Repository.Init(remotePath, isBare: true);
+
+        string branch;
+        using (var local = new Repository(repo.Path))
+            branch = local.Head.FriendlyName;
+
+        await RunGitOkAsync(repo.Path, ["remote", "add", "origin", remotePath]);
+        await RunGitOkAsync(repo.Path, ["push", "-u", "origin", branch]);
+        await RunGitOkAsync(null, ["--git-dir", remotePath, "symbolic-ref", "HEAD", $"refs/heads/{branch}"]);
+
+        return branch;
+    }
+
+    private static async Task<string> PushCommitFromCloneAsync(
+        string remotePath,
+        string branch,
+        string message,
+        string fileName,
+        string content)
+    {
+        var clonePath = TempDirectoryPath("gitster-remote-writer-");
+
+        try
+        {
+            await RunGitOkAsync(null, ["clone", remotePath, clonePath]);
+            await ConfigureGitUserAsync(clonePath);
+
+            await System.IO.File.WriteAllTextAsync(System.IO.Path.Combine(clonePath, fileName), content);
+            await RunGitOkAsync(clonePath, ["add", fileName]);
+            await RunGitOkAsync(clonePath, ["commit", "-m", message]);
+            await RunGitOkAsync(clonePath, ["push", "origin", branch]);
+
+            var head = await RunGitOkAsync(clonePath, ["rev-parse", "--verify", "HEAD"]);
+            return head.Stdout.Trim();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(clonePath);
+        }
+    }
+
+    private static async Task ConfigureGitUserAsync(string repoPath)
+    {
+        await RunGitOkAsync(repoPath, ["config", "user.name", "Tester"]);
+        await RunGitOkAsync(repoPath, ["config", "user.email", "tester@gitster.test"]);
+        await RunGitOkAsync(repoPath, ["config", "commit.gpgsign", "false"]);
+    }
+
+    private static async Task<GitResult> RunGitOkAsync(string? workDir, IReadOnlyList<string> args)
+    {
+        var result = await GitCli.RunAsync(workDir, args);
+        if (!result.Success)
+            Assert.Fail($"git {string.Join(" ", args)} failed:\n{result.Output}");
+
+        return result;
+    }
+
+    private static string TempDirectoryPath(string prefix) =>
+        System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            prefix + Guid.NewGuid().ToString("N")[..12]);
+
     private static string TempZipPath() =>
         System.IO.Path.Combine(
             System.IO.Path.GetTempPath(),
@@ -518,6 +754,23 @@ public sealed class GitCliBackendTests
         {
             if (System.IO.File.Exists(path))
                 System.IO.File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void DeleteDirectoryIfExists(string path)
+    {
+        try
+        {
+            if (!Directory.Exists(path))
+                return;
+
+            foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                System.IO.File.SetAttributes(file, FileAttributes.Normal);
+
+            Directory.Delete(path, recursive: true);
         }
         catch
         {

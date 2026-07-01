@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -50,6 +51,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private bool _isSwitchingRepository;
     private bool _initialRepositoryLoadStarted;
     private string? _loadedRepositoryPath;
+    private readonly HashSet<string> _taggedCommitShas = new(StringComparer.OrdinalIgnoreCase);
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
@@ -272,6 +274,7 @@ public partial class MainWindowViewModel : BaseViewModel
         OnPropertyChanged(nameof(CanAmendSelectedCommit));
         ArchiveHeadCommand.NotifyCanExecuteChanged();
         PushThroughCommitCommand.NotifyCanExecuteChanged();
+        NotifyCommitContextCommands();
     }
 
     partial void OnFolderPathChanged(string value)
@@ -293,6 +296,7 @@ public partial class MainWindowViewModel : BaseViewModel
         OnPropertyChanged(nameof(IsAmendUnsafe));
         OnPropertyChanged(nameof(CanAmendSelectedCommit));
         PushThroughCommitCommand.NotifyCanExecuteChanged();
+        NotifyCommitContextCommands();
         _ = AuthorPanelVM.LoadFromCommitAsync(value);
     }
 
@@ -305,11 +309,30 @@ public partial class MainWindowViewModel : BaseViewModel
             SelectedCommit = CommitListVM.SelectedCommit;
             HistoryRewriteDraftVM.SetSelectedCommit(CommitListVM.SelectedCommit);
             QuickActionsVM.NotifySelectionChanged();
+            NotifyCommitContextCommands();
+        }
+        else if (e.PropertyName == nameof(CommitListViewModel.SelectedCommits))
+        {
+            QuickActionsVM.NotifySelectionChanged();
+            CompareSelectedCommitsCommand.NotifyCanExecuteChanged();
         }
         else if (e.PropertyName == nameof(CommitListViewModel.LoadedCommits))
         {
             HistoryRewriteDraftVM.SetCommits(CommitListVM.LoadedCommits);
         }
+    }
+
+    private void NotifyCommitContextCommands()
+    {
+        CheckoutCommitDetachedCommand.NotifyCanExecuteChanged();
+        ViewCommitDetailsCommand.NotifyCanExecuteChanged();
+        OpenCommitInBrowserCommand.NotifyCanExecuteChanged();
+        CompareSelectedCommitsCommand.NotifyCanExecuteChanged();
+        NewBranchFromCommitCommand.NotifyCanExecuteChanged();
+        NewTagFromCommitCommand.NotifyCanExecuteChanged();
+        PushTagCommand.NotifyCanExecuteChanged();
+        RevertCommitCommand.NotifyCanExecuteChanged();
+        CherryPickCommitCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -891,6 +914,354 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private async Task CheckoutCommitDetached(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        var shortSha = ShortSha(commit.FullSha);
+        if (!_windowService.Confirm(
+            $"Checkout {shortSha} in detached HEAD state?\n\n" +
+            "You will leave the current branch. Create a branch before committing new work if you want to keep it.",
+            "Checkout detached"))
+            return;
+
+        try
+        {
+            await _feedbackService.RunAsync(
+                $"Checkout {shortSha}",
+                () => _gitBackend.CheckoutCommitDetachedAsync(commit.FullSha));
+            ClearPendingHeadRefresh();
+            await RefreshAfterHeadChangeAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Checkout failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private async Task ViewCommitDetails(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        try
+        {
+            var details = await _gitBackend.GetCommitAsync(commit.FullSha);
+            var window = new CommitDetailsDialog(details);
+            _windowService.ShowDialog(window);
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Could not load commit details:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private void OpenCommitInBrowser(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        try
+        {
+            using var repo = new Repository(Path);
+            var remote = repo.Network.Remotes[ActiveRemote(null)] ?? repo.Network.Remotes.FirstOrDefault();
+            if (remote is null)
+            {
+                _windowService.Warning("No remote is configured for this repository.", "Open in browser");
+                return;
+            }
+
+            if (!CommitBrowserUrlBuilder.TryBuild(remote.Url, commit.FullSha, out var browserUrl))
+            {
+                _windowService.Warning(
+                    $"Gitster does not know how to build a commit URL for this remote:\n{remote.Url}",
+                    "Open in browser");
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo(browserUrl) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Could not open commit in browser:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCompareSelectedCommits))]
+    private async Task CompareSelectedCommits()
+    {
+        var selected = CommitListVM.SelectedCommits
+            .GroupBy(c => c.FullSha, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+        if (selected.Count != 2)
+        {
+            _windowService.Info("Select exactly two commits to compare.", "Compare commits");
+            return;
+        }
+
+        var visible = CommitListVM.Items.OfType<CommitItem>().ToList();
+        var ordered = selected
+            .OrderBy(c =>
+            {
+                var index = visible.FindIndex(v => string.Equals(v.FullSha, c.FullSha, StringComparison.OrdinalIgnoreCase));
+                return index < 0 ? int.MaxValue : index;
+            })
+            .ToList();
+
+        var compare = ordered[0];
+        var @base = ordered[1];
+        SidebarVM.CurrentMode = AppMode.Search;
+        await SearchVM.RunCompareRefsAsync(@base.FullSha, compare.FullSha, threeDot: false);
+    }
+
+    private bool CanCompareSelectedCommits() => CommitListVM.HasTwoSelectedCommits;
+
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private async Task NewBranchFromCommit(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        var shortSha = ShortSha(commit.FullSha);
+        var dialog = new TextInputDialog
+        {
+            Title = "Create branch",
+            Prompt = $"New branch name (starting from {shortSha}):",
+            Value = string.Empty,
+        };
+        if (_windowService.ShowDialog(dialog) != true)
+            return;
+
+        var name = dialog.Value.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        try
+        {
+            _ = _snapshotService.CaptureAsync(_gitBackend, $"Create branch {name}");
+            await _feedbackService.RunAsync("Create branch", () => _gitBackend.CreateBranchAsync(name, commit.FullSha));
+            await BranchesVM.LoadAsync();
+            SidebarVM.BranchCount = BranchesVM.LocalCount;
+            await CommitListVM.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Create branch failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private async Task NewTagFromCommit(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        var shortSha = ShortSha(commit.FullSha);
+        var dialog = new TextInputDialog
+        {
+            Title = "Create tag",
+            Prompt = $"New tag name (pointing at {shortSha}):",
+            Value = string.Empty,
+        };
+        if (_windowService.ShowDialog(dialog) != true)
+            return;
+
+        var name = dialog.Value.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        try
+        {
+            await _feedbackService.RunAsync("Create tag", () => _gitBackend.CreateTagAsync(name, commit.FullSha));
+            _taggedCommitShas.Add(commit.FullSha);
+            PushTagCommand.NotifyCanExecuteChanged();
+            await CommitListVM.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Create tag failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanPushTag))]
+    private async Task PushTag(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        var shortSha = ShortSha(commit.FullSha);
+        try
+        {
+            var tags = (await _gitBackend.GetTagsForCommitAsync(commit.FullSha)).ToList();
+            if (tags.Count == 0)
+            {
+                _windowService.Info(
+                    $"No local tag points at {shortSha}. Create a tag on this commit first, then push it.",
+                    "Push tag");
+                return;
+            }
+
+            var tagName = tags.Count == 1
+                ? tags[0]
+                : PromptForTagToPush(shortSha, tags);
+            if (string.IsNullOrWhiteSpace(tagName))
+                return;
+
+            if (Remotes.Count == 0)
+            {
+                _windowService.Warning("No remote is configured for this repository.", "Push tag");
+                return;
+            }
+
+            var remote = ActiveRemote(null);
+            await _feedbackService.RunAsync(
+                $"Push tag {tagName}",
+                () => _gitBackend.PushTagAsync(tagName, remote));
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Push tag failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    private bool CanPushTag(CommitItem? commit) =>
+        commit is not null
+        && HasCommitContextTarget(commit)
+        && _taggedCommitShas.Contains(commit.FullSha);
+
+    private string? PromptForTagToPush(string shortSha, IReadOnlyList<string> tags)
+    {
+        var dialog = new TextInputDialog
+        {
+            Title = "Push tag",
+            Prompt = $"Multiple local tags point at {shortSha}. Enter one to push:\n{string.Join(", ", tags)}",
+            Value = tags[0],
+        };
+        if (_windowService.ShowDialog(dialog) != true)
+            return null;
+
+        var name = dialog.Value.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        if (tags.Contains(name, StringComparer.Ordinal))
+            return name;
+
+        _windowService.Warning("Choose one of the tags that points at the selected commit.", "Push tag");
+        return null;
+    }
+
+    private void RefreshCommitTagAvailability(Repository repo)
+    {
+        _taggedCommitShas.Clear();
+        foreach (var tag in repo.Tags)
+        {
+            if (tag.PeeledTarget is Commit commit)
+                _taggedCommitShas.Add(commit.Id.Sha);
+        }
+
+        PushTagCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ClearCommitTagAvailability()
+    {
+        _taggedCommitShas.Clear();
+        PushTagCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private async Task RevertCommit(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        var shortSha = ShortSha(commit.FullSha);
+        if (!_windowService.Confirm(
+            $"Revert commit {shortSha}?\n\n" +
+            "This creates a new commit that applies the inverse of the selected commit.",
+            "Revert commit"))
+            return;
+
+        try
+        {
+            var beforeSha = await _gitBackend.GetHeadShaAsync();
+            var branchName = TitleBarVM.CurrentBranch;
+            await _snapshotService.CaptureAsync(_gitBackend, $"Before revert {shortSha}");
+
+            await _feedbackService.RunAsync(
+                $"Revert {shortSha}",
+                () => _gitBackend.RevertCommitAsync(commit.FullSha));
+
+            var afterSha = await _gitBackend.GetHeadShaAsync();
+            var reflogSelector = await TryGetHeadReflogSelectorAsync();
+            await _opsLogService.RecordAsync(new OperationRecord(
+                Id: Guid.NewGuid().ToString(),
+                Timestamp: DateTimeOffset.Now,
+                Kind: OperationKind.Revert,
+                Description: $"Revert {shortSha}",
+                BranchName: branchName,
+                BeforeSha: ShortSha(beforeSha),
+                AfterSha: ShortSha(afterSha),
+                ReflogSelector: reflogSelector,
+                Status: OperationStatus.Active));
+
+            ClearPendingHeadRefresh();
+            await RefreshAfterHeadChangeAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Revert failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasCommitContextTarget))]
+    private async Task CherryPickCommit(CommitItem? commit)
+    {
+        if (commit is null)
+            return;
+
+        var shortSha = ShortSha(commit.FullSha);
+        if (!_windowService.Confirm(
+            $"Cherry-pick commit {shortSha} onto the current branch?",
+            "Cherry-pick"))
+            return;
+
+        try
+        {
+            var beforeSha = await _gitBackend.GetHeadShaAsync();
+            _ = _snapshotService.CaptureAsync(_gitBackend, $"Cherry-pick {shortSha}");
+            await _feedbackService.RunAsync($"Cherry-pick {shortSha}", () => _gitBackend.CherryPickAsync(commit.FullSha));
+            var afterSha = await _gitBackend.GetHeadShaAsync();
+            var branchName = TitleBarVM.CurrentBranch;
+            await _opsLogService.RecordAsync(new OperationRecord(
+                Id: Guid.NewGuid().ToString(),
+                Timestamp: DateTimeOffset.Now,
+                Kind: OperationKind.CherryPick,
+                Description: $"Cherry-pick {shortSha}",
+                BranchName: branchName,
+                BeforeSha: ShortSha(beforeSha),
+                AfterSha: ShortSha(afterSha),
+                ReflogSelector: null,
+                Status: OperationStatus.Active));
+
+            ClearPendingHeadRefresh();
+            await RefreshAfterHeadChangeAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Cherry-pick failed:\n{ex.Message}", "Gitster");
+        }
+    }
+
+    private bool HasCommitContextTarget(CommitItem? commit) =>
+        IsGoButtonEnabled && commit is not null;
+
     private async Task<bool> EnsureCleanWorkingTreeBeforeRemovingChangeAsync()
     {
         WorkingTreeStatus status;
@@ -1360,6 +1731,7 @@ public partial class MainWindowViewModel : BaseViewModel
             await CommitListVM.LoadAsync(ct);
             ct.ThrowIfCancellationRequested();
 
+            RefreshCommitTagAvailability(repo);
             UpdateStatusBar(repo);
             _ = _authorDirService.RefreshAsync();
             _ = RefreshHeadRelatedSidePanelsAsync();
@@ -1450,6 +1822,8 @@ public partial class MainWindowViewModel : BaseViewModel
         await CommitListVM.LoadAsync(ct, progress);
         ct.ThrowIfCancellationRequested();
 
+        RefreshCommitTagAvailability(repo);
+
         progress?.Report(new RepositoryLoadProgress("Finalizing", "Refreshing author index."));
         _ = _authorDirService.RefreshAsync();
     }
@@ -1464,6 +1838,7 @@ public partial class MainWindowViewModel : BaseViewModel
             TimestampEditVM.UpdatePreviewBefore("-");
             IsGoButtonEnabled = false;
             CommitListVM.ClearList();
+            ClearCommitTagAvailability();
             UpdateStatusBar(repo);
             return false;
         }
@@ -1498,6 +1873,7 @@ public partial class MainWindowViewModel : BaseViewModel
         Remotes.Clear();
         TitleBarVM.Clear();
         CommitListVM.ClearList();
+        ClearCommitTagAvailability();
         HistoryRewriteDraftVM.SetSelectedCommit(null);
         HistoryRewriteDraftVM.SetCommits([]);
     }

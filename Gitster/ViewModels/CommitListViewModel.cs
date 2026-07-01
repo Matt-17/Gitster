@@ -33,6 +33,7 @@ public partial class CommitListViewModel : BaseViewModel
 
     private List<CommitItem> _allRows = [];
     private List<CommitItem> _incomingRows = [];
+    private List<CommitItem> _selectedCommits = [];
     private RemoteSets? _remoteSets;
     private CommitQuery _query = CommitQuery.Parse(null);
 
@@ -53,6 +54,12 @@ public partial class CommitListViewModel : BaseViewModel
     /// <summary>Flat list of <see cref="CommitSectionHeader"/> and <see cref="CommitItem"/> rows.</summary>
     [ObservableProperty]
     public partial IReadOnlyList<object> Items { get; set; } = [];
+
+    partial void OnItemsChanged(IReadOnlyList<object> value)
+    {
+        SelectParentCommitCommand.NotifyCanExecuteChanged();
+        SelectChildCommitCommand.NotifyCanExecuteChanged();
+    }
 
     [ObservableProperty]
     public partial double GraphColumnWidth { get; set; } = GraphColumnMinWidth;
@@ -102,10 +109,24 @@ public partial class CommitListViewModel : BaseViewModel
     public partial CommitItem? SelectedCommit { get; set; }
 
     /// <summary>All currently selected commits (populated by the view's SelectionChanged handler).</summary>
-    public List<CommitItem> SelectedCommits { get; set; } = [];
+    public List<CommitItem> SelectedCommits
+    {
+        get => _selectedCommits;
+        set
+        {
+            if (SetProperty(ref _selectedCommits, value))
+                OnPropertyChanged(nameof(HasTwoSelectedCommits));
+        }
+    }
+
+    public bool HasTwoSelectedCommits =>
+        SelectedCommits.Select(c => c.FullSha).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 2;
 
     [ObservableProperty]
     public partial string FilterText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool ShowOutgoingIncomingOnly { get; set; }
 
     [ObservableProperty]
     public partial bool HasActiveFilters { get; set; }
@@ -270,9 +291,59 @@ public partial class CommitListViewModel : BaseViewModel
     [RelayCommand]
     private void SelectLastCommit() => SelectCommitBoundary(first: false);
 
+    [RelayCommand(CanExecute = nameof(CanSelectParentCommit))]
+    private void SelectParentCommit()
+    {
+        if (SelectedCommit?.ParentShas.FirstOrDefault() is not { } parentSha)
+            return;
+
+        var parent = VisibleCommits()
+            .FirstOrDefault(c => string.Equals(c.FullSha, parentSha, StringComparison.OrdinalIgnoreCase));
+        if (parent is not null)
+            SelectedCommit = parent;
+    }
+
+    private bool CanSelectParentCommit() =>
+        SelectedCommit?.ParentShas.Count > 0
+        && VisibleCommits().Any(c => string.Equals(
+            c.FullSha,
+            SelectedCommit.ParentShas[0],
+            StringComparison.OrdinalIgnoreCase));
+
+    [RelayCommand(CanExecute = nameof(CanSelectChildCommit))]
+    private void SelectChildCommit()
+    {
+        if (SelectedCommit is null)
+            return;
+
+        var commits = VisibleCommits();
+        var currentIndex = FindSelectedCommitIndex(commits);
+        if (currentIndex < 0)
+            return;
+
+        for (var i = currentIndex - 1; i >= 0; i--)
+        {
+            if (commits[i].ParentShas.Any(p =>
+                string.Equals(p, SelectedCommit.FullSha, StringComparison.OrdinalIgnoreCase)))
+            {
+                SelectedCommit = commits[i];
+                return;
+            }
+        }
+    }
+
+    private bool CanSelectChildCommit()
+    {
+        if (SelectedCommit is null)
+            return false;
+
+        return VisibleCommits().Any(c => c.ParentShas.Any(p =>
+            string.Equals(p, SelectedCommit.FullSha, StringComparison.OrdinalIgnoreCase)));
+    }
+
     private void SelectCommitOffset(int offset)
     {
-        var commits = Items.OfType<CommitItem>().ToList();
+        var commits = VisibleCommits();
         if (commits.Count == 0)
         {
             SelectedCommit = null;
@@ -289,7 +360,7 @@ public partial class CommitListViewModel : BaseViewModel
 
     private void SelectCommitBoundary(bool first)
     {
-        var commits = Items.OfType<CommitItem>().ToList();
+        var commits = VisibleCommits();
         SelectedCommit = commits.Count == 0
             ? null
             : commits[first ? 0 : commits.Count - 1];
@@ -308,6 +379,8 @@ public partial class CommitListViewModel : BaseViewModel
         return commits.FindIndex(c =>
             string.Equals(c.FullSha, selected.FullSha, StringComparison.OrdinalIgnoreCase));
     }
+
+    private List<CommitItem> VisibleCommits() => Items.OfType<CommitItem>().ToList();
 
     private static CommitItem ToItem(CommitInfo info) => new(
         info.Message,
@@ -363,7 +436,7 @@ public partial class CommitListViewModel : BaseViewModel
             var matchedIncoming = query.IsEmpty
                 ? incoming
                 : incoming.Where(c => Match(query, c)).ToList();
-            var builtRows = BuildRows(matchedIncoming, matchedLocal);
+            var builtRows = BuildRows(matchedIncoming, ApplyOutgoingIncomingFilter(matchedLocal));
 
             try
             {
@@ -387,8 +460,16 @@ public partial class CommitListViewModel : BaseViewModel
     private List<CommitItem> FilteredIncoming() =>
         _query.IsEmpty ? _incomingRows : _incomingRows.Where(c => Match(_query, c)).ToList();
 
-    private List<CommitItem> FilteredLocal() =>
-        _query.IsEmpty ? _allRows : _allRows.Where(c => Match(_query, c)).ToList();
+    private List<CommitItem> FilteredLocal()
+    {
+        var rows = _query.IsEmpty ? _allRows : _allRows.Where(c => Match(_query, c)).ToList();
+        return ApplyOutgoingIncomingFilter(rows);
+    }
+
+    private List<CommitItem> ApplyOutgoingIncomingFilter(IEnumerable<CommitItem> rows) =>
+        ShowOutgoingIncomingOnly
+            ? rows.Where(IsOutgoing).ToList()
+            : rows.ToList();
 
     private static bool IsOutgoing(CommitItem c) =>
         c.RemoteState is CommitRemoteState.LocalOnly or CommitRemoteState.NoTrackingBranch;
@@ -487,7 +568,7 @@ public partial class CommitListViewModel : BaseViewModel
 
     private string StatusForRows(int localCount, int incomingCount)
     {
-        var count = HasActiveFilters ? localCount + incomingCount : _allRows.Count;
+        var count = HasActiveFilters || ShowOutgoingIncomingOnly ? localCount + incomingCount : _allRows.Count;
         if (SelectedScope == HistoryScope.AllBranches)
         {
             return HasActiveFilters
@@ -505,7 +586,20 @@ public partial class CommitListViewModel : BaseViewModel
     partial void OnSelectedCommitChanged(CommitItem? value)
     {
         RemoveChangeFromCommitCommand.NotifyCanExecuteChanged();
+        SelectParentCommitCommand.NotifyCanExecuteChanged();
+        SelectChildCommitCommand.NotifyCanExecuteChanged();
         _ = LoadDiffAsync(value);
+    }
+
+    partial void OnShowOutgoingIncomingOnlyChanged(bool value)
+    {
+        if (value && SelectedScope != HistoryScope.CurrentBranch)
+        {
+            SelectedScope = HistoryScope.CurrentBranch;
+            return;
+        }
+
+        ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha);
     }
 
     private async Task LoadDiffAsync(CommitItem? commit)

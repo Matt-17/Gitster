@@ -32,26 +32,63 @@
             <Setter Property="ContextMenu">
                 <Setter.Value>
                     <ContextMenu DataContext="{Binding PlacementTarget, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="Checkout (--detach)"
+                                  Command="{Binding Tag.CheckoutCommitDetachedCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="View Commit Details"
+                                  Command="{Binding Tag.ViewCommitDetailsCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="Open in Browser"
+                                  Command="{Binding Tag.OpenCommitInBrowserCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <Separator/>
                         <MenuItem Header="Push through this commit"
                                   Command="{Binding Tag.PushThroughCommitCommand}"
-                                  CommandParameter="{Binding DataContext}">
-                            <MenuItem.Style>
-                                <Style TargetType="MenuItem">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding DataContext.RemoteState}" Value="LocalOnly">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </MenuItem.Style>
+                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="Push Tag"
+                                  Command="{Binding Tag.PushTagCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <Separator/>
+                        <MenuItem Header="Compare Commits..."
+                                  Command="{Binding Tag.CompareSelectedCommitsCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="New Branch..."
+                                  Command="{Binding Tag.NewBranchFromCommitCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="New Tag..."
+                                  Command="{Binding Tag.NewTagFromCommitCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <Separator/>
+                        <MenuItem Header="Revert"
+                                  Command="{Binding Tag.RevertCommitCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="Reset">
+                            <MenuItem Header="Reset branch here (--mixed, keep changes)"
+                                      Command="{Binding Tag.ResetToCommitMixedCommand}"
+                                      CommandParameter="{Binding DataContext}"/>
+                            <MenuItem Header="Reset branch here (--hard, delete changes)"
+                                      Command="{Binding Tag.ResetToCommitHardCommand}"
+                                      CommandParameter="{Binding DataContext}"/>
                         </MenuItem>
-                        <MenuItem Header="Reset branch here (--mixed, keep changes)"
-                                  Command="{Binding Tag.ResetToCommitMixedCommand}"
+                        <MenuItem Header="Cherry-Pick"
+                                  Command="{Binding Tag.CherryPickCommitCommand}"
                                   CommandParameter="{Binding DataContext}"/>
-                        <MenuItem Header="Reset branch here (--hard, delete changes)"
-                                  Command="{Binding Tag.ResetToCommitHardCommand}"
-                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="Squash Commits..."
+                                  Command="{Binding Tag.QuickActionsVM.SquashSelectedCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Go to Child"
+                                  InputGestureText="Alt+PgUp"
+                                  Command="{Binding Tag.CommitListVM.SelectChildCommitCommand}"/>
+                        <MenuItem Header="Go to Parent"
+                                  InputGestureText="Alt+PgDn"
+                                  Command="{Binding Tag.CommitListVM.SelectParentCommitCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Refresh"
+                                  Command="{Binding Tag.RefreshCommand}"/>
+                        <MenuItem Header="Show Outgoing / Incoming Only"
+                                  IsCheckable="True"
+                                  StaysOpenOnClick="True"
+                                  IsChecked="{Binding Tag.CommitListVM.ShowOutgoingIncomingOnly, Mode=TwoWay}"/>
                     </ContextMenu>
                 </Setter.Value>
             </Setter>

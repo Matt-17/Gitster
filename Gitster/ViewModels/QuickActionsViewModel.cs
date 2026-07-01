@@ -426,6 +426,7 @@ public partial class QuickActionsViewModel : BaseViewModel
     {
         RewordCommand.NotifyCanExecuteChanged();
         FixupCommand.NotifyCanExecuteChanged();
+        SquashSelectedCommand.NotifyCanExecuteChanged();
         ArchiveSelectedCommitCommand.NotifyCanExecuteChanged();
     }
 

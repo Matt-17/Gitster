@@ -1,3 +1,5 @@
+using System.IO;
+
 using Gitster.Services.Git;
 using LibGit2Sharp;
 
@@ -89,6 +91,97 @@ public sealed class LibGit2BackendTests
         Assert.AreEqual(CurrentOperation.None, check.Info.CurrentOperation,
             "no cherry-pick state should remain");
         Assert.IsFalse(check.RetrieveStatus().IsDirty, "working tree must be clean after abort");
+    }
+
+    [TestMethod]
+    public async Task CheckoutCommitDetached_MovesHeadToSelectedCommitDetached()
+    {
+        using var repo = new GitTestRepo();
+        var first = repo.Commit("first", "a.txt", "1");
+        repo.Commit("second", "a.txt", "2");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.CheckoutCommitDetachedAsync(first);
+
+        using var check = new Repository(repo.Path);
+        Assert.IsTrue(check.Info.IsHeadDetached);
+        Assert.AreEqual(first, check.Head.Tip!.Sha);
+    }
+
+    [TestMethod]
+    public async Task CreateTag_PointsTagAtSelectedCommit()
+    {
+        using var repo = new GitTestRepo();
+        var commit = repo.Commit("tagged", "a.txt", "1");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var tagName = await backend.CreateTagAsync("v-test", commit);
+
+        Assert.AreEqual("v-test", tagName);
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(commit, ((Commit)check.Tags["v-test"]!.Target).Sha);
+    }
+
+    [TestMethod]
+    public async Task GetTagsForCommit_ReturnsTagsPointingAtSelectedCommit()
+    {
+        using var repo = new GitTestRepo();
+        var first = repo.Commit("first", "a.txt", "1");
+        var second = repo.Commit("second", "a.txt", "2");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+        await backend.CreateTagAsync("v-first", first);
+        await backend.CreateTagAsync("release/first", first);
+        await backend.CreateTagAsync("v-second", second);
+
+        var tags = await backend.GetTagsForCommitAsync(first);
+
+        CollectionAssert.AreEqual(new[] { "release/first", "v-first" }, tags.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RevertCommit_CleanCommit_CreatesRevertCommit()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("first", "a.txt", "1\n");
+        var second = repo.Commit("second", "a.txt", "2\n");
+        var headBefore = repo.Head();
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RevertCommitAsync(second);
+
+        using var check = new Repository(repo.Path);
+        Assert.AreNotEqual(headBefore, check.Head.Tip!.Sha);
+        StringAssert.StartsWith(check.Head.Tip.MessageShort, "Revert");
+        Assert.AreEqual("1\n", File.ReadAllText(Path.Combine(repo.Path, "a.txt")));
+    }
+
+    [TestMethod]
+    public async Task RevertCommit_Conflict_AbortsAndLeavesWorkingTreeClean()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("first", "a.txt", "1\n");
+        var second = repo.Commit("second", "a.txt", "2\n");
+        repo.Commit("third", "a.txt", "3\n");
+        var headBefore = repo.Head();
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.RevertCommitAsync(second));
+
+        Assert.AreEqual(headBefore, repo.Head());
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(CurrentOperation.None, check.Info.CurrentOperation);
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
     }
 
     [TestMethod]
@@ -300,45 +393,15 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
-    public async Task PushThroughCommit_LocalOnlyCommit_PushesSelectedCommitOnly()
+    public async Task ServerOperations_ThrowBecauseLibGit2BackendIsLocalOnly()
     {
-        using var repo = new GitTestRepo();
-        var baseSha = repo.Commit("base", "base.txt", "base");
-        var remotePath = System.IO.Path.Combine(
-            System.IO.Path.GetTempPath(),
-            "gitster-remote-" + Guid.NewGuid().ToString("N")[..12]);
-        Repository.Init(remotePath, isBare: true);
+        var backend = new LibGit2Backend();
 
-        try
-        {
-            string branchName;
-            using (var setup = new Repository(repo.Path))
-            {
-                branchName = setup.Head.FriendlyName;
-                var remote = setup.Network.Remotes.Add("origin", remotePath);
-                setup.Network.Push(remote, $"{baseSha}:{setup.Head.CanonicalName}", new PushOptions());
-                Commands.Fetch(setup, remote.Name, remote.FetchRefSpecs.Select(x => x.Specification), null, "fetch origin");
-                setup.Branches.Update(setup.Head, b => b.TrackedBranch = $"refs/remotes/origin/{branchName}");
-            }
-
-            var selected = repo.Commit("selected", "selected.txt", "selected");
-            var newer = repo.Commit("newer", "newer.txt", "newer");
-
-            var backend = new LibGit2Backend();
-            await backend.OpenAsync(repo.Path);
-
-            await backend.PushThroughCommitAsync(selected);
-
-            using var local = new Repository(repo.Path);
-            using var remoteRepo = new Repository(remotePath);
-            Assert.AreEqual(newer, local.Head.Tip!.Sha, "partial push must not move local HEAD");
-            Assert.AreEqual(selected, local.Head.TrackedBranch.Tip!.Sha, "tracking ref should reflect the partial push");
-            Assert.AreEqual(selected, remoteRepo.Branches[branchName].Tip!.Sha, "remote branch should stop at the selected commit");
-        }
-        finally
-        {
-            DeleteDirectoryIfExists(remotePath);
-        }
+        await AssertLocalOnlyAsync(() => backend.FetchAsync());
+        await AssertLocalOnlyAsync(() => backend.PullAsync());
+        await AssertLocalOnlyAsync(() => backend.PushAsync());
+        await AssertLocalOnlyAsync(() => backend.PushThroughCommitAsync("abc123"));
+        await AssertLocalOnlyAsync(() => backend.PushTagAsync("v-test"));
     }
 
     [TestMethod]
@@ -562,13 +625,10 @@ public sealed class LibGit2BackendTests
         Assert.IsFalse(check.RetrieveStatus().IsDirty);
     }
 
-    private static void DeleteDirectoryIfExists(string path)
+    private static async Task AssertLocalOnlyAsync(Func<Task> operation)
     {
-        if (!System.IO.Directory.Exists(path))
-            return;
+        var ex = await Assert.ThrowsExceptionAsync<NotSupportedException>(operation);
 
-        foreach (var file in System.IO.Directory.EnumerateFiles(path, "*", System.IO.SearchOption.AllDirectories))
-            System.IO.File.SetAttributes(file, System.IO.FileAttributes.Normal);
-        System.IO.Directory.Delete(path, recursive: true);
+        StringAssert.Contains(ex.Message, "LibGit2Backend is local-only");
     }
 }
