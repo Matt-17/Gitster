@@ -71,6 +71,7 @@ public partial class StashesViewModel : BaseViewModel
     private readonly Func<Task>            _onStashesChanged;
 
     private List<StashItem> _allStashes = [];
+    private CancellationTokenSource? _diffCts;
 
     public ObservableCollection<StashItem> Stashes { get; } = [];
 
@@ -87,12 +88,28 @@ public partial class StashesViewModel : BaseViewModel
     public partial string FilterText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string DiffPreview { get; set; } = string.Empty;
+    public partial string DiffHeader { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool DiffLoading { get; set; }
+
+    [ObservableProperty]
+    public partial List<DiffFileEntry> DiffFiles { get; set; } = [];
 
     [ObservableProperty]
     public partial bool HasStashes { get; set; }
 
     public bool HasSelectedStash => SelectedStash != null;
+
+    public string DiffHeaderDisplay =>
+        DiffLoading ? "loading..."
+        : SelectedStash == null ? "no stash selected"
+        : string.IsNullOrEmpty(DiffHeader) ? "no diff to display"
+        : DiffHeader;
+
+    partial void OnDiffHeaderChanged(string value) => OnPropertyChanged(nameof(DiffHeaderDisplay));
+
+    partial void OnDiffLoadingChanged(bool value) => OnPropertyChanged(nameof(DiffHeaderDisplay));
 
     // ── Constructor ────────────────────────────────────────────────────────
 
@@ -137,7 +154,10 @@ public partial class StashesViewModel : BaseViewModel
         _allStashes = [];
         Stashes.Clear();
         SelectedStash = null;
-        DiffPreview   = string.Empty;
+        _diffCts?.Cancel();
+        DiffFiles     = [];
+        DiffHeader    = string.Empty;
+        DiffLoading   = false;
         HasStashes    = false;
     }
 
@@ -169,16 +189,59 @@ public partial class StashesViewModel : BaseViewModel
 
     partial void OnSelectedStashChanged(StashItem? value)
     {
-        DiffPreview = string.Empty;
+        OnPropertyChanged(nameof(DiffHeaderDisplay));
         if (value != null)
             _ = LoadDiffAsync(value);
+        else
+        {
+            _diffCts?.Cancel();
+            DiffFiles = [];
+            DiffHeader = string.Empty;
+            DiffLoading = false;
+        }
     }
 
     private async Task LoadDiffAsync(StashItem stash)
     {
-        try { DiffPreview = await _git.GetStashDiffAsync(stash.Info.Index); }
-        catch { DiffPreview = string.Empty; }
+        _diffCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _diffCts = cts;
+        var token = cts.Token;
+
+        DiffFiles = [];
+        DiffHeader = string.Empty;
+        DiffLoading = true;
+
+        try
+        {
+            var diff = await Task.Run(() => _git.GetStashDiffAsync(stash.Info.Index, token), token);
+            if (token.IsCancellationRequested || !IsCurrentSelection(stash))
+                return;
+
+            DiffFiles = diff.Files.ToList();
+            DiffHeader = string.IsNullOrEmpty(diff.Header)
+                ? stash.Ref
+                : $"{stash.Ref} - {diff.Header}";
+            DiffLoading = false;
+        }
+        catch (OperationCanceledException)
+        {
+            // Selection changed.
+        }
+        catch
+        {
+            if (!IsCurrentSelection(stash))
+                return;
+
+            DiffFiles = [];
+            DiffHeader = string.Empty;
+            DiffLoading = false;
+        }
     }
+
+    private bool IsCurrentSelection(StashItem stash) =>
+        SelectedStash?.CommitSha == stash.CommitSha
+        && SelectedStash.Info.Index == stash.Info.Index;
 
     // ── Commands ───────────────────────────────────────────────────────────
 

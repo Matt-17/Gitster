@@ -610,7 +610,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => NS<Dictionary<string, string>>();
     public Task<int> GetStashCountAsync()                       => NS<int>();
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync()     => NS<IReadOnlyList<StashInfo>>();
-    public Task<string> GetStashDiffAsync(int stashIndex)       => NS<string>();
+    public Task<CommitDiff> GetStashDiffAsync(int stashIndex, CancellationToken ct = default) => NS<CommitDiff>();
     public Task ApplyStashAsync(int stashIndex, bool reinstateIndex = true) => NSVoid();
     public Task PopStashAsync(int stashIndex, bool reinstateIndex = true)   => NSVoid();
     public Task DropStashAsync(int stashIndex)                  => NSVoid();

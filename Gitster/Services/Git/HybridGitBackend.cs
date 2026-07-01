@@ -86,7 +86,7 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => _lib.GetAllRefsAsync();
     public Task<int> GetStashCountAsync()                       => _lib.GetStashCountAsync();
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync()     => _lib.GetStashesAsync();
-    public Task<string> GetStashDiffAsync(int stashIndex)       => _lib.GetStashDiffAsync(stashIndex);
+    public Task<CommitDiff> GetStashDiffAsync(int stashIndex, CancellationToken ct = default) => _lib.GetStashDiffAsync(stashIndex, ct);
     public Task ApplyStashAsync(int stashIndex, bool reinstateIndex = true) => _lib.ApplyStashAsync(stashIndex, reinstateIndex);
     public Task PopStashAsync(int stashIndex, bool reinstateIndex = true)   => _lib.PopStashAsync(stashIndex, reinstateIndex);
     public Task DropStashAsync(int stashIndex)                  => _lib.DropStashAsync(stashIndex);
