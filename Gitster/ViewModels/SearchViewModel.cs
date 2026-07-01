@@ -145,6 +145,15 @@ public partial class SearchViewModel : BaseViewModel
         finally { IsBusy = false; }
     }
 
+    public async Task RunCompareRefsAsync(string baseRef, string compareRef, bool threeDot = false)
+    {
+        CurrentKind = SearchKind.CompareRefs;
+        BaseRef = baseRef;
+        CompareRef = compareRef;
+        ThreeDot = threeDot;
+        await Run();
+    }
+
     private async Task RunCommitsQueryAsync(CancellationToken ct)
     {
         var query = CommitQuery.Parse(QueryText);

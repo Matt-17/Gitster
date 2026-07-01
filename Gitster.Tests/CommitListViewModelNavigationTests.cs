@@ -3,8 +3,10 @@ using System.IO;
 using Gitster.Services;
 using Gitster.Services.Git;
 using Gitster.Services.History;
+using Gitster.Services.Search;
 using Gitster.ViewModels;
 using NSubstitute;
+using System.Reflection;
 
 namespace Gitster.Tests;
 
@@ -111,6 +113,64 @@ public sealed class CommitListViewModelNavigationTests
     }
 
     [TestMethod]
+    public void SelectParentCommit_SelectsFirstVisibleParent()
+    {
+        var vm = CreateViewModel();
+        var parent = Item("parent");
+        var child = Item("child", parentShas: [parent.FullSha]);
+        vm.Items = [child, parent];
+        vm.SelectedCommit = child;
+
+        vm.SelectParentCommitCommand.Execute(null);
+
+        Assert.AreSame(parent, vm.SelectedCommit);
+    }
+
+    [TestMethod]
+    public void SelectChildCommit_SelectsNearestVisibleChild()
+    {
+        var vm = CreateViewModel();
+        var parent = Item("parent");
+        var child = Item("child", parentShas: [parent.FullSha]);
+        var grandchild = Item("grandchild", parentShas: [child.FullSha]);
+        vm.Items = [grandchild, child, parent];
+        vm.SelectedCommit = child;
+
+        vm.SelectChildCommitCommand.Execute(null);
+
+        Assert.AreSame(grandchild, vm.SelectedCommit);
+    }
+
+    [TestMethod]
+    public void ShowOutgoingIncomingOnly_WithSearchFilter_HidesSyncedLocalRows()
+    {
+        var vm = CreateViewModel();
+        var outgoingKeep = Item("outgoing-keep", message: "keep outgoing", remoteState: CommitRemoteState.LocalOnly);
+        var syncedKeep = Item("synced-keep", message: "keep synced", remoteState: CommitRemoteState.OnRemote);
+        var outgoingDrop = Item("outgoing-drop", message: "drop outgoing", remoteState: CommitRemoteState.LocalOnly);
+        var incomingKeep = Item("incoming-keep", message: "keep incoming", remoteState: CommitRemoteState.Incoming);
+
+        SetPrivateField(vm, "_allRows", new List<CommitItem> { outgoingKeep, syncedKeep, outgoingDrop });
+        SetPrivateField(vm, "_incomingRows", new List<CommitItem> { incomingKeep });
+        SetPrivateField(vm, "_remoteSets", new RemoteSets(
+            Array.Empty<CommitInfo>(),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { outgoingKeep.FullSha, outgoingDrop.FullSha },
+            new Dictionary<string, string>(),
+            HasTrackingBranch: true,
+            HasRemote: true,
+            RemoteName: "origin",
+            RemoteUrl: "https://example.test/repo.git"));
+        SetPrivateField(vm, "_query", CommitQuery.Parse("message:keep"));
+
+        vm.ShowOutgoingIncomingOnly = true;
+
+        var visibleShas = vm.Items.OfType<CommitItem>().Select(c => c.FullSha).ToList();
+        CollectionAssert.AreEquivalent(
+            new[] { incomingKeep.FullSha, outgoingKeep.FullSha },
+            visibleShas);
+    }
+
+    [TestMethod]
     public void GraphColumnWidthForLaneCount_WithDenseGraph_ExpandsBeyondCompactColumn()
     {
         Assert.AreEqual(28, CommitListViewModel.GraphColumnWidthForLaneCount(1));
@@ -130,11 +190,24 @@ public sealed class CommitListViewModelNavigationTests
             new UiPreferencesService());
     }
 
-    private static CommitItem Item(string id) =>
+    private static CommitItem Item(
+        string id,
+        string? message = null,
+        CommitRemoteState remoteState = CommitRemoteState.LocalOnly,
+        IReadOnlyList<string>? parentShas = null) =>
         new(
-            $"Message {id}",
+            message ?? $"Message {id}",
             new DateTime(2026, 1, 1),
             id,
             "Tester",
-            fullSha: $"{id}-full-sha");
+            remoteState: remoteState,
+            fullSha: $"{id}-full-sha",
+            parentShas: parentShas);
+
+    private static void SetPrivateField<T>(object target, string fieldName, T value)
+    {
+        var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Field '{fieldName}' was not found.");
+        field.SetValue(target, value);
+    }
 }

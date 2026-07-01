@@ -5,8 +5,8 @@ namespace Gitster.Services.Git;
 /// <summary>
 /// Routes Git operations to the appropriate backend:
 /// <list type="bullet">
-///   <item><see cref="LibGit2Backend"/> handles everything that works without spawning a process.</item>
-///   <item><see cref="GitCliBackend"/> handles rebase-class operations that need the CLI.</item>
+///   <item><see cref="LibGit2Backend"/> handles local repository work only.</item>
+///   <item><see cref="GitCliBackend"/> handles server operations and CLI-only workflows.</item>
 /// </list>
 /// Replace <c>new LibGit2Backend()</c> in DI with <c>new HybridGitBackend()</c>.
 /// </summary>
@@ -52,24 +52,23 @@ public sealed class HybridGitBackend : IGitBackend
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => _lib.AmendAuthorAsync(request);
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => _lib.RewriteCommitsAsync(rewrites, branchName);
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => _lib.RemoveFileChangeFromCommitAsync(sha, path, branchName);
-    public Task FetchAsync(string remoteName = "origin")        => _lib.FetchAsync(remoteName);
-    public Task PullAsync(string remoteName = "origin")         => _lib.PullAsync(remoteName);
+    public Task FetchAsync(string remoteName = "origin")        => RunServerOperationAsync("Fetch", () => _cli.FetchAsync(remoteName));
+    public Task PullAsync(string remoteName = "origin")         => RunServerOperationAsync("Pull", () => _cli.PullAsync(remoteName));
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
-        // True --force-with-lease only exists in the CLI; libgit2 would degrade it to a
-        // plain force, so prefer the CLI when it's available for the safe variant.
-        => mode == PushMode.ForceWithLease && GitCli.IsAvailable
-            ? _cli.PushAsync(remoteName, mode)
-            : _lib.PushAsync(remoteName, mode);
-    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+        => RunServerOperationAsync("Push", () => _cli.PushAsync(remoteName, mode));
+    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+        => RunServerOperationAsync("Push through commit", () => _cli.PushThroughCommitAsync(commitSha, remoteName));
+
+    private static async Task RunServerOperationAsync(string operationName, Func<Task> operation)
     {
         if (!GitCli.IsAvailable)
             await GitCli.DetectAsync();
 
         if (!GitCli.IsAvailable)
             throw new InvalidOperationException(
-                "Push through commit requires the Git command-line tool. Install Git for Windows and restart Gitster.");
+                $"{operationName} requires the Git command-line tool. Gitster never uses LibGit2Sharp for server operations because authentication must stay with Git's credential flow. Install Git for Windows and restart Gitster.");
 
-        await _cli.PushThroughCommitAsync(commitSha, remoteName);
+        await operation();
     }
     public Task<string> GetReflogSelectorForHeadAsync()         => _lib.GetReflogSelectorForHeadAsync();
     public Task ResetMixedAsync(string targetReference, string? branchName = null) => _lib.ResetMixedAsync(targetReference, branchName);
@@ -78,7 +77,12 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<string> ResolveRefAsync(string refSpec)         => _lib.ResolveRefAsync(refSpec);
     public Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string a, string b) => _lib.GetCommitsBetweenAsync(a, b);
     public Task<bool> CommitExistsAsync(string sha)             => _lib.CommitExistsAsync(sha);
+    public Task CheckoutCommitDetachedAsync(string sha)         => _lib.CheckoutCommitDetachedAsync(sha);
     public Task CherryPickAsync(string sha)                     => _lib.CherryPickAsync(sha);
+    public Task<string> CreateTagAsync(string name, string targetSha) => _lib.CreateTagAsync(name, targetSha);
+    public Task<IReadOnlyList<string>> GetTagsForCommitAsync(string sha) => _lib.GetTagsForCommitAsync(sha);
+    public Task PushTagAsync(string tagName, string remoteName = "origin") => RunServerOperationAsync("Push tag", () => _cli.PushTagAsync(tagName, remoteName));
+    public Task RevertCommitAsync(string sha)                   => _lib.RevertCommitAsync(sha);
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => _lib.GetAllRefsAsync();
     public Task<int> GetStashCountAsync()                       => _lib.GetStashCountAsync();
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync()     => _lib.GetStashesAsync();

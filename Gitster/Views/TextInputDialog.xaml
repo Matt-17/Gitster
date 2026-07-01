@@ -5,8 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Input"
-        Width="420" Height="160"
-        MinWidth="340" MinHeight="140"
+        Width="420"
+        SizeToContent="Height"
+        MinWidth="340" MinHeight="180"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource BackgroundPrimary}">

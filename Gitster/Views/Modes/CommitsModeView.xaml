@@ -11,8 +11,8 @@
     <UserControl.InputBindings>
         <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding CommitListVM.SelectPreviousCommitCommand}"/>
         <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding CommitListVM.SelectNextCommitCommand}"/>
-        <KeyBinding Key="Prior" Modifiers="Alt" Command="{Binding CommitListVM.SelectPreviousCommitPageCommand}"/>
-        <KeyBinding Key="Next" Modifiers="Alt" Command="{Binding CommitListVM.SelectNextCommitPageCommand}"/>
+        <KeyBinding Key="Prior" Modifiers="Alt" Command="{Binding CommitListVM.SelectChildCommitCommand}"/>
+        <KeyBinding Key="Next" Modifiers="Alt" Command="{Binding CommitListVM.SelectParentCommitCommand}"/>
         <KeyBinding Key="Home" Modifiers="Alt" Command="{Binding CommitListVM.SelectFirstCommitCommand}"/>
         <KeyBinding Key="End" Modifiers="Alt" Command="{Binding CommitListVM.SelectLastCommitCommand}"/>
     </UserControl.InputBindings>

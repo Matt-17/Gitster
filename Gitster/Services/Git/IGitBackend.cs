@@ -38,6 +38,8 @@ public interface IGitBackend
     Task AmendAuthorAsync(AmendAuthorRequest request);
     Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null);
     Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null);
+
+    // Server operations: route through Git CLI only. LibGit2Backend is local-only.
     Task FetchAsync(string remoteName = "origin");
     Task PullAsync(string remoteName = "origin");
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal);
@@ -50,7 +52,14 @@ public interface IGitBackend
     Task<string> ResolveRefAsync(string refSpec);
     Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string fromSha, string toSha);
     Task<bool> CommitExistsAsync(string sha);
+    Task CheckoutCommitDetachedAsync(string sha);
     Task CherryPickAsync(string sha);
+    Task<string> CreateTagAsync(string name, string targetSha);
+    Task<IReadOnlyList<string>> GetTagsForCommitAsync(string sha);
+
+    // Server operation: route through Git CLI only. LibGit2Backend is local-only.
+    Task PushTagAsync(string tagName, string remoteName = "origin");
+    Task RevertCommitAsync(string sha);
 
     Task<Dictionary<string, string>> GetAllRefsAsync();
     Task<int> GetStashCountAsync();

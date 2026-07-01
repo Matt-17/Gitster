@@ -855,68 +855,20 @@ public sealed class LibGit2Backend : IGitBackend
     }
 
     public Task FetchAsync(string remoteName = "origin")
-    {
-        using var repo = OpenRepository();
-        var remote = ResolveRemote(repo, remoteName);
-        var specs = remote.FetchRefSpecs.Select(x => x.Specification);
-        Commands.Fetch(repo, remote.Name, specs, null, $"Fetch from {remote.Name}");
-        return Task.CompletedTask;
-    }
+        => ServerWorkNotSupportedAsync(nameof(FetchAsync));
 
     public Task PullAsync(string remoteName = "origin")
-    {
-        using var repo = OpenRepository();
-        _ = ResolveRemote(repo, remoteName);
-
-        var signature = repo.Config.BuildSignature(DateTimeOffset.Now)
-            ?? throw new InvalidOperationException("Could not resolve git user signature for pull.");
-        Commands.Pull(repo, signature, new PullOptions());
-        return Task.CompletedTask;
-    }
+        => ServerWorkNotSupportedAsync(nameof(PullAsync));
 
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
-    {
-        using var repo = OpenRepository();
-        var remote = ResolveRemote(repo, remoteName);
-        var branch = GetCurrentLocalBranch(repo, "push");
-
-        // libgit2 has no real force-with-lease — HybridGitBackend routes that to the CLI.
-        // Here a lease request degrades to a plain force (the prior behaviour) when no CLI.
-        if (mode == PushMode.Force || mode == PushMode.ForceWithLease)
-        {
-            var pushRefSpec = $"+{branch.CanonicalName}:{branch.CanonicalName}";
-            repo.Network.Push(remote, pushRefSpec, new PushOptions());
-        }
-        else
-        {
-            repo.Network.Push(branch, new PushOptions());
-        }
-
-        if (branch.Tip is { } tip)
-            UpdateTrackingBranchAfterPush(repo, branch, remote, tip);
-
-        return Task.CompletedTask;
-    }
+        => ServerWorkNotSupportedAsync(nameof(PushAsync));
 
     public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
-    {
-        if (string.IsNullOrWhiteSpace(commitSha))
-            throw new ArgumentException("Commit SHA is required.", nameof(commitSha));
+        => ServerWorkNotSupportedAsync(nameof(PushThroughCommitAsync));
 
-        using var repo = OpenRepository();
-        var remote = ResolveRemote(repo, remoteName);
-        var branch = GetCurrentLocalBranch(repo, "push through a commit");
-        var commit = repo.Lookup<Commit>(commitSha)
-            ?? throw new InvalidOperationException($"Commit not found: {commitSha}");
-
-        if (!IsReachableFrom(repo, branch.Tip, commit))
-            throw new InvalidOperationException("The selected commit is not on the current branch.");
-
-        var pushRefSpec = $"{commit.Id.Sha}:{branch.CanonicalName}";
-        repo.Network.Push(remote, pushRefSpec, new PushOptions());
-        UpdateTrackingBranchAfterPush(repo, branch, remote, commit);
-        return Task.CompletedTask;
-    }
+    private static Task ServerWorkNotSupportedAsync(string operationName) =>
+        throw new NotSupportedException(
+            $"{operationName} is server work. LibGit2Backend is local-only; route server operations through GitCliBackend so authentication stays with Git.");
 
     public Task<string> GetReflogSelectorForHeadAsync()
     {
@@ -1013,29 +965,6 @@ public sealed class LibGit2Backend : IGitBackend
         return branch;
     }
 
-    private static bool IsReachableFrom(Repository repo, Commit? source, Commit target)
-    {
-        if (source is null)
-            return false;
-
-        return repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
-        {
-            IncludeReachableFrom = source,
-        }).Any(c => string.Equals(c.Sha, target.Sha, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static void UpdateTrackingBranchAfterPush(Repository repo, Branch branch, Remote remote, Commit commit)
-    {
-        var tracked = branch.TrackedBranch;
-        if (tracked?.Reference is null)
-            return;
-
-        if (!string.Equals(tracked.RemoteName, remote.Name, StringComparison.Ordinal))
-            return;
-
-        repo.Refs.UpdateTarget(tracked.Reference, commit.Id, $"push through {ShortSha(commit.Sha)}");
-    }
-
     private static void EnsureAttachedHead(Repository repo, string operation)
     {
         if (repo.Info.IsHeadDetached)
@@ -1090,6 +1019,17 @@ public sealed class LibGit2Backend : IGitBackend
         return Task.FromResult(repo.Lookup<Commit>(sha) != null);
     }
 
+    public Task CheckoutCommitDetachedAsync(string sha)
+    {
+        using var repo = OpenRepository();
+        var commit = repo.Lookup<Commit>(sha)
+            ?? throw new InvalidOperationException($"Commit not found: {sha}");
+
+        Commands.Checkout(repo, commit);
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
     public Task CherryPickAsync(string sha)
     {
         using var repo = OpenRepository();
@@ -1113,6 +1053,69 @@ public sealed class LibGit2Backend : IGitBackend
                 $"Cherry-pick of {sha[..Math.Min(7, sha.Length)]} produced conflicts and was aborted — " +
                 "history and working tree are unchanged.");
         }
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
+    public Task<string> CreateTagAsync(string name, string targetSha)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Tag name is required.", nameof(name));
+
+        using var repo = OpenRepository();
+        var commit = repo.Lookup<Commit>(targetSha)
+            ?? throw new InvalidOperationException($"Commit not found: {targetSha}");
+        var tag = repo.Tags.Add(name.Trim(), commit);
+        return Task.FromResult(tag.FriendlyName);
+    }
+
+    public Task<IReadOnlyList<string>> GetTagsForCommitAsync(string sha)
+    {
+        if (string.IsNullOrWhiteSpace(sha))
+            throw new ArgumentException("Commit SHA is required.", nameof(sha));
+
+        using var repo = OpenRepository();
+        var commit = repo.Lookup<Commit>(sha)
+            ?? throw new InvalidOperationException($"Commit not found: {sha}");
+        var tags = repo.Tags
+            .Where(tag => ResolveTagTargetCommit(tag)?.Id == commit.Id)
+            .Select(tag => tag.FriendlyName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<string>>(tags);
+    }
+
+    public Task PushTagAsync(string tagName, string remoteName = "origin")
+        => ServerWorkNotSupportedAsync(nameof(PushTagAsync));
+
+    public Task RevertCommitAsync(string sha)
+    {
+        using var repo = OpenRepository();
+        if (repo.RetrieveStatus().IsDirty)
+            throw new InvalidOperationException(
+                "Cannot revert while the working tree has uncommitted changes. Commit or stash them first.");
+
+        var commit = repo.Lookup<Commit>(sha)
+            ?? throw new InvalidOperationException($"Commit not found: {sha}");
+        var sig = repo.Config.BuildSignature(DateTimeOffset.Now)
+            ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+        var originalHead = repo.Head.Tip;
+
+        var result = repo.Revert(commit, sig, new RevertOptions());
+        if (result.Status == RevertStatus.Conflicts)
+        {
+            if (originalHead != null)
+                repo.Reset(ResetMode.Hard, originalHead);
+            CleanupSequencerState(repo);
+            throw new InvalidOperationException(
+                $"Revert of {sha[..Math.Min(7, sha.Length)]} produced conflicts and was aborted — " +
+                "history and working tree are unchanged.");
+        }
+
+        if (result.Status == RevertStatus.NothingToRevert)
+            throw new InvalidOperationException("There is nothing to revert for the selected commit.");
 
         HeadChanged?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
@@ -2066,9 +2069,24 @@ public sealed class LibGit2Backend : IGitBackend
         var c = repo.Lookup<Commit>(r);
         if (c != null) return c;
         if (repo.Branches[r]?.Tip is { } bt) return bt;
-        if (repo.Tags[r]?.Target is Commit tc) return tc;
+        if (repo.Tags[r] is { } tag && ResolveTagTargetCommit(tag) is { } tc) return tc;
         if (repo.Branches[$"origin/{r}"]?.Tip is { } rt) return rt;
         return null;
+    }
+
+    private static Commit? ResolveTagTargetCommit(Tag tag) =>
+        tag.PeeledTarget as Commit;
+
+    private static string NormalizeTagName(string tagName)
+    {
+        if (string.IsNullOrWhiteSpace(tagName))
+            throw new ArgumentException("Tag name is required.", nameof(tagName));
+
+        var name = tagName.Trim();
+        const string prefix = "refs/tags/";
+        return name.StartsWith(prefix, StringComparison.Ordinal)
+            ? name[prefix.Length..]
+            : name;
     }
 
     // ── Phase 3: Worktrees — routed to CLI via HybridGitBackend ─────────────
@@ -2082,12 +2100,4 @@ public sealed class LibGit2Backend : IGitBackend
     public Task PruneWorktreesAsync() =>
         throw new NotSupportedException("Route through HybridGitBackend.");
 
-    private static Remote ResolveRemote(Repository repo, string remoteName)
-    {
-        var remote = string.IsNullOrWhiteSpace(remoteName)
-            ? repo.Network.Remotes.FirstOrDefault()
-            : repo.Network.Remotes[remoteName];
-
-        return remote ?? throw new InvalidOperationException("No remote found.");
-    }
 }
