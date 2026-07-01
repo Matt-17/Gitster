@@ -87,9 +87,11 @@ public partial class BranchesViewModel : BaseViewModel
     [NotifyPropertyChangedFor(nameof(HasSelection))]
     [NotifyPropertyChangedFor(nameof(CanCheckout))]
     [NotifyPropertyChangedFor(nameof(CanMerge))]
+    [NotifyPropertyChangedFor(nameof(CanStitchHistory))]
     [NotifyPropertyChangedFor(nameof(CanDelete))]
     [NotifyCanExecuteChangedFor(nameof(CheckoutCommand))]
     [NotifyCanExecuteChangedFor(nameof(MergeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StitchHistoryCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreateFromHereCommand))]
@@ -113,6 +115,7 @@ public partial class BranchesViewModel : BaseViewModel
     public bool HasSelection    => SelectedBranch != null;
     public bool CanCheckout     => SelectedBranch is { IsCurrent: false };
     public bool CanMerge        => SelectedBranch is { IsCurrent: false };
+    public bool CanStitchHistory => SelectedBranch is { IsCurrent: false };
     public bool CanDelete       => SelectedBranch is { IsCurrent: false, IsRemote: false };
     public bool SortByDateActive => !SortByName;
     public bool SortByNameActive => SortByName;
@@ -383,6 +386,66 @@ public partial class BranchesViewModel : BaseViewModel
                 await AfterChangeAsync();
 
             _windowService.Warning(ex.Message, "Merge failed");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStitchHistory))]
+    private async Task StitchHistory()
+    {
+        if (SelectedBranch is not { } row) return;
+
+        HistoryStitchPreview preview;
+        try
+        {
+            preview = await _feedback.RunAsync(
+                "Preview stitch",
+                () => _git.PreviewHistoryStitchAsync(row.Name),
+                p => p.CanExecute ? $"{p.UniqueSourceCommitCount} commits" : "blocked");
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning($"Could not preview history stitch:\n{ex.Message}", "Stitch history failed");
+            return;
+        }
+
+        var dialog = new HistoryStitchDialog(preview);
+        if (_windowService.ShowDialog(dialog) != true)
+            return;
+
+        try
+        {
+            var beforeSha = await _git.GetHeadShaAsync();
+            _ = _snapshots.CaptureAsync(_git, $"Before history stitch from {row.Name}");
+
+            var result = await _feedback.RunAsync(
+                "Stitch history",
+                () => _git.StitchHistoryAsync(row.Name),
+                r => ShortSha(r.MergeCommitSha));
+
+            await _opsLog.RecordAsync(new OperationRecord(
+                Id:             Guid.NewGuid().ToString(),
+                Timestamp:      DateTimeOffset.Now,
+                Kind:           OperationKind.Merge,
+                Description:    $"Stitch history from {result.SourceRef}",
+                BranchName:     result.TargetBranch,
+                BeforeSha:      ShortSha(beforeSha),
+                AfterSha:       ShortSha(result.MergeCommitSha),
+                ReflogSelector: null,
+                Status:         OperationStatus.Active));
+
+            await AfterChangeAsync();
+
+            _windowService.Info(
+                $"History stitched from '{result.SourceRef}'.\n\n" +
+                $"Merge commit: {ShortSha(result.MergeCommitSha)}\n" +
+                $"Backup branch: {result.BackupBranch}\n\n" +
+                "Current files were left unchanged.\n\n" +
+                $"Before push, Gitster undo/reset or the backup branch is safe. After push, use git revert -m 1 {ShortSha(result.MergeCommitSha)}.",
+                "History stitched");
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"History stitch failed:\n{ex.Message}", "Gitster");
         }
     }
 

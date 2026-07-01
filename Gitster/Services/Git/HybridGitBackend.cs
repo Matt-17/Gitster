@@ -88,6 +88,8 @@ public sealed class HybridGitBackend : IGitBackend
     public Task DeleteBranchAsync(string name, bool force)                    => _lib.DeleteBranchAsync(name, force);
     public Task RenameBranchAsync(string oldName, string newName)             => _lib.RenameBranchAsync(oldName, newName);
     public Task<BranchMergeResult> MergeBranchAsync(string branchName, BranchMergeStrategy strategy) => _lib.MergeBranchAsync(branchName, strategy);
+    public Task<HistoryStitchPreview> PreviewHistoryStitchAsync(string sourceRef) => _lib.PreviewHistoryStitchAsync(sourceRef);
+    public Task<HistoryStitchResult> StitchHistoryAsync(string sourceRef)     => _cli.StitchHistoryAsync(sourceRef);
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)    => _lib.CommitToBranchAsync(request);
     public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted) => _lib.CreateSnapshotBranchAsync(branchName, includeUncommitted);
     public Task<ArchiveResult> ArchiveSourceZipAsync(ArchiveRequest request, CancellationToken ct = default) => _cli.ArchiveSourceZipAsync(request, ct);

@@ -797,15 +797,20 @@ public sealed class LibGit2Backend : IGitBackend
 
     private static void EnsureCleanWorkingTree(Repository repo, string operation)
     {
+        if (HasUncommittedChanges(repo))
+            throw new InvalidOperationException(
+                $"Cannot {operation} while the working tree has uncommitted changes. Commit or stash them first.");
+    }
+
+    private static bool HasUncommittedChanges(Repository repo)
+    {
         var status = repo.RetrieveStatus(new StatusOptions
         {
             IncludeUntracked = true,
             RecurseUntrackedDirs = true,
         });
 
-        if (status.Any(e => (e.State & FileStatus.Ignored) == 0))
-            throw new InvalidOperationException(
-                $"Cannot {operation} while the working tree has uncommitted changes. Commit or stash them first.");
+        return status.Any(e => (e.State & FileStatus.Ignored) == 0);
     }
 
     private static bool ShaMatches(Commit commit, string sha) =>
@@ -1633,6 +1638,109 @@ public sealed class LibGit2Backend : IGitBackend
     }
 
     // ── Phase 3: Commit-to-another-branch (Step B) ──────────────────────────
+
+    public async Task<HistoryStitchPreview> PreviewHistoryStitchAsync(string sourceRef)
+    {
+        await GitCli.DetectAsync();
+
+        using var repo = OpenRepository();
+        var warnings = new List<string>();
+        var blocks = new List<string>();
+        var head = repo.Head.Tip;
+        var targetBranch = repo.Info.IsHeadDetached ? "detached HEAD" : repo.Head.FriendlyName;
+        var targetHeadSha = head?.Sha ?? string.Empty;
+        var sourceBranch = repo.Branches[sourceRef];
+        var source = sourceBranch?.Tip ?? repo.Lookup<Commit>(sourceRef);
+        var sourceTipSha = source?.Sha ?? string.Empty;
+
+        if (!GitCli.IsAvailable)
+        {
+            blocks.Add(
+                "Stitching history requires the Git command-line tool because Gitster runs git merge --no-ff -s ours exactly.");
+        }
+
+        if (head is null)
+        {
+            blocks.Add("Cannot stitch history in a repository without a HEAD commit.");
+        }
+
+        if (repo.Info.IsHeadDetached)
+        {
+            blocks.Add("Check out a local branch before stitching history.");
+        }
+
+        if (source is null)
+        {
+            blocks.Add($"Source branch or ref '{sourceRef}' was not found.");
+        }
+        else if (sourceBranch?.IsCurrentRepositoryHead == true ||
+                 (!repo.Info.IsHeadDetached && string.Equals(sourceRef, repo.Head.FriendlyName, StringComparison.Ordinal)))
+        {
+            blocks.Add("Choose an old source branch, not the current branch.");
+        }
+
+        if (HasUncommittedChanges(repo))
+        {
+            blocks.Add("Commit or stash uncommitted changes before stitching history.");
+        }
+
+        var isAlreadyReachable = false;
+        var uniqueSourceCommitCount = 0;
+        string? squashMatchSha = null;
+        if (head is not null && source is not null)
+        {
+            var mergeBase = repo.ObjectDatabase.FindMergeBase(source, head);
+            isAlreadyReachable = mergeBase?.Sha.Equals(source.Sha, StringComparison.OrdinalIgnoreCase) == true;
+            if (isAlreadyReachable)
+            {
+                blocks.Add($"'{sourceRef}' is already reachable from the current branch.");
+            }
+
+            uniqueSourceCommitCount = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = source,
+                ExcludeReachableFrom = head,
+            }).Count();
+
+            squashMatchSha = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = head,
+            }).FirstOrDefault(c => c.Tree.Sha.Equals(source.Tree.Sha, StringComparison.OrdinalIgnoreCase))?.Sha;
+
+            if (squashMatchSha is null && !isAlreadyReachable)
+            {
+                warnings.Add(
+                    "No exact squash-tree match was found on the current branch. Continue only if this is still the old history you want to reference.");
+            }
+        }
+
+        var tracked = repo.Head.TrackedBranch;
+        if (head is not null && tracked?.Tip is not null)
+        {
+            var divergence = repo.ObjectDatabase.CalculateHistoryDivergence(head, tracked.Tip);
+            if ((divergence.BehindBy ?? 0) > 0)
+            {
+                warnings.Add(
+                    $"The current branch is behind {tracked.FriendlyName}. Pull or inspect incoming commits before stitching if this branch should be current.");
+            }
+        }
+
+        return new HistoryStitchPreview(
+            sourceRef,
+            sourceTipSha,
+            targetBranch,
+            targetHeadSha,
+            isAlreadyReachable,
+            uniqueSourceCommitCount,
+            squashMatchSha,
+            warnings,
+            blocks);
+    }
+
+    public Task<HistoryStitchResult> StitchHistoryAsync(string sourceRef) =>
+        throw new NotSupportedException("History stitch execution requires the Git command-line tool.");
 
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)
     {

@@ -404,6 +404,74 @@ public sealed class GitCliBackend : IGitBackend
         if (!r.Success)
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
     }
+
+    public async Task<HistoryStitchResult> StitchHistoryAsync(string sourceRef)
+    {
+        EnsurePath();
+        EnsureCli();
+
+        var status = await GitCli.RunAsync(RepositoryPath, ["status", "--porcelain"]);
+        if (!status.Success)
+            throw new InvalidOperationException($"Could not read working tree status:\n{status.Output}");
+        if (!string.IsNullOrWhiteSpace(status.Stdout))
+            throw new InvalidOperationException(
+                "Cannot stitch history while the working tree has uncommitted changes. Commit or stash them first.");
+
+        var currentBranch = await GitCli.RunAsync(RepositoryPath, ["symbolic-ref", "--short", "HEAD"]);
+        if (!currentBranch.Success)
+            throw new InvalidOperationException("Check out a local branch before stitching history.");
+
+        var targetBranch = currentBranch.Stdout.Trim();
+        if (string.Equals(sourceRef, targetBranch, StringComparison.Ordinal))
+            throw new InvalidOperationException("Choose an old source branch, not the current branch.");
+
+        var head = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", "HEAD^{commit}"]);
+        if (!head.Success)
+            throw new InvalidOperationException($"Could not resolve HEAD:\n{head.Output}");
+
+        var source = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{sourceRef}^{{commit}}"]);
+        if (!source.Success)
+            throw new InvalidOperationException($"Source branch or ref '{sourceRef}' was not found.");
+
+        var ancestor = await GitCli.RunAsync(RepositoryPath, ["merge-base", "--is-ancestor", source.Stdout.Trim(), "HEAD"]);
+        if (ancestor.ExitCode == 0)
+            throw new InvalidOperationException($"'{sourceRef}' is already reachable from the current branch.");
+        if (ancestor.ExitCode != 1)
+            throw new InvalidOperationException($"Could not compare source branch ancestry:\n{ancestor.Output}");
+
+        var backupBranch = await BuildAvailableBackupBranchNameAsync(targetBranch, head.Stdout.Trim());
+        var backup = await GitCli.RunAsync(RepositoryPath, ["branch", backupBranch, "HEAD"]);
+        if (!backup.Success)
+            throw new InvalidOperationException($"Could not create backup branch '{backupBranch}':\n{backup.Output}");
+
+        var merge = await GitCli.RunAsync(
+            RepositoryPath,
+            [
+                "merge",
+                "--no-ff",
+                "-s",
+                "ours",
+                sourceRef,
+                "-m",
+                $"Record original history of {sourceRef}",
+            ],
+            new Dictionary<string, string> { ["GIT_TERMINAL_PROMPT"] = "0" });
+        if (!merge.Success)
+            throw new InvalidOperationException($"History stitch merge failed:\n{merge.Output}");
+
+        var mergeHead = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", "HEAD^{commit}"]);
+        if (!mergeHead.Success)
+            throw new InvalidOperationException($"History stitch completed, but Gitster could not read the new HEAD:\n{mergeHead.Output}");
+
+        HeadChanged?.Invoke(this, EventArgs.Empty);
+        return new HistoryStitchResult(
+            sourceRef,
+            source.Stdout.Trim(),
+            targetBranch,
+            backupBranch,
+            mergeHead.Stdout.Trim());
+    }
+
     public Task<string> GetReflogSelectorForHeadAsync()         => NS<string>();
     public Task ResetMixedAsync(string targetReference, string? branchName = null) => NSVoid();
     public Task ResetHardAsync(string targetReference, string? branchName = null)  => NSVoid();
@@ -432,6 +500,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task DeleteBranchAsync(string name, bool force)                    => NSVoid();
     public Task RenameBranchAsync(string oldName, string newName)             => NSVoid();
     public Task<BranchMergeResult> MergeBranchAsync(string branchName, BranchMergeStrategy strategy) => NS<BranchMergeResult>();
+    public Task<HistoryStitchPreview> PreviewHistoryStitchAsync(string sourceRef) => NS<HistoryStitchPreview>();
     public Task<string> CommitToBranchAsync(CommitToBranchRequest request)    => NS<string>();
     public Task<string> CreateSnapshotBranchAsync(string branchName, bool includeUncommitted) => NS<string>();
 
@@ -682,6 +751,35 @@ public sealed class GitCliBackend : IGitBackend
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    private async Task<string> BuildAvailableBackupBranchNameAsync(string targetBranch, string headSha)
+    {
+        var stem = $"backup/{SanitizeBranchSegment(targetBranch)}-before-history-stitch-{ShortSha(headSha)}-{DateTime.Now:yyyyMMddHHmmss}";
+        for (var i = 0; i < 20; i++)
+        {
+            var candidate = i == 0 ? stem : $"{stem}-{i + 1}";
+            var exists = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"refs/heads/{candidate}"]);
+            if (!exists.Success)
+                return candidate;
+        }
+
+        throw new InvalidOperationException("Could not find an available backup branch name.");
+    }
+
+    private static string SanitizeBranchSegment(string value)
+    {
+        var chars = value
+            .Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '-')
+            .ToArray();
+        var result = new string(chars).Trim('-', '.');
+        while (result.Contains("--", StringComparison.Ordinal))
+            result = result.Replace("--", "-", StringComparison.Ordinal);
+
+        return string.IsNullOrWhiteSpace(result) ? "branch" : result;
+    }
+
+    private static string ShortSha(string sha) =>
+        sha.Length >= 7 ? sha[..7] : sha;
 
     private void EnsurePath()
     {

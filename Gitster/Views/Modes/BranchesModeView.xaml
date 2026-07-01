@@ -279,6 +279,12 @@
                             Command="{Binding MergeCommand}"
                             HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
 
+                    <Button Content="Stitch history..."
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding StitchHistoryCommand}"
+                            ToolTip="Record this branch as history using git merge --no-ff -s ours without changing current files"
+                            HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
