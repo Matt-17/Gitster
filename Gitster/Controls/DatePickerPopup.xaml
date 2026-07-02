@@ -78,7 +78,8 @@
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0"
                             Click="PrevMonthButton_Click"
-                            Style="{StaticResource GhostButtonStyle}">
+                            Style="{StaticResource GhostButtonStyle}"
+                            AutomationProperties.Name="Previous month">
                         <Path Width="8"
                               Height="12"
                               Stretch="Uniform"
@@ -110,7 +111,8 @@
 
                     <Button Grid.Column="2"
                             Click="NextMonthButton_Click"
-                            Style="{StaticResource GhostButtonStyle}">
+                            Style="{StaticResource GhostButtonStyle}"
+                            AutomationProperties.Name="Next month">
                         <Path Width="8"
                               Height="12"
                               Stretch="Uniform"

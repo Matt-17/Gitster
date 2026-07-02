@@ -17,7 +17,6 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding"         Value="0"/>
             <Setter Property="Cursor"          Value="Hand"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -26,10 +25,13 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentMainLightestBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentMainLightestBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -38,29 +40,28 @@
         </Style>
     </UserControl.Resources>
 
-    <Border BorderBrush="{StaticResource BorderTertiary}"
+    <Border BorderBrush="{DynamicResource BorderTertiary}"
             BorderThickness="0,0,1,0"
-            Background="{StaticResource BackgroundSecondary}">
+            Background="{DynamicResource BackgroundSecondary}">
         <StackPanel Orientation="Vertical">
 
             <!-- Commits (Ctrl+1) -->
             <Button Height="44" Style="{StaticResource SidebarButton}"
                     Command="{Binding SelectModeCommand}"
                     CommandParameter="{x:Static models:AppMode.Commits}"
+                    AutomationProperties.Name="Commits"
                     ToolTip="Commits  Ctrl+1">
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                               Fill="{StaticResource AccentBlue}"
+                               Fill="{DynamicResource AccentBlue}"
                                Visibility="{Binding IsCommitsActive, Converter={StaticResource BoolToVis}}"/>
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="Transparent"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                          Data="M12,2 L12,22 M9,7 A3,3 0 0,1 15,7 A3,3 0 0,1 9,7 Z M9,17 A3,3 0 0,1 15,17 A3,3 0 0,1 9,17 Z">
+                    <Path Data="{StaticResource IconCommitsGeometry}">
                         <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                            <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+                                <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsCommitsActive}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -73,20 +74,19 @@
             <Button Height="44" Style="{StaticResource SidebarButton}"
                     Command="{Binding SelectModeCommand}"
                     CommandParameter="{x:Static models:AppMode.Stashes}"
+                    AutomationProperties.Name="Stashes"
                     ToolTip="Stashes  Ctrl+2">
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                               Fill="{StaticResource AccentBlue}"
+                               Fill="{DynamicResource AccentBlue}"
                                Visibility="{Binding IsStashesActive, Converter={StaticResource BoolToVis}}"/>
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="Transparent"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                          Data="M2,7 H22 M2,12 H22 M2,17 H22">
+                    <Path Data="{StaticResource IconStashesGeometry}">
                         <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                            <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+                                <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsStashesActive}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -94,7 +94,7 @@
                     </Path>
                     <!-- Badge dot -->
                     <Border Width="6" Height="6" CornerRadius="3"
-                            Background="{StaticResource AccentBlue}"
+                            Background="{DynamicResource AccentBlue}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,9,9,0"
                             Visibility="{Binding HasStashBadge, Converter={StaticResource BoolToVis}}"/>
@@ -105,20 +105,19 @@
             <Button Height="44" Style="{StaticResource SidebarButton}"
                     Command="{Binding SelectModeCommand}"
                     CommandParameter="{x:Static models:AppMode.Branches}"
+                    AutomationProperties.Name="Branches"
                     ToolTip="Branches  Ctrl+3">
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                               Fill="{StaticResource AccentBlue}"
+                               Fill="{DynamicResource AccentBlue}"
                                Visibility="{Binding IsBranchesActive, Converter={StaticResource BoolToVis}}"/>
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="Transparent"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                          Data="M10,3 A2,2 0 0,1 14,3 A2,2 0 0,1 10,3 Z M5,21 A2,2 0 0,1 9,21 A2,2 0 0,1 5,21 Z M15,21 A2,2 0 0,1 19,21 A2,2 0 0,1 15,21 Z M12,5 L12,11 M12,11 C12,16 7,16 7,19 M12,11 C12,16 17,16 17,19">
+                    <Path Data="{StaticResource IconBranchesGeometry}">
                         <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                            <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+                                <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsBranchesActive}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -126,7 +125,7 @@
                     </Path>
                     <!-- Badge dot -->
                     <Border Width="6" Height="6" CornerRadius="3"
-                            Background="{StaticResource AccentBlue}"
+                            Background="{DynamicResource AccentBlue}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,9,9,0"
                             Visibility="{Binding HasBranchBadge, Converter={StaticResource BoolToVis}}"/>
@@ -137,20 +136,19 @@
             <Button Height="44" Style="{StaticResource SidebarButton}"
                     Command="{Binding SelectModeCommand}"
                     CommandParameter="{x:Static models:AppMode.Worktrees}"
+                    AutomationProperties.Name="Worktrees"
                     ToolTip="Worktrees  Ctrl+4">
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                               Fill="{StaticResource AccentBlue}"
+                               Fill="{DynamicResource AccentBlue}"
                                Visibility="{Binding IsWorktreesActive, Converter={StaticResource BoolToVis}}"/>
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="Transparent"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                          Data="M1,1 H11 V11 H1 Z M13,1 H23 V11 H13 Z M1,13 H11 V23 H1 Z M13,13 H23 V23 H13 Z">
+                    <Path Data="{StaticResource IconWorktreesGeometry}">
                         <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                            <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+                                <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsWorktreesActive}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -163,20 +161,19 @@
             <Button Height="44" Style="{StaticResource SidebarButton}"
                     Command="{Binding SelectModeCommand}"
                     CommandParameter="{x:Static models:AppMode.Search}"
+                    AutomationProperties.Name="Search"
                     ToolTip="Search  Ctrl+5">
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                               Fill="{StaticResource AccentBlue}"
+                               Fill="{DynamicResource AccentBlue}"
                                Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}}"/>
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="Transparent"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                          Data="M3,10 A7,7 0 0,1 17,10 A7,7 0 0,1 3,10 Z M15,15 L21,21">
+                    <Path Data="{StaticResource IconSearchGeometry}">
                         <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                            <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+                                <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSearchActive}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -189,20 +186,19 @@
             <Button Height="44" Style="{StaticResource SidebarButton}"
                     Command="{Binding SelectModeCommand}"
                     CommandParameter="{x:Static models:AppMode.OperationsLog}"
+                    AutomationProperties.Name="Operations log"
                     ToolTip="Operations log  Ctrl+6">
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                               Fill="{StaticResource AccentBlue}"
+                               Fill="{DynamicResource AccentBlue}"
                                Visibility="{Binding IsOperationsLogActive, Converter={StaticResource BoolToVis}}"/>
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="Transparent"
-                          StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                          Data="M3,12 A9,9 0 0,1 21,12 A9,9 0 0,1 3,12 Z M12,7 L12,12 L15.5,14">
+                    <Path Data="{StaticResource IconOperationsLogGeometry}">
                         <Path.Style>
-                            <Style TargetType="Path">
-                                <Setter Property="Stroke" Value="{StaticResource TextTertiary}"/>
+                            <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+                                <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsOperationsLogActive}" Value="True">
-                                        <Setter Property="Stroke" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -210,7 +206,7 @@
                     </Path>
                     <!-- Badge dot -->
                     <Border Width="6" Height="6" CornerRadius="3"
-                            Background="{StaticResource AccentBlue}"
+                            Background="{DynamicResource AccentBlue}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,9,9,0"
                             Visibility="{Binding HasOpsLogBadge, Converter={StaticResource BoolToVis}}"/>

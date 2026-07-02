@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:Gitster.Controls"
              xmlns:models="clr-namespace:Gitster.Models"
+             xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
              x:Name="Root"
              mc:Ignorable="d">
@@ -16,13 +17,13 @@
                         <Setter Property="Background" Value="Transparent"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding Kind}" Value="Added">
-                                <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
+                                <Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Kind}" Value="Removed">
-                                <Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/>
+                                <Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Kind}" Value="Hunk">
-                                <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -34,10 +35,10 @@
                            Padding="8,0">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Kind}" Value="Hunk">
-                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -47,7 +48,7 @@
         </DataTemplate>
 
         <HierarchicalDataTemplate x:Key="DiffTreeNodeTemplate"
-                                  DataType="{x:Type local:DiffTreeNode}"
+                                  DataType="{x:Type vm:DiffTreeNode}"
                                   ItemsSource="{Binding Children}">
             <Grid Height="20"
                   ToolTip="{Binding TooltipText}">
@@ -63,8 +64,8 @@
                       Height="10"
                       Stretch="Uniform"
                       Data="M2,5 H7 L8.5,7 H16 V15 H2 Z"
-                      Fill="{StaticResource BackgroundSecondary}"
-                      Stroke="{StaticResource TextTertiary}"
+                      Fill="{DynamicResource BackgroundSecondary}"
+                      Stroke="{DynamicResource TextTertiary}"
                       StrokeThickness="1"
                       Visibility="Collapsed"
                       VerticalAlignment="Center"/>
@@ -81,16 +82,16 @@
                     </Border.RenderTransform>
                     <Border.Style>
                         <Style TargetType="Border">
-                            <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                            <Setter Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Status}" Value="A">
-                                    <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Status}" Value="D">
-                                    <Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Status}" Value="R">
-                                    <Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -101,7 +102,7 @@
                                FontWeight="Bold"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"/>
+                               Foreground="{DynamicResource TextSecondary}"/>
                 </Border>
 
                 <TextBlock x:Name="NodeName"
@@ -109,7 +110,7 @@
                            Text="{Binding Name}"
                            FontFamily="{StaticResource FontFamilyUi}"
                            FontSize="12"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            VerticalAlignment="Center"
                            Margin="3,0,8,0"/>
 
@@ -117,7 +118,7 @@
                            Grid.Column="2"
                            Text="{Binding FileCountText}"
                            FontSize="11"
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            VerticalAlignment="Center"
                            Margin="10,0,4,0"
                            Visibility="Collapsed"/>
@@ -128,7 +129,7 @@
                     <Setter TargetName="StatusBadge" Property="Visibility" Value="Collapsed"/>
                     <Setter TargetName="FolderCounts" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="NodeName" Property="FontWeight" Value="SemiBold"/>
-                    <Setter TargetName="NodeName" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                    <Setter TargetName="NodeName" Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                 </DataTrigger>
             </HierarchicalDataTemplate.Triggers>
         </HierarchicalDataTemplate>
@@ -145,7 +146,7 @@
                                   Width="6"
                                   Height="7"
                                   Data="M2,1 L6,5 L2,9 Z"
-                                  Fill="{StaticResource TextTertiary}"
+                                  Fill="{DynamicResource TextTertiary}"
                                   Stretch="Uniform"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"/>
@@ -155,7 +156,7 @@
                                 <Setter TargetName="Arrow" Property="Data" Value="M1,2 L9,2 L5,7 Z"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource TextSecondary}"/>
+                                <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextSecondary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -218,10 +219,10 @@
                                 <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RowBackground" Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                <Setter TargetName="RowBackground" Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="RowBackground" Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                                <Setter TargetName="RowBackground" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -237,8 +238,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="{StaticResource BackgroundSecondary}"
-                BorderBrush="{StaticResource BorderTertiary}"
+                Background="{DynamicResource BackgroundSecondary}"
+                BorderBrush="{DynamicResource BorderTertiary}"
                 BorderThickness="0,0,0,1"
                 Padding="8,5">
             <Grid>
@@ -251,29 +252,29 @@
                 <TextBlock Grid.Column="0"
                            Text="Diff"
                            FontWeight="Medium"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1"
                            Text=" - "
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="2"
-                           Text="{Binding Header, ElementName=Root}"
+                           Text="{Binding ViewModel.Header, ElementName=Root}"
                            FontFamily="{StaticResource FontFamilyMono}"
                            FontSize="11"
-                           Foreground="{StaticResource TextSecondary}"
+                           Foreground="{DynamicResource TextSecondary}"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"/>
                 <TextBlock Grid.Column="3"
-                           Text="{Binding FileCountText, ElementName=Root}"
+                           Text="{Binding ViewModel.FileCountText, ElementName=Root}"
                            FontSize="11"
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            VerticalAlignment="Center"
                            Margin="12,0,0,0"/>
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" Background="{StaticResource BackgroundPrimary}">
+        <Grid Grid.Row="1" Background="{DynamicResource BackgroundPrimary}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="240" MinWidth="150"/>
                 <ColumnDefinition Width="3"/>
@@ -281,9 +282,9 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
-                    BorderBrush="{StaticResource BorderTertiary}"
+                    BorderBrush="{DynamicResource BorderTertiary}"
                     BorderThickness="0,0,1,0"
-                    Background="{StaticResource BackgroundPrimary}">
+                    Background="{DynamicResource BackgroundPrimary}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -291,27 +292,27 @@
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0"
-                            Background="{StaticResource BackgroundSecondary}"
-                            BorderBrush="{StaticResource BorderTertiary}"
+                            Background="{DynamicResource BackgroundSecondary}"
+                            BorderBrush="{DynamicResource BorderTertiary}"
                             BorderThickness="0,0,0,1"
                             Padding="8,4">
                         <DockPanel LastChildFill="True">
                             <TextBlock DockPanel.Dock="Right"
-                                       Text="{Binding FileCountText, ElementName=Root}"
+                                       Text="{Binding ViewModel.FileCountText, ElementName=Root}"
                                        FontSize="10"
-                                       Foreground="{StaticResource TextTertiary}"
+                                       Foreground="{DynamicResource TextTertiary}"
                                        VerticalAlignment="Center"/>
                             <TextBlock Text="Files"
                                        FontSize="11"
                                        FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondary}"
+                                       Foreground="{DynamicResource TextSecondary}"
                                        VerticalAlignment="Center"/>
                         </DockPanel>
                     </Border>
 
                     <TreeView Grid.Row="1"
                               x:Name="FileTreeView"
-                              ItemsSource="{Binding FileTree, ElementName=Root}"
+                              ItemsSource="{Binding ViewModel.FileTree, ElementName=Root}"
                               ItemTemplate="{StaticResource DiffTreeNodeTemplate}"
                               SelectedItemChanged="FileTreeView_SelectedItemChanged"
                               ContextMenuOpening="FileTreeView_ContextMenuOpening"
@@ -326,14 +327,14 @@
                             <ContextMenu>
                                 <MenuItem Header="Remove change from commit"
                                           Command="{Binding PlacementTarget.Tag.RemoveChangeFromCommitCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"
-                                          CommandParameter="{Binding PlacementTarget.Tag.SelectedFile, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"/>
+                                          CommandParameter="{Binding PlacementTarget.Tag.ViewModel.SelectedFile, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"/>
                             </ContextMenu>
                         </TreeView.ContextMenu>
                         <TreeView.Resources>
-                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7"/>
-                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1A1A1A"/>
-                            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#F5F5F5"/>
-                            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1A1A1A"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{DynamicResource SelectionBackgroundColor}"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{DynamicResource SelectionTextColor}"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{DynamicResource InactiveSelectionBackgroundColor}"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{DynamicResource InactiveSelectionTextColor}"/>
                         </TreeView.Resources>
                     </TreeView>
                 </Grid>
@@ -341,7 +342,7 @@
 
             <GridSplitter Grid.Column="1"
                           HorizontalAlignment="Stretch"
-                          Background="{StaticResource BorderTertiary}"
+                          Background="{DynamicResource BorderTertiary}"
                           ResizeBehavior="PreviousAndNext"
                           helper:PersistedGridSplitter.Key="{Binding FileTreeSplitterKey, ElementName=Root}"
                           helper:PersistedGridSplitter.DefinitionKind="Column"
@@ -354,15 +355,15 @@
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
-                        Background="{StaticResource BackgroundSecondary}"
-                        BorderBrush="{StaticResource BorderTertiary}"
+                        Background="{DynamicResource BackgroundSecondary}"
+                        BorderBrush="{DynamicResource BorderTertiary}"
                         BorderThickness="0,0,0,1"
                         Padding="8,4">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedFile, ElementName=Root}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding ViewModel.SelectedFile, ElementName=Root}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>
@@ -374,10 +375,10 @@
                                    FontSize="11"
                                    Margin="12,0,0,0"
                                    VerticalAlignment="Center">
-                            <Run Text="+" Foreground="{StaticResource AccentSuccess}"/>
-                            <Run Text="{Binding SelectedFile.Added, ElementName=Root, Mode=OneWay}" Foreground="{StaticResource AccentSuccess}"/>
-                            <Run Text="  -" Foreground="{StaticResource AccentDanger}"/>
-                            <Run Text="{Binding SelectedFile.Deleted, ElementName=Root, Mode=OneWay}" Foreground="{StaticResource AccentDanger}"/>
+                            <Run Text="+" Foreground="{DynamicResource AccentSuccess}"/>
+                            <Run Text="{Binding ViewModel.SelectedFile.Added, ElementName=Root, Mode=OneWay}" Foreground="{DynamicResource AccentSuccess}"/>
+                            <Run Text="  -" Foreground="{DynamicResource AccentDanger}"/>
+                            <Run Text="{Binding ViewModel.SelectedFile.Deleted, ElementName=Root, Mode=OneWay}" Foreground="{DynamicResource AccentDanger}"/>
                         </TextBlock>
                         <Border DockPanel.Dock="Left"
                                 Margin="0,0,6,0"
@@ -387,74 +388,115 @@
                                 VerticalAlignment="Center">
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedFile.Status, ElementName=Root}" Value="A">
-                                            <Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/>
+                                        <DataTrigger Binding="{Binding ViewModel.SelectedFile.Status, ElementName=Root}" Value="A">
+                                            <Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/>
                                         </DataTrigger>
-                                        <DataTrigger Binding="{Binding SelectedFile.Status, ElementName=Root}" Value="D">
-                                            <Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/>
+                                        <DataTrigger Binding="{Binding ViewModel.SelectedFile.Status, ElementName=Root}" Value="D">
+                                            <Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
                                         </DataTrigger>
-                                        <DataTrigger Binding="{Binding SelectedFile.Status, ElementName=Root}" Value="R">
-                                            <Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/>
+                                        <DataTrigger Binding="{Binding ViewModel.SelectedFile.Status, ElementName=Root}" Value="R">
+                                            <Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <TextBlock Text="{Binding SelectedFile.Status, ElementName=Root}"
+                            <TextBlock Text="{Binding ViewModel.SelectedFile.Status, ElementName=Root}"
                                        FontFamily="{StaticResource FontFamilyMono}"
                                        FontSize="9"
                                        FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource TextSecondary}"/>
+                                       Foreground="{DynamicResource TextSecondary}"/>
                         </Border>
-                        <TextBlock Text="{Binding SelectedFile.Path, ElementName=Root}"
+                        <TextBlock Text="{Binding ViewModel.SelectedFile.Path, ElementName=Root}"
                                    FontFamily="{StaticResource FontFamilyMono}"
                                    FontSize="11"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextPrimary}"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                     </DockPanel>
                 </Border>
 
-                <ScrollViewer Grid.Row="1"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto">
-                    <ScrollViewer.Style>
-                        <Style TargetType="ScrollViewer">
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding ViewModel.VisibleSelectedLines, ElementName=Root}"
+                         ItemTemplate="{StaticResource DiffLineTemplate}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         SelectionMode="Single"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling">
+                    <ListBox.Style>
+                        <Style TargetType="ListBox">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedFile, ElementName=Root}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding ViewModel.SelectedFile, ElementName=Root}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </ScrollViewer.Style>
-                    <ItemsControl ItemsSource="{Binding SelectedFile.Lines, ElementName=Root}"
-                                  ItemTemplate="{StaticResource DiffLineTemplate}"/>
-                </ScrollViewer>
+                    </ListBox.Style>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Focusable" Value="False"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
 
-                <TextBlock Grid.RowSpan="2"
-                           Text="{Binding EmptyMessage, ElementName=Root}"
-                           Foreground="{StaticResource TextTertiary}"
-                           FontStyle="Italic"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Margin="16"
-                           TextWrapping="Wrap">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
+                <Border Grid.Row="1"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,14"
+                        Padding="10,6"
+                        CornerRadius="4"
+                        Background="{DynamicResource BackgroundPrimary}"
+                        BorderBrush="{DynamicResource BorderTertiary}"
+                        BorderThickness="1"
+                        Visibility="{Binding ViewModel.IsSelectedDiffCapped, ElementName=Root, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding ViewModel.HiddenLineText, ElementName=Root}"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <Button Content="Show all"
+                                Style="{StaticResource GhostButton}"
+                                Padding="8,2"
+                                Command="{Binding ViewModel.ShowAllLinesCommand, ElementName=Root}"/>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Grid.RowSpan="2"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Margin="16">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedFile, ElementName=Root}" Value="{x:Null}">
+                                <DataTrigger Binding="{Binding ViewModel.SelectedFile, ElementName=Root}" Value="{x:Null}">
                                     <Setter Property="Visibility" Value="Visible"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+                    </StackPanel.Style>
+                    <local:RingSpinner Width="18" Height="18"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"
+                                       Visibility="{Binding ViewModel.IsLoading, ElementName=Root, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <TextBlock Text="{Binding ViewModel.EmptyMessage, ElementName=Root}"
+                               Foreground="{DynamicResource TextTertiary}"
+                               FontStyle="Italic"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
             </Grid>
         </Grid>
     </Grid>

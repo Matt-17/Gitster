@@ -12,7 +12,7 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False">
 
-    <Border Padding="16" Background="{StaticResource BackgroundPrimary}">
+    <Border Padding="16" Background="{DynamicResource BackgroundPrimary}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -31,15 +31,15 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Find commits by"
-                           Foreground="{StaticResource TextSecondary}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="12" VerticalAlignment="Center"/>
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding Authors}"
                           SelectedItem="{Binding FindAuthor}"
                           DisplayMemberPath="DisplayName"
                           Height="28" FontSize="12"
-                          Foreground="{StaticResource TextPrimary}"
-                          BorderBrush="{StaticResource BorderTertiary}"/>
+                          Foreground="{DynamicResource TextPrimary}"
+                          BorderBrush="{DynamicResource BorderTertiary}"/>
             </Grid>
 
             <!-- Replace row -->
@@ -49,38 +49,38 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Replace with"
-                           Foreground="{StaticResource TextSecondary}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="12" VerticalAlignment="Center"/>
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding Authors}"
                           SelectedItem="{Binding ReplaceAuthor}"
                           DisplayMemberPath="DisplayName"
                           Height="28" FontSize="12"
-                          Foreground="{StaticResource TextPrimary}"
-                          BorderBrush="{StaticResource BorderTertiary}"/>
+                          Foreground="{DynamicResource TextPrimary}"
+                          BorderBrush="{DynamicResource BorderTertiary}"/>
             </Grid>
 
             <!-- Options -->
             <CheckBox Grid.Row="2"
                       Content="Also update committer"
                       IsChecked="{Binding AlsoUpdateCommitter}"
-                      Foreground="{StaticResource TextSecondary}"
+                      Foreground="{DynamicResource TextSecondary}"
                       FontSize="12"
                       Margin="0,0,0,12"/>
 
             <!-- Warning: unsafe commits -->
             <Border Grid.Row="3"
                     Visibility="{Binding HasUnsafeCommits, Converter={StaticResource BooleanToVisibilityConverter}}"
-                    Background="{StaticResource AccentWarningBackground}"
-                    BorderBrush="{StaticResource AccentWarning}"
+                    Background="{DynamicResource AccentWarningBackground}"
+                    BorderBrush="{DynamicResource AccentWarning}"
                     BorderThickness="0.5"
                     CornerRadius="{StaticResource CornerRadiusMd}"
                     Padding="10,7"
                     Margin="0,0,0,10">
                 <TextBlock TextWrapping="Wrap" FontSize="12">
-                    <Run Text="⚠" Foreground="{StaticResource AccentWarning}"/>
+                    <Run Text="⚠" Foreground="{DynamicResource AccentWarning}"/>
                     <Run Text=" Some of the affected commits are already on the remote. Rewriting will require a force-push."
-                         Foreground="{StaticResource TextPrimary}"/>
+                         Foreground="{DynamicResource TextPrimary}"/>
                 </TextBlock>
             </Border>
 
@@ -92,15 +92,15 @@
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0"
                            FontSize="11"
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            Margin="0,0,0,4">
                     <Run Text="Affected commits: "/>
                     <Run Text="{Binding AffectedCommits.Count, Mode=OneWay}"/>
                 </TextBlock>
                 <ListBox Grid.Row="1"
                          ItemsSource="{Binding AffectedCommits}"
-                         Background="{StaticResource BackgroundSecondary}"
-                         BorderBrush="{StaticResource BorderTertiary}"
+                         Background="{DynamicResource BackgroundSecondary}"
+                         BorderBrush="{DynamicResource BorderTertiary}"
                          BorderThickness="0.5"
                          FontSize="12">
                     <ListBox.ItemTemplate>
@@ -109,10 +109,10 @@
                                 <TextBlock Text="{Binding Sha}"
                                            FontFamily="{StaticResource FontFamilyMono}"
                                            FontSize="11"
-                                           Foreground="{StaticResource TextSecondary}"
+                                           Foreground="{DynamicResource TextSecondary}"
                                            Margin="0,0,8,0"/>
                                 <TextBlock Text="{Binding Message}"
-                                           Foreground="{StaticResource TextPrimary}"
+                                           Foreground="{DynamicResource TextPrimary}"
                                            TextTrimming="CharacterEllipsis"
                                            MaxWidth="300"/>
                             </StackPanel>
@@ -124,7 +124,7 @@
             <!-- Loading indicator -->
             <TextBlock Grid.Row="5"
                        Text="Loading…"
-                       Foreground="{StaticResource TextTertiary}"
+                       Foreground="{DynamicResource TextTertiary}"
                        FontSize="12"
                        Margin="0,0,0,10"
                        Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
@@ -133,6 +133,7 @@
             <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Cancel" Width="80" Height="30" Margin="0,0,8,0"
                         Click="OnCancel"
+                        IsCancel="True"
                         Style="{StaticResource GhostButton}"/>
                 <Button Content="Rewrite commits" Height="30" Padding="12,0"
                         Command="{Binding RewriteCommand}"

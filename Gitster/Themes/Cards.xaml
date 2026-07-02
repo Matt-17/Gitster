@@ -4,8 +4,8 @@
     <!-- ── PanelCard ─────────────────────────────────────────────── -->
     <!-- White surface, subtle border, rounded corners, inner padding.-->
     <Style x:Key="PanelCard" TargetType="Border">
-        <Setter Property="Background"       Value="{StaticResource BackgroundPrimary}"/>
-        <Setter Property="BorderBrush"      Value="{StaticResource BorderTertiary}"/>
+        <Setter Property="Background"       Value="{DynamicResource BackgroundPrimary}"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BorderTertiary}"/>
         <Setter Property="BorderThickness"  Value="0.5"/>
         <Setter Property="CornerRadius"     Value="{StaticResource CornerRadiusMd}"/>
         <Setter Property="Padding"          Value="{StaticResource PaddingMdThickness}"/>

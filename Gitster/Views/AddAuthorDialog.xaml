@@ -12,19 +12,19 @@
 
     <Window.Resources>
         <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Padding" Value="0,0,0,3"/>
         </Style>
         <Style TargetType="TextBox" BasedOn="{StaticResource GitsterTextBox}">
             <Setter Property="Height" Value="28"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
     </Window.Resources>
 
-    <Border Padding="16" Background="{StaticResource BackgroundPrimary}">
+    <Border Padding="16" Background="{DynamicResource BackgroundPrimary}">
         <StackPanel>
 
             <Label Content="Name"/>
@@ -35,13 +35,13 @@
 
             <CheckBox x:Name="GlobalCheck"
                       Content="Add to global .gitconfig"
-                      Foreground="{StaticResource TextSecondary}"
+                      Foreground="{DynamicResource TextSecondary}"
                       FontSize="12"
                       Margin="0,0,0,16"/>
 
             <!-- Error text -->
             <TextBlock x:Name="ErrorText"
-                       Foreground="{StaticResource AccentDanger}"
+                       Foreground="{DynamicResource AccentDanger}"
                        FontSize="11"
                        Visibility="Collapsed"
                        Margin="0,0,0,8"
@@ -50,9 +50,11 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Cancel" Width="80" Height="30" Margin="0,0,8,0"
                         Click="OnCancel"
+                        IsCancel="True"
                         Style="{StaticResource GhostButton}"/>
                 <Button Content="Add" Width="80" Height="30"
                         Click="OnAdd"
+                        IsDefault="True"
                         Style="{StaticResource PrimaryButton}"/>
             </StackPanel>
 

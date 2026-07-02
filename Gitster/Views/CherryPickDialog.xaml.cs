@@ -49,7 +49,8 @@ public partial class CherryPickDialog : Window
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show(
+            GitsterDialog.Show(
+                this,
                 $"Could not load commits for '{branchName}':\n{ex.Message}",
                 "Gitster", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -70,7 +71,8 @@ public partial class CherryPickDialog : Window
     {
         if (CommitList.SelectedItem is not CherryPickCommitRow row)
         {
-            System.Windows.MessageBox.Show(
+            GitsterDialog.Show(
+                this,
                 "Select a commit to cherry-pick first.",
                 "Gitster", MessageBoxButton.OK, MessageBoxImage.Information);
             return;

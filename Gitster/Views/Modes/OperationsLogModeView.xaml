@@ -5,12 +5,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:conv="clr-namespace:Gitster.Converters"
+             xmlns:controls="clr-namespace:Gitster.Controls"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
     <UserControl.Resources>
         <conv:RelativeTimeConverter x:Key="RelativeTime"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:InverseBoolVisibilityConverter x:Key="InverseBoolToVis"/>
     </UserControl.Resources>
 
     <Grid Margin="16">
@@ -48,14 +50,15 @@
             </ComboBox>
         </StackPanel>
 
-        <!-- Record list -->
-        <ListView Grid.Row="2" x:Name="RecordList"
-                  BorderThickness="0.5"
-                  BorderBrush="{DynamicResource BorderTertiary}"
-                  Background="{DynamicResource BackgroundSecondary}"
-                  SelectionMode="Single">
-            <ListView.View>
-                <GridView>
+        <Grid Grid.Row="2">
+            <!-- Record list -->
+            <ListView x:Name="RecordList"
+                      BorderThickness="0.5"
+                      BorderBrush="{DynamicResource BorderTertiary}"
+                      Background="{DynamicResource BackgroundSecondary}"
+                      SelectionMode="Single">
+                <ListView.View>
+                    <GridView>
                     <GridViewColumn Header="When" Width="100">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
@@ -137,8 +140,14 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                </GridView>
-            </ListView.View>
-        </ListView>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+
+            <controls:EmptyStateControl Icon="U"
+                                        Title="No operations yet"
+                                        Message="Undoable history operations will appear here after you amend, rewrite, stash, merge, or restore."
+                                        Visibility="{Binding HasItems, ElementName=RecordList, Converter={StaticResource InverseBoolToVis}}"/>
+        </Grid>
     </Grid>
 </UserControl>

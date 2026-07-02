@@ -19,8 +19,9 @@ public sealed class CommitHistoryService
     public const int DefaultPageSize = 200;
 
     private readonly IGitBackend _git;
-    private readonly string _cacheRoot;
-    private readonly string _dbPath;
+    private readonly HistoryCacheDb _cacheDb;
+    private readonly IRepositoryReadProvider _repositoryReader;
+    private readonly HistoryCacheValidator _cacheValidator = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<CommitRefLabel>> EmptyRefLabels =
         new Dictionary<string, IReadOnlyList<CommitRefLabel>>(StringComparer.OrdinalIgnoreCase);
@@ -36,10 +37,21 @@ public sealed class CommitHistoryService
     }
 
     public CommitHistoryService(IGitBackend git, string cacheRoot)
+        : this(
+            git,
+            cacheRoot,
+            git as IRepositoryReadProvider ?? new LibGit2RepositoryReadProvider())
+    {
+    }
+
+    internal CommitHistoryService(
+        IGitBackend git,
+        string cacheRoot,
+        IRepositoryReadProvider repositoryReader)
     {
         _git = git;
-        _cacheRoot = cacheRoot;
-        _dbPath = Path.Combine(_cacheRoot, "history.sqlite");
+        _cacheDb = new HistoryCacheDb(cacheRoot);
+        _repositoryReader = repositoryReader;
     }
 
     public Task OpenAsync(
@@ -67,36 +79,28 @@ public sealed class CommitHistoryService
                     "Validating history cache",
                     "Checking cached branch state."));
                 EnsureDatabase();
-                using var repo = new Repository(repoPath);
+                using var repo = OpenRepository(repoPath);
                 var context = BuildContext(repo, scope);
                 using var conn = OpenConnection();
 
                 var existing = GetBranchState(conn, context);
-                UpsertBranch(conn, context, existing?.IsComplete ?? false, existing?.CachedCount ?? 0);
-
-                if (existing != null
+                var historyRowsNeedGraphUpgrade =
+                    existing != null
                     && existing.CachedCount > 0
-                    && HistoryRowsNeedGraphUpgrade(conn, context))
+                    && HistoryRowsNeedGraphUpgrade(conn, context);
+                var decision = _cacheValidator.DecideOpenState(context, existing, historyRowsNeedGraphUpgrade);
+                UpsertBranch(conn, context, decision.InitialIsComplete, decision.InitialCachedCount);
+
+                if (decision.ResetRows)
                 {
                     DeleteRows(conn, context);
                     UpsertBranch(conn, context, isComplete: false, cachedCount: 0);
-                    existing = existing with { IsComplete = false, CachedCount = 0 };
+                    if (existing is not null)
+                        existing = existing with { IsComplete = false, CachedCount = 0 };
                 }
 
-                if (existing != null
-                    && existing.CachedCount > 0
-                    && !string.Equals(existing.HeadSha, context.HeadSha, StringComparison.OrdinalIgnoreCase))
-                {
-                    if (scope == HistoryScope.CurrentBranch)
-                    {
-                        ValidateHeadChange(conn, repo, context, existing, ct, progress);
-                    }
-                    else
-                    {
-                        DeleteRows(conn, context);
-                        UpsertBranch(conn, context, isComplete: false, cachedCount: 0);
-                    }
-                }
+                if (decision.ValidateHeadChange && existing is not null)
+                    ValidateHeadChange(conn, repo, context, existing, ct, progress);
 
                 _context = context;
             }
@@ -127,7 +131,7 @@ public sealed class CommitHistoryService
         try
         {
             var context = RequireContext();
-            using var repo = new Repository(context.RepoPath);
+            using var repo = OpenRepository(context.RepoPath);
             using var conn = OpenConnection();
             EnsureCachedCount(conn, repo, context, offset + count, ct, progress);
             return ReadRows(conn, context, offset, count);
@@ -195,7 +199,7 @@ public sealed class CommitHistoryService
                     return cachedRows;
                 }
 
-                using var repo = new Repository(context.RepoPath);
+                using var repo = OpenRepository(context.RepoPath);
                 var rows = WalkRows(repo, context, int.MaxValue, ct, progress);
                 ReplaceRows(conn, context, rows, isComplete: true);
                 return rows;
@@ -912,11 +916,18 @@ public sealed class CommitHistoryService
 
     private void EnsureDatabase()
     {
-        Directory.CreateDirectory(_cacheRoot);
+        _cacheDb.EnsureDirectory();
+        _cacheDb.RunWithCorruptionReset(EnsureDatabaseCore);
+    }
+
+    private void EnsureDatabaseCore()
+    {
         using var conn = OpenConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA user_version = 2;
 
             CREATE TABLE IF NOT EXISTS history_branches (
                 repo_key TEXT NOT NULL,
@@ -981,17 +992,10 @@ public sealed class CommitHistoryService
     }
 
     private SqliteConnection OpenConnection()
-    {
-        var builder = new SqliteConnectionStringBuilder
-        {
-            DataSource = _dbPath,
-            Mode = SqliteOpenMode.ReadWriteCreate,
-            Cache = SqliteCacheMode.Shared,
-        };
-        var conn = new SqliteConnection(builder.ToString());
-        conn.Open();
-        return conn;
-    }
+        => _cacheDb.OpenConnection();
+
+    private Repository OpenRepository(string repoPath)
+        => _repositoryReader.OpenRepository(repoPath);
 
     private static string Serialize<T>(IReadOnlyList<T> values) =>
         JsonSerializer.Serialize(values);
@@ -1022,18 +1026,4 @@ public sealed class CommitHistoryService
         return sb.ToString();
     }
 
-    private sealed record HistoryContext(
-        string RepoKey,
-        string RepoPath,
-        string GitDir,
-        string BranchName,
-        string HeadSha,
-        string? UpstreamSha,
-        HistoryScope Scope);
-
-    private sealed record BranchState(
-        string HeadSha,
-        string? UpstreamSha,
-        bool IsComplete,
-        int CachedCount);
 }

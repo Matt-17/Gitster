@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
 using Gitster.Services;
+using Gitster.Services.Features;
 using Gitster.Services.Git;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
@@ -119,6 +120,27 @@ public partial class BranchesViewModel : BaseViewModel
     public bool CanDelete       => SelectedBranch is { IsCurrent: false, IsRemote: false };
     public bool SortByDateActive => !SortByName;
     public bool SortByNameActive => SortByName;
+
+    public BranchesViewModel(
+        IGitBackend              git,
+        OperationFeedbackService feedback,
+        OperationsLogService     opsLog,
+        SnapshotService          snapshots,
+        SourceArchiveService     archiveService,
+        UiPreferencesService     ui,
+        IWindowService?          windowService,
+        RepositoryCommandContext commandContext)
+        : this(
+            git,
+            feedback,
+            opsLog,
+            snapshots,
+            archiveService,
+            ui,
+            windowService,
+            commandContext.RefreshSidebarBadges)
+    {
+    }
 
     public BranchesViewModel(
         IGitBackend              git,
@@ -275,6 +297,9 @@ public partial class BranchesViewModel : BaseViewModel
     [RelayCommand]
     private void SortByNameToggle() => SortByName = true;
 
+    [RelayCommand]
+    private void ClearFilter() => FilterText = string.Empty;
+
     [RelayCommand(CanExecute = nameof(CanCheckout))]
     private Task Checkout() => SelectedBranch is { } row ? CheckoutRowAsync(row) : Task.CompletedTask;
 
@@ -383,7 +408,11 @@ public partial class BranchesViewModel : BaseViewModel
         catch (Exception ex)
         {
             if (ex.Message.Contains("produced conflicts", StringComparison.OrdinalIgnoreCase))
+            {
                 await AfterChangeAsync();
+                await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Merge", ex);
+                return;
+            }
 
             _windowService.Warning(ex.Message, "Merge failed");
         }

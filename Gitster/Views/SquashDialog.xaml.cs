@@ -32,7 +32,8 @@ public partial class SquashDialog : Window
     {
         if (string.IsNullOrWhiteSpace(MessageBox.Text))
         {
-            System.Windows.MessageBox.Show(
+            GitsterDialog.Show(
+                this,
                 "A commit message cannot be empty.",
                 "Gitster", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;

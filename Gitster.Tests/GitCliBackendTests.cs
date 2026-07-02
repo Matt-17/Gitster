@@ -46,6 +46,56 @@ public sealed class GitCliBackendTests
     }
 
     [TestMethod]
+    public async Task FixupCommitIntoCommit_FoldsNewerCommitIntoOlderTarget()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var target = repo.Commit("target", "target.txt", "target");
+        repo.Commit("middle", "middle.txt", "middle");
+        var source = repo.Commit("source", "source.txt", "source");
+
+        var backend = new GitCliBackend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.FixupCommitIntoCommitAsync(source, target);
+
+        Assert.AreEqual(3, repo.CommitCount(), "source should be folded into target");
+        Assert.IsFalse(repo.IsRebaseInProgress(), "no rebase state should remain after a clean fixup");
+        CollectionAssert.Contains(AllMessages(repo), "target");
+        CollectionAssert.DoesNotContain(AllMessages(repo), "source");
+        Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(repo.Path, "source.txt")));
+
+        using var check = new Repository(repo.Path);
+        Assert.IsFalse(check.RetrieveStatus().IsDirty, "fixup must leave the working tree clean");
+    }
+
+    [TestMethod]
+    public async Task GitCli_RunAsync_EmitsCompletionTelemetry()
+    {
+        await EnsureGitAsync();
+        GitCliLogEventArgs? observed = null;
+        void Handler(object? sender, GitCliLogEventArgs args) => observed = args;
+
+        GitCli.Completed += Handler;
+        try
+        {
+            var result = await GitCli.RunAsync(null, ["--version"]);
+
+            Assert.IsTrue(result.Success);
+            Assert.IsNotNull(observed);
+            Assert.AreEqual("--version", observed!.Verb);
+            Assert.IsFalse(observed.TimedOut);
+            Assert.IsFalse(observed.Canceled);
+            Assert.AreEqual(0, observed.ExitCode);
+        }
+        finally
+        {
+            GitCli.Completed -= Handler;
+        }
+    }
+
+    [TestMethod]
     public async Task Fixup_OnConflict_AbortsAndRestoresPreOpStateWithChangesStaged()
     {
         await EnsureGitAsync();

@@ -3,7 +3,7 @@ using Gitster.Services.Git.LibGit2;
 
 namespace Gitster.Services.Git;
 
-public sealed class LibGit2Backend : IGitBackend
+public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
 {
     private readonly LibGit2RepositoryContext _context = new();
     private readonly LibGit2HistoryReader _history;
@@ -36,6 +36,14 @@ public sealed class LibGit2Backend : IGitBackend
         | GitCapabilities.ReflogUndo | GitCapabilities.StashManagement;
 
     public Task OpenAsync(string path) => _context.OpenAsync(path);
+
+    public LibGit2Sharp.Repository OpenRepository(string repoPath)
+    {
+        if (string.Equals(RepositoryPath, repoPath, StringComparison.OrdinalIgnoreCase))
+            return _context.OpenRepository();
+
+        return new LibGit2Sharp.Repository(repoPath);
+    }
 
     public Task<WorkingTreeState> GetWorkingTreeStateAsync() => _workingTree.GetWorkingTreeStateAsync();
 
@@ -80,16 +88,16 @@ public sealed class LibGit2Backend : IGitBackend
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null)
         => _rewrite.RemoveFileChangeFromCommitAsync(sha, path, branchName);
 
-    public Task FetchAsync(string remoteName = "origin")
+    public Task FetchAsync(string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(FetchAsync));
 
-    public Task PullAsync(string remoteName = "origin")
+    public Task PullAsync(string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PullAsync));
 
-    public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
+    public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushAsync));
 
-    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushThroughCommitAsync));
 
     public Task<string> GetReflogSelectorForHeadAsync() => _rewrite.GetReflogSelectorForHeadAsync();
@@ -117,7 +125,7 @@ public sealed class LibGit2Backend : IGitBackend
 
     public Task<IReadOnlyList<string>> GetTagsForCommitAsync(string sha) => _history.GetTagsForCommitAsync(sha);
 
-    public Task PushTagAsync(string tagName, string remoteName = "origin")
+    public Task PushTagAsync(string tagName, string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushTagAsync));
 
     public Task RevertCommitAsync(string sha) => _rewrite.RevertCommitAsync(sha);
@@ -148,6 +156,9 @@ public sealed class LibGit2Backend : IGitBackend
     public Task FixupIntoCommitAsync(string targetSha)
         => throw new NotSupportedException("Route through HybridGitBackend.");
 
+    public Task FixupCommitIntoCommitAsync(string sourceSha, string targetSha)
+        => throw new NotSupportedException("Route through HybridGitBackend.");
+
     public Task RewordCommitAsync(string sha, string newMessage)
         => _rewrite.RewordCommitAsync(sha, newMessage);
 
@@ -156,6 +167,26 @@ public sealed class LibGit2Backend : IGitBackend
         string combinedMessage,
         DateTimeOffset? overrideDate)
         => _rewrite.SquashCommitsHeadAsync(shas, combinedMessage, overrideDate);
+
+    public Task ReorderCommitsAsync(
+        IReadOnlyList<string> shasNewestFirst,
+        IReadOnlyList<string> reorderedShasNewestFirst,
+        string? branchName = null)
+        => _rewrite.ReorderCommitsAsync(shasNewestFirst, reorderedShasNewestFirst, branchName);
+
+    public Task SplitCommitAsync(
+        string sha,
+        IReadOnlyList<string> firstCommitPaths,
+        string firstMessage,
+        string secondMessage,
+        string? branchName = null)
+        => _rewrite.SplitCommitAsync(sha, firstCommitPaths, firstMessage, secondMessage, branchName);
+
+    public Task<string> CreateOrphanBranchAsync(string branchName, bool commitCurrentTree)
+        => _rewrite.CreateOrphanBranchAsync(branchName, commitCurrentTree);
+
+    public Task<string> RescueDetachedHeadAsync(string branchName)
+        => _rewrite.RescueDetachedHeadAsync(branchName);
 
     public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)
         => _rewrite.AreCommitsContiguousAsync(shas);

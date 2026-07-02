@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Services.Git;
+using Gitster.Services.Features;
 using Gitster.Services.History;
 
 namespace Gitster;
@@ -134,6 +135,32 @@ public partial class CommitItem : ObservableObject
 
     [ObservableProperty]
     public partial string HistoryEditTooltip { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSigningBadge))]
+    [NotifyPropertyChangedFor(nameof(SigningBadgeText))]
+    [NotifyPropertyChangedFor(nameof(SigningBadgeTooltip))]
+    public partial CommitSigningStatus SigningStatus { get; set; } = CommitSigningStatus.Unknown;
+
+    public bool HasSigningBadge => SigningStatus != CommitSigningStatus.Unknown;
+
+    public string SigningBadgeText => SigningStatus switch
+    {
+        CommitSigningStatus.Good => "S",
+        CommitSigningStatus.Bad => "!",
+        CommitSigningStatus.Untrusted => "?",
+        CommitSigningStatus.NoSignature => "∅",
+        _ => string.Empty,
+    };
+
+    public string SigningBadgeTooltip => SigningStatus switch
+    {
+        CommitSigningStatus.Good => "Signature verified",
+        CommitSigningStatus.Bad => "Bad signature",
+        CommitSigningStatus.Untrusted => "Signature key is untrusted",
+        CommitSigningStatus.NoSignature => "No commit signature",
+        _ => string.Empty,
+    };
 
     public void ClearHistoryEditOverlay()
     {

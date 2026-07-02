@@ -1,5 +1,6 @@
 using Gitster.Services.Git;
 using Gitster.Services.History;
+using System.Diagnostics;
 
 namespace Gitster.Tests;
 
@@ -91,6 +92,25 @@ public sealed class CommitGraphLayoutServiceTests
         Assert.IsTrue(rows.Values.All(r => r.NodeColorIndex >= 0));
         Assert.IsTrue(rows.Values.All(r => r.NodeColorIndex < CommitGraphPalette.Count));
         Assert.AreEqual(rows["c0"].NodeColorIndex, rows[$"c{CommitGraphPalette.Count}"].NodeColorIndex);
+    }
+
+    [TestMethod]
+    public void Layout_SyntheticFiftyThousandCommits_StaysWithinBudget()
+    {
+        var nodes = new List<CommitGraphNode>(50_000);
+        for (var i = 49_999; i >= 0; i--)
+        {
+            var sha = $"c{i}";
+            var parents = i == 0 ? [] : new[] { $"c{i - 1}" };
+            nodes.Add(new CommitGraphNode(sha, parents, Array.Empty<CommitRefLabel>()));
+        }
+
+        var sw = Stopwatch.StartNew();
+        var rows = new CommitGraphLayoutService().Layout(nodes);
+        sw.Stop();
+
+        Assert.AreEqual(50_000, rows.Count);
+        Assert.IsTrue(sw.ElapsedMilliseconds < 5_000, $"Graph layout took {sw.ElapsedMilliseconds} ms.");
     }
 
     private static IReadOnlyDictionary<string, CommitGraphRow> Layout(params CommitGraphNode[] nodes) =>

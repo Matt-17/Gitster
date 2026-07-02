@@ -22,7 +22,7 @@ public partial class SnapshotBranchDialog : Window
     {
         if (string.IsNullOrWhiteSpace(NameBox.Text))
         {
-            System.Windows.MessageBox.Show("Enter a branch name.", "Snapshot to branch",
+            GitsterDialog.Show(this, "Enter a branch name.", "Snapshot to branch",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }

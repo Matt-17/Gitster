@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
 using Gitster.Services;
+using Gitster.Services.Features;
 using Gitster.Services.Git;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
@@ -112,6 +113,25 @@ public partial class StashesViewModel : BaseViewModel
     partial void OnDiffLoadingChanged(bool value) => OnPropertyChanged(nameof(DiffHeaderDisplay));
 
     // ── Constructor ────────────────────────────────────────────────────────
+
+    public StashesViewModel(
+        IGitBackend git,
+        OperationFeedbackService feedbackService,
+        OperationsLogService opsLogService,
+        SnapshotService snapshotService,
+        StashNameService nameService,
+        IWindowService? windowService,
+        RepositoryCommandContext commandContext)
+        : this(
+            git,
+            feedbackService,
+            opsLogService,
+            snapshotService,
+            nameService,
+            windowService,
+            commandContext.RefreshSidebarBadges)
+    {
+    }
 
     public StashesViewModel(
         IGitBackend git,
@@ -253,6 +273,7 @@ public partial class StashesViewModel : BaseViewModel
 
         try
         {
+            _ = _snapshotService.CaptureAsync(_git, "Create stash");
             await _feedbackService.RunAsync("Stash",
                 () => _git.CreateStashAsync(dialog.StashMessage, dialog.IncludeUntracked));
             await LoadAsync();
@@ -270,13 +291,18 @@ public partial class StashesViewModel : BaseViewModel
     private async Task Apply()
     {
         if (SelectedStash is not { } stash) return;
+        _ = _snapshotService.CaptureAsync(_git, $"Apply {stash.Ref}");
         try
         {
             await _feedbackService.RunAsync("Apply stash",
                 () => _git.ApplyStashAsync(stash.Info.Index));
+            await _onStashesChanged();
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Apply stash", ex))
+                return;
+
             _windowService.Warning(ex.Message, "Apply failed");
         }
     }
@@ -310,6 +336,9 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Pop stash", ex))
+                return;
+
             _windowService.Warning(ex.Message, "Pop failed");
         }
     }
@@ -423,6 +452,9 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Convert stash", ex))
+                return;
+
             _windowService.Warning(ex.Message, "Convert failed");
         }
     }

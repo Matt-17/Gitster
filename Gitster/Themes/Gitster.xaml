@@ -3,28 +3,12 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!-- ── Colours ────────────────────────────────────────────────── -->
-    <SolidColorBrush x:Key="BackgroundPrimary"    Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="BackgroundSecondary"  Color="#F5F5F5"/>
-    <SolidColorBrush x:Key="BorderTertiary"       Color="#E0E0E0"/>
-    <SolidColorBrush x:Key="BorderSecondary"      Color="#BDBDBD"/>
-    <SolidColorBrush x:Key="WindowBorderBrush"    Color="#8A8A8A"/>
-    <SolidColorBrush x:Key="TextPrimary"          Color="#1A1A1A"/>
-    <SolidColorBrush x:Key="TextSecondary"        Color="#555555"/>
-    <SolidColorBrush x:Key="TextTertiary"         Color="#9E9E9E"/>
-    <SolidColorBrush x:Key="AccentBlue"           Color="#007ACC"/>
-    <SolidColorBrush x:Key="AccentBlueBackground" Color="#CCE4F7"/>
-    <SolidColorBrush x:Key="AccentWarning"           Color="#D97706"/>
-    <SolidColorBrush x:Key="AccentSuccess"           Color="#16A34A"/>
-    <SolidColorBrush x:Key="AccentDanger"            Color="#DC2626"/>
-    <SolidColorBrush x:Key="AccentWarningBackground" Color="#FEF3C7"/>
-    <SolidColorBrush x:Key="AccentDangerBackground"  Color="#FEE2E2"/>
-    <SolidColorBrush x:Key="AccentSuccessBackground" Color="#DCFCE7"/>
-    <SolidColorBrush x:Key="AccentInfoBackground"    Color="#DBEAFE"/>
-    <SolidColorBrush x:Key="IncomingHeaderBackground" Color="#F7FBFF"/>
-    <SolidColorBrush x:Key="OutgoingHeaderBackground" Color="#FFFCF2"/>
-    <SolidColorBrush x:Key="SoftDisabledBackground"   Color="#FAFAFA"/>
 
     <!-- ── Spacing ────────────────────────────────────────────────── -->
+    <sys:Double  x:Key="Space4">4</sys:Double>
+    <sys:Double  x:Key="Space8">8</sys:Double>
+    <sys:Double  x:Key="Space12">12</sys:Double>
+    <sys:Double  x:Key="Space16">16</sys:Double>
     <sys:Double  x:Key="PaddingSm">6</sys:Double>
     <sys:Double  x:Key="PaddingMd">10</sys:Double>
     <sys:Double  x:Key="PaddingLg">14</sys:Double>
@@ -41,6 +25,9 @@
     <!-- ── Typography ────────────────────────────────────────────── -->
     <FontFamily x:Key="FontFamilyUi">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="FontFamilyMono">Cascadia Mono, JetBrains Mono, Consolas</FontFamily>
+    <sys:Double x:Key="FontSizeSmall">11</sys:Double>
+    <sys:Double x:Key="FontSizeBase">12</sys:Double>
+    <sys:Double x:Key="FontSizeHeader">16</sys:Double>
 
     <Style x:Key="GitsterTextBox" TargetType="{x:Type TextBox}">
         <Setter Property="Background" Value="{DynamicResource BackgroundPrimary}"/>

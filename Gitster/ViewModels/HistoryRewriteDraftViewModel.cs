@@ -49,6 +49,24 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         OperationsLogService opsLog,
         SnapshotService snapshots,
         IWindowService windowService,
+        RepositoryCommandContext commandContext)
+        : this(
+            git,
+            feedback,
+            opsLog,
+            snapshots,
+            windowService,
+            () => commandContext.CurrentBranch,
+            commandContext.RefreshAfterHistoryRewrite)
+    {
+    }
+
+    public HistoryRewriteDraftViewModel(
+        IGitBackend git,
+        OperationFeedbackService feedback,
+        OperationsLogService opsLog,
+        SnapshotService snapshots,
+        IWindowService windowService,
         Func<string?> getBranchName,
         Func<string?, Task> refreshAfterApply)
     {

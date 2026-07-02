@@ -25,12 +25,21 @@
         </Grid.ColumnDefinitions>
 
         <!-- Left: commit list -->
-        <controls:CommitListView Grid.Column="0" DataContext="{Binding CommitListVM}"/>
+        <Grid Grid.Column="0">
+            <controls:CommitListView DataContext="{Binding CommitListVM}"
+                                     Visibility="{Binding CommitListVM.HasItems, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <controls:EmptyStateControl Icon="+"
+                                        Title="No commits yet"
+                                        Message="Set your Git identity, add a .gitignore template if needed, then create the first commit from the commit panel."
+                                        ActionText="Open commit panel"
+                                        ActionCommand="{Binding OpenCommitPanelCommand}"
+                                        Visibility="{Binding ShowEmptyCommitList, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        </Grid>
 
         <!-- Splitter -->
         <GridSplitter Grid.Column="1"
                       HorizontalAlignment="Stretch"
-                      Background="{StaticResource BorderTertiary}"
+                      Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="CommitsMode.ActionPanelWidth"
                       helper:PersistedGridSplitter.DefinitionKind="Column"

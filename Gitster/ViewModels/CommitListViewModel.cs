@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
 using Gitster.Services.Git;
+using Gitster.Services.Features;
 using Gitster.Services.History;
 using Gitster.Services.Search;
 
@@ -26,6 +27,7 @@ public partial class CommitListViewModel : BaseViewModel
 
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
+    private readonly GitFeatureService _features;
     private readonly CommitGraphLayoutService _graphLayout = new();
 
     /// <summary>Shared UI preferences (date display mode, gravatar) for row bindings.</summary>
@@ -44,10 +46,12 @@ public partial class CommitListViewModel : BaseViewModel
     public CommitListViewModel(
         IGitBackend git,
         CommitHistoryService history,
-        Gitster.Services.UiPreferencesService ui)
+        Gitster.Services.UiPreferencesService ui,
+        GitFeatureService? features = null)
     {
         _git = git;
         _history = history;
+        _features = features ?? new GitFeatureService();
         Ui = ui;
     }
 
@@ -59,7 +63,12 @@ public partial class CommitListViewModel : BaseViewModel
     {
         SelectParentCommitCommand.NotifyCanExecuteChanged();
         SelectChildCommitCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(IsEmpty));
     }
+
+    public bool HasItems => Items.Count > 0;
+    public bool IsEmpty => !HistoryLoading && Items.Count == 0;
 
     [ObservableProperty]
     public partial double GraphColumnWidth { get; set; } = GraphColumnMinWidth;
@@ -88,6 +97,45 @@ public partial class CommitListViewModel : BaseViewModel
     }
 
     public Func<DiffFileEntry?, Task>? RemoveChangeFromCommitAsync { get; set; }
+    public Func<CommitItem, CommitItem, Task>? FixupDroppedCommitAsync { get; set; }
+
+    public static bool CanDropCommitForFixup(
+        CommitItem? source,
+        CommitItem? target,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (source is null || target is null)
+        {
+            reason = "Drag one commit onto another commit.";
+            return false;
+        }
+
+        if (source.FullSha.Equals(target.FullSha, StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "Choose two different commits.";
+            return false;
+        }
+
+        if (source.RemoteState == CommitRemoteState.Incoming || target.RemoteState == CommitRemoteState.Incoming)
+        {
+            reason = "Incoming commits must be pulled or cherry-picked before fixup.";
+            return false;
+        }
+
+        if (source.RemoteState == CommitRemoteState.OnRemote || target.RemoteState == CommitRemoteState.OnRemote)
+        {
+            reason = "Synced commits are blocked because fixup rewrites published history.";
+            return false;
+        }
+
+        return true;
+    }
+
+    public Task DropCommitForFixupAsync(CommitItem source, CommitItem target) =>
+        FixupDroppedCommitAsync is null
+            ? Task.CompletedTask
+            : FixupDroppedCommitAsync(source, target);
 
     [RelayCommand(CanExecute = nameof(CanRemoveChangeFromCommit))]
     private async Task RemoveChangeFromCommit(DiffFileEntry? file)
@@ -164,6 +212,8 @@ public partial class CommitListViewModel : BaseViewModel
         RemoveChangeFromCommitCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnHistoryLoadingChanged(bool value) => OnPropertyChanged(nameof(IsEmpty));
+
     public void UpdateDiff(string header, List<DiffFileEntry> files,
         CommitRemoteState remoteState = CommitRemoteState.LocalOnly)
     {
@@ -204,6 +254,7 @@ public partial class CommitListViewModel : BaseViewModel
             if (ct.IsCancellationRequested) return;
 
             var newAllRows = rows.Select(r => r.ToCommitItem()).ToList();
+            await ApplySigningStatusesAsync(newAllRows, ct);
 
             RemoteSets sets = RemoteSets.Empty;
             var newIncomingRows = new List<CommitItem>();
@@ -219,6 +270,7 @@ public partial class CommitListViewModel : BaseViewModel
                 await _history.ApplyRemoteSetsAsync(sets, ct);
                 ApplyRemoteSets(sets, newAllRows);
                 newIncomingRows = sets.Incoming.Select(ToItem).ToList();
+                await ApplySigningStatusesAsync(newIncomingRows, ct);
             }
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -393,6 +445,29 @@ public partial class CommitListViewModel : BaseViewModel
         info.OrphanedPairSha,
         info.ParentShas,
         info.RefLabels);
+
+    private async Task ApplySigningStatusesAsync(IReadOnlyList<CommitItem> rows, CancellationToken ct)
+    {
+        if (rows.Count == 0 || string.IsNullOrWhiteSpace(_git.RepositoryPath) || !GitCli.IsAvailable)
+            return;
+
+        try
+        {
+            var statuses = await _features.GetSigningStatusesAsync(
+                _git.RepositoryPath,
+                rows.Select(r => r.FullSha).Distinct(StringComparer.OrdinalIgnoreCase).Take(500).ToList(),
+                ct);
+
+            foreach (var row in rows)
+                if (statuses.TryGetValue(row.FullSha, out var status))
+                    row.SigningStatus = status;
+        }
+        catch
+        {
+            foreach (var row in rows)
+                row.SigningStatus = CommitSigningStatus.Unknown;
+        }
+    }
 
     private void ApplyRemoteSets(RemoteSets sets, IEnumerable<CommitItem> rows)
     {

@@ -55,6 +55,100 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task ReorderCommits_IndependentContiguousRange_PreservesTipTree()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var c2 = repo.Commit("c2", "a.txt", "a");
+        var c3 = repo.Commit("c3", "b.txt", "b");
+        var c4 = repo.Commit("c4", "c.txt", "c");
+        string originalTree;
+        using (var r = new Repository(repo.Path))
+            originalTree = r.Head.Tip!.Tree.Sha;
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.ReorderCommitsAsync(
+            [c4, c3, c2],
+            [c4, c2, c3]);
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(originalTree, check.Head.Tip!.Tree.Sha);
+        CollectionAssert.AreEqual(
+            new[] { "c4", "c2", "c3", "base" },
+            FirstParentMessages(check.Head.Tip!, 4).ToArray());
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    [TestMethod]
+    public async Task SplitCommit_FileLevelSplit_ReplaysDescendantsAndPreservesTipTree()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var target = CommitFiles(repo.Path, "combined", ("a.txt", "a"), ("b.txt", "b"));
+        repo.Commit("descendant", "c.txt", "c");
+        string originalTree;
+        using (var r = new Repository(repo.Path))
+            originalTree = r.Head.Tip!.Tree.Sha;
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.SplitCommitAsync(target, ["a.txt"], "part a", "part b");
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(originalTree, check.Head.Tip!.Tree.Sha);
+        CollectionAssert.AreEqual(
+            new[] { "descendant", "part b", "part a", "base" },
+            FirstParentMessages(check.Head.Tip!, 4).ToArray());
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    [TestMethod]
+    public async Task CreateOrphanBranch_CurrentTree_CreatesParentlessBranch()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        repo.Commit("tip", "tip.txt", "tip");
+        string originalTree;
+        using (var r = new Repository(repo.Path))
+            originalTree = r.Head.Tip!.Tree.Sha;
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var branch = await backend.CreateOrphanBranchAsync("orphan/snapshot", commitCurrentTree: true);
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual("orphan/snapshot", branch);
+        Assert.AreEqual("orphan/snapshot", check.Head.FriendlyName);
+        Assert.AreEqual(0, check.Head.Tip!.Parents.Count());
+        Assert.AreEqual(originalTree, check.Head.Tip.Tree.Sha);
+    }
+
+    [TestMethod]
+    public async Task RescueDetachedHead_CreatesBranchAtDetachedHead()
+    {
+        using var repo = new GitTestRepo();
+        var first = repo.Commit("first", "a.txt", "1");
+        repo.Commit("second", "b.txt", "2");
+        using (var r = new Repository(repo.Path))
+            Commands.Checkout(r, r.Lookup<Commit>(first)!);
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var branch = await backend.RescueDetachedHeadAsync("rescue/first");
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual("rescue/first", branch);
+        Assert.IsFalse(check.Info.IsHeadDetached);
+        Assert.AreEqual("rescue/first", check.Head.FriendlyName);
+        Assert.AreEqual(first, check.Head.Tip!.Sha);
+    }
+
+    [TestMethod]
     public async Task CherryPick_Conflict_AbortsAndLeavesWorkingTreeClean()
     {
         using var repo = new GitTestRepo();
@@ -623,6 +717,29 @@ public sealed class LibGit2BackendTests
         Assert.AreEqual(currentBranch, check.Head.FriendlyName);
         Assert.AreEqual(beforeHead, check.Head.Tip!.Sha);
         Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    private static string CommitFiles(string repoPath, string message, params (string Path, string Content)[] files)
+    {
+        using var repo = new Repository(repoPath);
+        foreach (var file in files)
+        {
+            System.IO.File.WriteAllText(System.IO.Path.Combine(repoPath, file.Path), file.Content);
+            Commands.Stage(repo, file.Path);
+        }
+
+        var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+        return repo.Commit(message, sig, sig).Sha;
+    }
+
+    private static IEnumerable<string> FirstParentMessages(Commit tip, int maxCount)
+    {
+        Commit? current = tip;
+        for (var i = 0; current is not null && i < maxCount; i++)
+        {
+            yield return current.MessageShort;
+            current = current.Parents.FirstOrDefault();
+        }
     }
 
     private static async Task AssertLocalOnlyAsync(Func<Task> operation)

@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
+             xmlns:controls="clr-namespace:Gitster.Controls"
              xmlns:converters="clr-namespace:Gitster.Converters"
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
@@ -21,10 +22,10 @@
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"
                     Visibility="{Binding IsCliAvailable, Converter={StaticResource InverseBoolVis}}">
             <TextBlock Text="Worktrees require the Git command-line tool"
-                       FontSize="15" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                       FontSize="15" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center"/>
             <TextBlock Text="Install Git for Windows and restart Gitster to use worktrees."
                        FontSize="12" Margin="0,6,0,0"
-                       Foreground="{StaticResource TextTertiary}" HorizontalAlignment="Center"/>
+                       Foreground="{DynamicResource TextTertiary}" HorizontalAlignment="Center"/>
         </StackPanel>
 
         <!-- Main layout (CLI available) -->
@@ -48,7 +49,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="Worktrees" FontSize="13" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button Content="Prune…" Style="{StaticResource GhostButton}" Padding="10,4"
                                 Margin="0,0,4,0" Command="{Binding PruneCommand}"
@@ -58,11 +59,13 @@
                     </StackPanel>
                 </Grid>
 
-                <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5"
-                            Visibility="{Binding HasWorktrees, Converter={StaticResource InverseBoolVis}}">
-                    <TextBlock Text="No worktrees" FontSize="15"
-                               Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                </StackPanel>
+                <controls:EmptyStateControl Grid.Row="1"
+                                            Icon="W"
+                                            Title="No linked worktrees"
+                                            Message="Create another checkout of this repository for parallel branch work."
+                                            ActionText="Add worktree"
+                                            ActionCommand="{Binding AddCommand}"
+                                            Visibility="{Binding HasWorktrees, Converter={StaticResource InverseBoolVis}}"/>
 
                 <ListView Grid.Row="1"
                           ItemsSource="{Binding Worktrees}"
@@ -87,33 +90,33 @@
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="6" Height="6" Margin="0,0,6,0" VerticalAlignment="Center"
-                                                 Fill="{StaticResource AccentBlue}"
+                                                 Fill="{DynamicResource AccentBlue}"
                                                  Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
                                         <TextBlock Text="{Binding BranchName}" FontSize="13"
-                                                   Foreground="{StaticResource TextPrimary}"
+                                                   Foreground="{DynamicResource TextPrimary}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                     <TextBlock Text="{Binding Path}" FontSize="11"
                                                FontFamily="{StaticResource FontFamilyMono}"
-                                               Foreground="{StaticResource TextTertiary}"
+                                               Foreground="{DynamicResource TextTertiary}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border CornerRadius="3" Padding="5,1" Margin="3,0,0,0"
-                                            Background="{StaticResource AccentInfoBackground}"
+                                            Background="{DynamicResource AccentInfoBackground}"
                                             Visibility="{Binding IsMain, Converter={StaticResource BoolVis}}">
-                                        <TextBlock Text="main" FontSize="10" Foreground="{StaticResource AccentBlue}"/>
+                                        <TextBlock Text="main" FontSize="10" Foreground="{DynamicResource AccentBlue}"/>
                                     </Border>
                                     <Border CornerRadius="3" Padding="5,1" Margin="3,0,0,0"
-                                            Background="{StaticResource AccentWarningBackground}"
+                                            Background="{DynamicResource AccentWarningBackground}"
                                             Visibility="{Binding IsLocked, Converter={StaticResource BoolVis}}">
-                                        <TextBlock Text="locked" FontSize="10" Foreground="{StaticResource AccentWarning}"/>
+                                        <TextBlock Text="locked" FontSize="10" Foreground="{DynamicResource AccentWarning}"/>
                                     </Border>
                                     <Border CornerRadius="3" Padding="5,1" Margin="3,0,0,0"
-                                            Background="{StaticResource AccentDangerBackground}"
+                                            Background="{DynamicResource AccentDangerBackground}"
                                             Visibility="{Binding IsPrunable, Converter={StaticResource BoolVis}}">
-                                        <TextBlock Text="missing" FontSize="10" Foreground="{StaticResource AccentDanger}"/>
+                                        <TextBlock Text="missing" FontSize="10" Foreground="{DynamicResource AccentDanger}"/>
                                     </Border>
                                 </StackPanel>
                             </Grid>
@@ -123,7 +126,7 @@
             </Grid>
 
             <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
-                          Background="{StaticResource BorderTertiary}"
+                          Background="{DynamicResource BorderTertiary}"
                           ResizeBehavior="PreviousAndNext"
                           helper:PersistedGridSplitter.Key="WorktreesMode.DetailPanelWidth"
                           helper:PersistedGridSplitter.DefinitionKind="Column"
@@ -133,7 +136,7 @@
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="10">
                 <StackPanel>
                     <TextBlock Text="Select a worktree"
-                               FontSize="13" Foreground="{StaticResource TextTertiary}"
+                               FontSize="13" Foreground="{DynamicResource TextTertiary}"
                                HorizontalAlignment="Center" Margin="0,40,0,0"
                                Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVis}}"/>
 
@@ -142,14 +145,14 @@
                             <StackPanel>
                                 <TextBlock Text="{Binding SelectedWorktree.BranchName}"
                                            FontSize="14" FontWeight="Medium"
-                                           Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                                           Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap"/>
                                 <TextBlock Text="{Binding SelectedWorktree.Path}"
                                            FontSize="11" FontFamily="{StaticResource FontFamilyMono}"
-                                           Foreground="{StaticResource TextSecondary}"
+                                           Foreground="{DynamicResource TextSecondary}"
                                            TextWrapping="Wrap" Margin="0,4,0,0"/>
                                 <TextBlock Text="{Binding SelectedWorktree.ShortSha}"
                                            FontSize="11" FontFamily="{StaticResource FontFamilyMono}"
-                                           Foreground="{StaticResource TextTertiary}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource TextTertiary}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
 
@@ -170,7 +173,7 @@
                             <Button Grid.Column="2" Content="Remove"
                                     Style="{StaticResource GhostButton}"
                                     Command="{Binding RemoveCommand}"
-                                    Foreground="{StaticResource AccentDanger}" HorizontalAlignment="Stretch"/>
+                                    Foreground="{DynamicResource AccentDanger}" HorizontalAlignment="Stretch"/>
                         </Grid>
                     </StackPanel>
                 </StackPanel>

@@ -30,4 +30,10 @@ public partial class OperationProgressWindow : Window
 
         e.Cancel = true;
     }
+
+    private void Cancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is OperationProgressViewModel viewModel)
+            viewModel.Cancel();
+    }
 }

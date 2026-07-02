@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 
 namespace Gitster.Services.Git;
 
@@ -8,8 +9,11 @@ namespace Gitster.Services.Git;
 /// </summary>
 public static class GitCli
 {
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
+
     public static bool IsAvailable { get; private set; }
     public static string? Version { get; private set; }
+    public static event EventHandler<GitCliLogEventArgs>? Completed;
 
     static GitCli() => _ = DetectAsync();
 
@@ -33,19 +37,22 @@ public static class GitCli
         string? workDir,
         string args,
         Dictionary<string, string>? env = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        TimeSpan? timeout = null)
     {
         var psi = new ProcessStartInfo("git", args)
         {
             WorkingDirectory        = workDir ?? Environment.CurrentDirectory,
             RedirectStandardOutput  = true,
             RedirectStandardError   = true,
+            StandardOutputEncoding  = Encoding.UTF8,
+            StandardErrorEncoding   = Encoding.UTF8,
             UseShellExecute         = false,
             CreateNoWindow          = true,
         };
 
         var verb = args.Split(' ', 2)[0];
-        return await RunProcessAsync(psi, verb, env, ct);
+        return await RunProcessAsync(psi, verb, env, ct, timeout);
     }
 
     /// <summary>
@@ -56,7 +63,8 @@ public static class GitCli
         string? workDir,
         IReadOnlyList<string> args,
         Dictionary<string, string>? env = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        TimeSpan? timeout = null)
     {
         if (args.Count == 0)
             throw new ArgumentException("At least one Git argument is required.", nameof(args));
@@ -66,6 +74,8 @@ public static class GitCli
             WorkingDirectory        = workDir ?? Environment.CurrentDirectory,
             RedirectStandardOutput  = true,
             RedirectStandardError   = true,
+            StandardOutputEncoding  = Encoding.UTF8,
+            StandardErrorEncoding   = Encoding.UTF8,
             UseShellExecute         = false,
             CreateNoWindow          = true,
         };
@@ -73,24 +83,28 @@ public static class GitCli
         foreach (var arg in args)
             psi.ArgumentList.Add(arg);
 
-        return await RunProcessAsync(psi, args[0], env, ct);
+        return await RunProcessAsync(psi, args[0], env, ct, timeout);
     }
 
     private static async Task<GitResult> RunProcessAsync(
         ProcessStartInfo psi,
         string verb,
         Dictionary<string, string>? env,
-        CancellationToken ct)
+        CancellationToken ct,
+        TimeSpan? timeout)
     {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        linkedCts.CancelAfter(TimeSpan.FromSeconds(60));
+        var effectiveTimeout = timeout ?? DefaultTimeout;
+        linkedCts.CancelAfter(effectiveTimeout);
         var token = linkedCts.Token;
 
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
         if (env != null)
             foreach (var (k, v) in env)
                 psi.Environment[k] = v;
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = false };
+        var started = Stopwatch.StartNew();
         process.Start();
 
         // Read both streams concurrently so neither buffer can fill and deadlock the
@@ -108,16 +122,43 @@ public static class GitCli
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { /* best-effort */ }
             try { await Task.WhenAll(stdoutTask, stderrTask); } catch { /* drain */ }
+            started.Stop();
 
             if (ct.IsCancellationRequested)
+            {
+                Completed?.Invoke(null, new GitCliLogEventArgs(
+                    verb,
+                    psi.WorkingDirectory,
+                    started.Elapsed,
+                    null,
+                    TimedOut: false,
+                    Canceled: true));
                 throw new OperationCanceledException(ct);
+            }
+
+            Completed?.Invoke(null, new GitCliLogEventArgs(
+                verb,
+                psi.WorkingDirectory,
+                started.Elapsed,
+                null,
+                TimedOut: true,
+                Canceled: false));
 
             throw new TimeoutException(
-                $"git {verb} did not finish within 60 seconds and was terminated.");
+                $"git {verb} did not finish within {(int)effectiveTimeout.TotalSeconds} seconds and was terminated.");
         }
 
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
+        started.Stop();
+
+        Completed?.Invoke(null, new GitCliLogEventArgs(
+            verb,
+            psi.WorkingDirectory,
+            started.Elapsed,
+            process.ExitCode,
+            TimedOut: false,
+            Canceled: false));
 
         return new GitResult(process.ExitCode, stdout.TrimEnd(), stderr.TrimEnd());
     }

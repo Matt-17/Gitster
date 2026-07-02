@@ -3,24 +3,31 @@ using System.Text.Json;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using Gitster.Models;
+
 namespace Gitster.Services;
 
 /// <summary>
 /// Persisted, observable UI preferences (plan A10 date mode, A13 branch tree, A14 gravatar).
-/// Stored in %AppData%/Gitster/ui-settings.json, a sibling of window-settings.json.
+/// Defaults to the consolidated settings.json store; the file-path constructor is retained for tests.
 /// </summary>
 public partial class UiPreferencesService : ObservableObject
 {
-    private static readonly string Dir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Gitster");
-    private static readonly string FilePath = Path.Combine(Dir, "ui-settings.json");
-
+    private readonly AppSettingsService? _settingsService;
     private readonly string _filePath;
     private readonly Dictionary<string, double> _splitterLengths = new(StringComparer.Ordinal);
     private bool _loaded;
 
-    public UiPreferencesService() : this(FilePath)
+    public UiPreferencesService() : this(new AppSettingsService())
     {
+    }
+
+    public UiPreferencesService(AppSettingsService settingsService)
+    {
+        _settingsService = settingsService;
+        _filePath = string.Empty;
+        Load();
+        _loaded = true;
     }
 
     public UiPreferencesService(string filePath)
@@ -35,6 +42,9 @@ public partial class UiPreferencesService : ObservableObject
         public bool UseRelativeDates { get; set; }
         public bool GravatarEnabled { get; set; }
         public bool BranchTreeView { get; set; }
+        public bool UpdateChecksEnabled { get; set; }
+        public bool PersistentLoggingEnabled { get; set; }
+        public ThemePreference ThemePreference { get; set; } = ThemePreference.System;
         public Dictionary<string, double>? SplitterLengths { get; set; }
     }
 
@@ -47,9 +57,31 @@ public partial class UiPreferencesService : ObservableObject
     [ObservableProperty]
     public partial bool BranchTreeView { get; set; }
 
+    [ObservableProperty]
+    public partial bool UpdateChecksEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial bool PersistentLoggingEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial ThemePreference ThemePreference { get; set; } = ThemePreference.System;
+
+    public bool IsLightTheme => ThemePreference == ThemePreference.Light;
+    public bool IsDarkTheme => ThemePreference == ThemePreference.Dark;
+    public bool IsSystemTheme => ThemePreference == ThemePreference.System;
+
     partial void OnUseRelativeDatesChanged(bool value) => Save();
     partial void OnGravatarEnabledChanged(bool value) => Save();
     partial void OnBranchTreeViewChanged(bool value) => Save();
+    partial void OnUpdateChecksEnabledChanged(bool value) => Save();
+    partial void OnPersistentLoggingEnabledChanged(bool value) => Save();
+    partial void OnThemePreferenceChanged(ThemePreference value)
+    {
+        OnPropertyChanged(nameof(IsLightTheme));
+        OnPropertyChanged(nameof(IsDarkTheme));
+        OnPropertyChanged(nameof(IsSystemTheme));
+        Save();
+    }
 
     public double? GetSplitterLength(string? key)
     {
@@ -78,22 +110,16 @@ public partial class UiPreferencesService : ObservableObject
     {
         try
         {
+            if (_settingsService is not null)
+            {
+                ApplySettings(_settingsService.LoadUiSettings());
+                return;
+            }
+
             if (!File.Exists(_filePath)) return;
             var p = JsonSerializer.Deserialize<Prefs>(File.ReadAllText(_filePath));
             if (p == null) return;
-            UseRelativeDates = p.UseRelativeDates;
-            GravatarEnabled = p.GravatarEnabled;
-            BranchTreeView = p.BranchTreeView;
-
-            _splitterLengths.Clear();
-            if (p.SplitterLengths is null)
-                return;
-
-            foreach (var (key, value) in p.SplitterLengths)
-            {
-                if (!string.IsNullOrWhiteSpace(key) && IsValidLength(value))
-                    _splitterLengths[key] = value;
-            }
+            ApplyPrefs(p);
         }
         catch { /* fall back to defaults */ }
     }
@@ -103,6 +129,21 @@ public partial class UiPreferencesService : ObservableObject
         if (!_loaded) return; // don't write during initial Load()
         try
         {
+            if (_settingsService is not null)
+            {
+                _settingsService.SaveUiSettings(new AppSettingsService.UiSettings
+                {
+                    UseRelativeDates = UseRelativeDates,
+                    GravatarEnabled = GravatarEnabled,
+                    BranchTreeView = BranchTreeView,
+                    UpdateChecksEnabled = UpdateChecksEnabled,
+                    PersistentLoggingEnabled = PersistentLoggingEnabled,
+                    ThemePreference = ThemePreference,
+                    SplitterLengths = new Dictionary<string, double>(_splitterLengths),
+                });
+                return;
+            }
+
             var dir = Path.GetDirectoryName(_filePath);
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
@@ -113,6 +154,9 @@ public partial class UiPreferencesService : ObservableObject
                     UseRelativeDates = UseRelativeDates,
                     GravatarEnabled = GravatarEnabled,
                     BranchTreeView = BranchTreeView,
+                    UpdateChecksEnabled = UpdateChecksEnabled,
+                    PersistentLoggingEnabled = PersistentLoggingEnabled,
+                    ThemePreference = ThemePreference,
                     SplitterLengths = new Dictionary<string, double>(_splitterLengths),
                 },
                 new JsonSerializerOptions { WriteIndented = true });
@@ -126,4 +170,39 @@ public partial class UiPreferencesService : ObservableObject
 
     private static bool IsValidLength(double value) =>
         !double.IsNaN(value) && !double.IsInfinity(value) && value > 0;
+
+    private void ApplySettings(AppSettingsService.UiSettings settings)
+    {
+        UseRelativeDates = settings.UseRelativeDates;
+        GravatarEnabled = settings.GravatarEnabled;
+        BranchTreeView = settings.BranchTreeView;
+        UpdateChecksEnabled = settings.UpdateChecksEnabled;
+        PersistentLoggingEnabled = settings.PersistentLoggingEnabled;
+        ThemePreference = settings.ThemePreference;
+        ReplaceSplitterLengths(settings.SplitterLengths);
+    }
+
+    private void ApplyPrefs(Prefs p)
+    {
+        UseRelativeDates = p.UseRelativeDates;
+        GravatarEnabled = p.GravatarEnabled;
+        BranchTreeView = p.BranchTreeView;
+        UpdateChecksEnabled = p.UpdateChecksEnabled;
+        PersistentLoggingEnabled = p.PersistentLoggingEnabled;
+        ThemePreference = p.ThemePreference;
+        ReplaceSplitterLengths(p.SplitterLengths);
+    }
+
+    private void ReplaceSplitterLengths(IReadOnlyDictionary<string, double>? values)
+    {
+        _splitterLengths.Clear();
+        if (values is null)
+            return;
+
+        foreach (var (key, value) in values)
+        {
+            if (!string.IsNullOrWhiteSpace(key) && IsValidLength(value))
+                _splitterLengths[key] = value;
+        }
+    }
 }

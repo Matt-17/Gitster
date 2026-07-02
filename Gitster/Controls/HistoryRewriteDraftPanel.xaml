@@ -21,7 +21,7 @@
                       Width="13"
                       Height="13"
                       Stretch="Uniform"
-                      Stroke="{StaticResource TextSecondary}"
+                      Stroke="{DynamicResource TextSecondary}"
                       StrokeThickness="1.5"
                       Fill="Transparent"
                       Data="M4,12 L4,17 L9,17 L18,8 L13,3 Z M12,4 L17,9"
@@ -31,13 +31,13 @@
                            Text="History edit"
                            FontSize="12"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="2"
                            Text="{Binding AffectedRewriteCount}"
                            FontSize="11"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource TextSecondary}"
+                           Foreground="{DynamicResource TextSecondary}"
                            VerticalAlignment="Center"
                            Visibility="{Binding HasDrafts, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </Grid>
@@ -45,7 +45,7 @@
             <StackPanel IsEnabled="{Binding IsSelectedCommitEditable}">
                 <TextBlock Text="Message"
                            FontSize="10"
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            Margin="0,0,0,3"/>
                 <TextBox Text="{Binding MessageText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True"
@@ -54,9 +54,9 @@
                          Height="74"
                          FontSize="12"
                          Margin="0,0,0,8"
-                         BorderBrush="{StaticResource BorderTertiary}"
-                         Foreground="{StaticResource TextPrimary}"
-                         Background="{StaticResource BackgroundPrimary}"/>
+                         BorderBrush="{DynamicResource BorderTertiary}"
+                         Foreground="{DynamicResource TextPrimary}"
+                         Background="{DynamicResource BackgroundPrimary}"/>
 
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
@@ -67,32 +67,32 @@
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Author"
                                    FontSize="10"
-                                   Foreground="{StaticResource TextTertiary}"
+                                   Foreground="{DynamicResource TextTertiary}"
                                    Margin="0,0,0,3"/>
                         <TextBox Text="{Binding AuthorName, UpdateSourceTrigger=PropertyChanged}"
                                  Height="28"
                                  FontSize="12"
-                                 BorderBrush="{StaticResource BorderTertiary}"
-                                 Foreground="{StaticResource TextPrimary}"
-                                 Background="{StaticResource BackgroundPrimary}"/>
+                                 BorderBrush="{DynamicResource BorderTertiary}"
+                                 Foreground="{DynamicResource TextPrimary}"
+                                 Background="{DynamicResource BackgroundPrimary}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
                         <TextBlock Text="Email"
                                    FontSize="10"
-                                   Foreground="{StaticResource TextTertiary}"
+                                   Foreground="{DynamicResource TextTertiary}"
                                    Margin="0,0,0,3"/>
                         <TextBox Text="{Binding AuthorEmail, UpdateSourceTrigger=PropertyChanged}"
                                  Height="28"
                                  FontSize="12"
-                                 BorderBrush="{StaticResource BorderTertiary}"
-                                 Foreground="{StaticResource TextPrimary}"
-                                 Background="{StaticResource BackgroundPrimary}"/>
+                                 BorderBrush="{DynamicResource BorderTertiary}"
+                                 Foreground="{DynamicResource TextPrimary}"
+                                 Background="{DynamicResource BackgroundPrimary}"/>
                     </StackPanel>
                 </Grid>
 
                 <TextBlock Text="Timestamp"
                            FontSize="10"
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            Margin="0,0,0,3"/>
                 <controls:DateControl SelectedDate="{Binding AuthorDate, Mode=TwoWay}"
                                       EditMode="DateTime"
@@ -102,7 +102,7 @@
                 <CheckBox IsChecked="{Binding UpdateCommitterTimestamp}"
                           Content="Update committer timestamp"
                           FontSize="11"
-                          Foreground="{StaticResource TextSecondary}"
+                          Foreground="{DynamicResource TextSecondary}"
                           Margin="0,0,0,8"/>
             </StackPanel>
 
@@ -111,17 +111,17 @@
                     Margin="0,0,0,8">
                 <Border.Style>
                     <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
+                        <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
                         <Setter Property="BorderThickness" Value="0.5"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding HasRemoteRewriteRisk}" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/>
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentWarning}"/>
+                                <Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentWarning}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding HasLocalOnlyCleanup}" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AccentInfoBackground}"/>
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Background" Value="{DynamicResource AccentInfoBackground}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -129,7 +129,7 @@
                 <TextBlock Text="{Binding SummaryText}"
                            TextWrapping="Wrap"
                            FontSize="11"
-                           Foreground="{StaticResource TextSecondary}"/>
+                           Foreground="{DynamicResource TextSecondary}"/>
             </Border>
 
             <StackPanel>

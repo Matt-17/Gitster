@@ -16,8 +16,8 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="✍"  FontSize="11" Foreground="{StaticResource TextTertiary}"/>
-                <TextBlock Text="Author" FontSize="10" Foreground="{StaticResource TextTertiary}" Margin="0,1,0,0"/>
+                <TextBlock Text="✍"  FontSize="11" Foreground="{DynamicResource TextTertiary}"/>
+                <TextBlock Text="Author" FontSize="10" Foreground="{DynamicResource TextTertiary}" Margin="0,1,0,0"/>
             </StackPanel>
 
             <!-- Quick-switch author dropdown -->
@@ -28,8 +28,8 @@
                       Text="{Binding AuthorText, UpdateSourceTrigger=PropertyChanged}"
                       Height="28"
                       FontSize="12"
-                      Foreground="{StaticResource TextPrimary}"
-                      BorderBrush="{StaticResource BorderTertiary}"
+                      Foreground="{DynamicResource TextPrimary}"
+                      BorderBrush="{DynamicResource BorderTertiary}"
                       ToolTip="Quick-switch author for next amend. Amend button applies the change."/>
 
             <!-- Edit authors dialog button -->

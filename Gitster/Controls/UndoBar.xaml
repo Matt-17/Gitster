@@ -15,10 +15,10 @@
     <Border Padding="10,0" Height="32">
         <Border.Style>
             <Style TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding HasUndoableOperation}" Value="True">
-                        <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                        <Setter Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -48,10 +48,10 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Text" Value="{Binding LastOperationText}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HasUndoableOperation}" Value="False">
-                                    <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

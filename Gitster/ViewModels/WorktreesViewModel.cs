@@ -67,6 +67,22 @@ public partial class WorktreesViewModel : BaseViewModel
         OperationFeedbackService feedback,
         SnapshotService          snapshots,
         IWindowService?          windowService,
+        RepositoryCommandContext commandContext)
+        : this(
+            git,
+            feedback,
+            snapshots,
+            windowService,
+            () => commandContext.CurrentPath,
+            commandContext.OpenRepositoryPath)
+    {
+    }
+
+    public WorktreesViewModel(
+        IGitBackend              git,
+        OperationFeedbackService feedback,
+        SnapshotService          snapshots,
+        IWindowService?          windowService,
         Func<string>             getCurrentPath,
         Action<string>           openInGitster)
     {

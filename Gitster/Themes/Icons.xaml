@@ -1,0 +1,31 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Geometry x:Key="IconCommitsGeometry">M12,2 L12,22 M9,7 A3,3 0 0,1 15,7 A3,3 0 0,1 9,7 Z M9,17 A3,3 0 0,1 15,17 A3,3 0 0,1 9,17 Z</Geometry>
+    <Geometry x:Key="IconStashesGeometry">M2,7 H22 M2,12 H22 M2,17 H22</Geometry>
+    <Geometry x:Key="IconBranchesGeometry">M10,3 A2,2 0 0,1 14,3 A2,2 0 0,1 10,3 Z M5,21 A2,2 0 0,1 9,21 A2,2 0 0,1 5,21 Z M15,21 A2,2 0 0,1 19,21 A2,2 0 0,1 15,21 Z M12,5 L12,11 M12,11 C12,16 7,16 7,19 M12,11 C12,16 17,16 17,19</Geometry>
+    <Geometry x:Key="IconWorktreesGeometry">M1,1 H11 V11 H1 Z M13,1 H23 V11 H13 Z M1,13 H11 V23 H1 Z M13,13 H23 V23 H13 Z</Geometry>
+    <Geometry x:Key="IconSearchGeometry">M3,10 A7,7 0 0,1 17,10 A7,7 0 0,1 3,10 Z M15,15 L21,21</Geometry>
+    <Geometry x:Key="IconOperationsLogGeometry">M3,12 A9,9 0 0,1 21,12 A9,9 0 0,1 3,12 Z M12,7 L12,12 L15.5,14</Geometry>
+    <Geometry x:Key="IconPinGeometry">M16,9 L16,4 L17,3 L17,2 L7,2 L7,3 L8,4 L8,9 L6,11 L6,12 L11.2,12 L11.2,19 L12.8,19 L12.8,12 L18,12 L18,11 Z</Geometry>
+    <Geometry x:Key="IconChevronDownGeometry">M0,0 L4,4 L8,0</Geometry>
+    <Geometry x:Key="IconSyncGeometry">M3,10 a7,7 0 0,1 14,0 M17,10 L14,7 M17,10 L20,7 M17,10 a7,7 0 0,1 -14,0 M3,10 L6,13 M3,10 L0,13</Geometry>
+    <Geometry x:Key="IconLightningGeometry">M13,2 L7,12 L11,12 L7,22 L17,10 L13,10 Z</Geometry>
+
+    <Style x:Key="StrokeIcon16" TargetType="Path">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Fill" Value="Transparent"/>
+        <Setter Property="StrokeThickness" Value="1.5"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="StrokeLineJoin" Value="Round"/>
+        <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
+    </Style>
+
+    <Style x:Key="StrokeIcon12" TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="Height" Value="12"/>
+    </Style>
+</ResourceDictionary>

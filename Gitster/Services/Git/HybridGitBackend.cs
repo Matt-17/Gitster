@@ -10,7 +10,7 @@ namespace Gitster.Services.Git;
 /// </list>
 /// Replace <c>new LibGit2Backend()</c> in DI with <c>new HybridGitBackend()</c>.
 /// </summary>
-public sealed class HybridGitBackend : IGitBackend
+public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
 {
     private readonly LibGit2Backend _lib = new();
     private readonly GitCliBackend  _cli = new();
@@ -27,6 +27,8 @@ public sealed class HybridGitBackend : IGitBackend
         await _lib.OpenAsync(path);
         await _cli.OpenAsync(path);
     }
+
+    public LibGit2Sharp.Repository OpenRepository(string repoPath) => _lib.OpenRepository(repoPath);
 
     public HybridGitBackend()
     {
@@ -52,12 +54,17 @@ public sealed class HybridGitBackend : IGitBackend
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => _lib.AmendAuthorAsync(request);
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => _lib.RewriteCommitsAsync(rewrites, branchName);
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => _lib.RemoveFileChangeFromCommitAsync(sha, path, branchName);
-    public Task FetchAsync(string remoteName = "origin")        => RunServerOperationAsync("Fetch", () => _cli.FetchAsync(remoteName));
-    public Task PullAsync(string remoteName = "origin")         => RunServerOperationAsync("Pull", () => _cli.PullAsync(remoteName));
-    public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
-        => RunServerOperationAsync("Push", () => _cli.PushAsync(remoteName, mode));
-    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
-        => RunServerOperationAsync("Push through commit", () => _cli.PushThroughCommitAsync(commitSha, remoteName));
+    public Task FetchAsync(string remoteName = "origin", CancellationToken ct = default)
+        => RunServerOperationAsync("Fetch", () => _cli.FetchAsync(remoteName, ct));
+
+    public Task PullAsync(string remoteName = "origin", CancellationToken ct = default)
+        => RunServerOperationAsync("Pull", () => _cli.PullAsync(remoteName, ct));
+
+    public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
+        => RunServerOperationAsync("Push", () => _cli.PushAsync(remoteName, mode, ct));
+
+    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
+        => RunServerOperationAsync("Push through commit", () => _cli.PushThroughCommitAsync(commitSha, remoteName, ct));
 
     private static async Task RunServerOperationAsync(string operationName, Func<Task> operation)
     {
@@ -81,7 +88,8 @@ public sealed class HybridGitBackend : IGitBackend
     public Task CherryPickAsync(string sha)                     => _lib.CherryPickAsync(sha);
     public Task<string> CreateTagAsync(string name, string targetSha) => _lib.CreateTagAsync(name, targetSha);
     public Task<IReadOnlyList<string>> GetTagsForCommitAsync(string sha) => _lib.GetTagsForCommitAsync(sha);
-    public Task PushTagAsync(string tagName, string remoteName = "origin") => RunServerOperationAsync("Push tag", () => _cli.PushTagAsync(tagName, remoteName));
+    public Task PushTagAsync(string tagName, string remoteName = "origin", CancellationToken ct = default)
+        => RunServerOperationAsync("Push tag", () => _cli.PushTagAsync(tagName, remoteName, ct));
     public Task RevertCommitAsync(string sha)                   => _lib.RevertCommitAsync(sha);
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => _lib.GetAllRefsAsync();
     public Task<int> GetStashCountAsync()                       => _lib.GetStashCountAsync();
@@ -95,6 +103,10 @@ public sealed class HybridGitBackend : IGitBackend
     public Task<IReadOnlyList<BranchSummary>> GetBranchesAsync()               => _lib.GetBranchesAsync();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200) => _lib.GetCommitsForRefAsync(refName, maxCount);
     public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)    => _lib.AreCommitsContiguousAsync(shas);
+    public Task ReorderCommitsAsync(IReadOnlyList<string> shasNewestFirst, IReadOnlyList<string> reorderedShasNewestFirst, string? branchName = null) => _lib.ReorderCommitsAsync(shasNewestFirst, reorderedShasNewestFirst, branchName);
+    public Task SplitCommitAsync(string sha, IReadOnlyList<string> firstCommitPaths, string firstMessage, string secondMessage, string? branchName = null) => _lib.SplitCommitAsync(sha, firstCommitPaths, firstMessage, secondMessage, branchName);
+    public Task<string> CreateOrphanBranchAsync(string branchName, bool commitCurrentTree) => _lib.CreateOrphanBranchAsync(branchName, commitCurrentTree);
+    public Task<string> RescueDetachedHeadAsync(string branchName) => _lib.RescueDetachedHeadAsync(branchName);
 
     // ── Phase 3: branch ops, commit-to-branch, snapshot (libgit2) ─────────
     public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync()            => _lib.GetBranchListAsync();
@@ -133,6 +145,9 @@ public sealed class HybridGitBackend : IGitBackend
     /// Fixup always requires CLI.
     /// </summary>
     public Task FixupIntoCommitAsync(string targetSha) => _cli.FixupIntoCommitAsync(targetSha);
+
+    public Task FixupCommitIntoCommitAsync(string sourceSha, string targetSha)
+        => _cli.FixupCommitIntoCommitAsync(sourceSha, targetSha);
 
     /// <summary>
     /// Reword HEAD via libgit2 amend; older commits via CLI interactive rebase.

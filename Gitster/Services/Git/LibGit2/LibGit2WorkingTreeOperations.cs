@@ -69,6 +69,8 @@ internal sealed class LibGit2WorkingTreeOperations
         {
         }
 
+        AppendStatusFallback(repo, staged, unstaged);
+
         return Task.FromResult(new WorkingTreeStatus(staged, unstaged));
     }
 
@@ -180,6 +182,139 @@ internal sealed class LibGit2WorkingTreeOperations
         ChangeKind.Conflicted => WorkingFileStatus.Conflicted,
         _ => WorkingFileStatus.Modified,
     };
+
+    private static void AppendStatusFallback(
+        Repository repo,
+        List<WorkingTreeFile> staged,
+        List<WorkingTreeFile> unstaged)
+    {
+        var stagedPaths = new HashSet<string>(staged.Select(file => file.Path), StringComparer.Ordinal);
+        var unstagedPaths = new HashSet<string>(unstaged.Select(file => file.Path), StringComparer.Ordinal);
+        RepositoryStatus status;
+        try
+        {
+            status = repo.RetrieveStatus(new StatusOptions
+            {
+                IncludeUntracked = true,
+                RecurseUntrackedDirs = true,
+            });
+        }
+        catch
+        {
+            AppendManualUntrackedFallback(repo, unstaged, unstagedPaths);
+            return;
+        }
+
+        foreach (var entry in status)
+        {
+            if (!stagedPaths.Contains(entry.FilePath) && IsStaged(entry.State))
+            {
+                staged.Add(new WorkingTreeFile(
+                    entry.FilePath,
+                    MapStatus(entry.State, staged: true),
+                    Staged: true,
+                    Added: 0,
+                    Deleted: 0));
+                stagedPaths.Add(entry.FilePath);
+            }
+
+            if (!unstagedPaths.Contains(entry.FilePath) && IsWorkdir(entry.State))
+            {
+                var statusKind = MapStatus(entry.State, staged: false);
+                unstaged.Add(new WorkingTreeFile(
+                    entry.FilePath,
+                    statusKind,
+                    Staged: false,
+                    Added: 0,
+                    Deleted: 0));
+                unstagedPaths.Add(entry.FilePath);
+            }
+        }
+    }
+
+    private static void AppendManualUntrackedFallback(
+        Repository repo,
+        List<WorkingTreeFile> unstaged,
+        HashSet<string> unstagedPaths)
+    {
+        try
+        {
+            var workdir = repo.Info.WorkingDirectory;
+            var gitDir = Path.GetFullPath(repo.Info.Path).TrimEnd(Path.DirectorySeparatorChar);
+            var tracked = new HashSet<string>(repo.Index.Select(entry => NormalizePath(entry.Path)), StringComparer.Ordinal);
+
+            foreach (var file in Directory.EnumerateFiles(workdir, "*", SearchOption.AllDirectories))
+            {
+                var fullPath = Path.GetFullPath(file);
+                if (fullPath.StartsWith(gitDir, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var relative = NormalizePath(Path.GetRelativePath(workdir, fullPath));
+                if (relative.StartsWith(".git/", StringComparison.OrdinalIgnoreCase)
+                    || tracked.Contains(relative)
+                    || unstagedPaths.Contains(relative)
+                    || IsIgnored(repo, relative))
+                {
+                    continue;
+                }
+
+                unstaged.Add(new WorkingTreeFile(relative, WorkingFileStatus.Untracked, Staged: false, Added: 0, Deleted: 0));
+                unstagedPaths.Add(relative);
+            }
+        }
+        catch
+        {
+            // LibGit2 status is still authoritative when filesystem enumeration is unavailable.
+        }
+    }
+
+    private static WorkingFileStatus MapStatus(FileStatus status, bool staged)
+    {
+        if ((status & FileStatus.Conflicted) != 0)
+            return WorkingFileStatus.Conflicted;
+        if ((status & (FileStatus.RenamedInIndex | FileStatus.RenamedInWorkdir)) != 0)
+            return WorkingFileStatus.Renamed;
+        if ((status & (FileStatus.TypeChangeInIndex | FileStatus.TypeChangeInWorkdir)) != 0)
+            return WorkingFileStatus.TypeChange;
+        if ((status & (FileStatus.DeletedFromIndex | FileStatus.DeletedFromWorkdir)) != 0)
+            return WorkingFileStatus.Deleted;
+        if ((status & FileStatus.NewInIndex) != 0)
+            return WorkingFileStatus.Added;
+        if (!staged && (status & FileStatus.NewInWorkdir) != 0)
+            return WorkingFileStatus.Untracked;
+
+        return WorkingFileStatus.Modified;
+    }
+
+    private static bool IsStaged(FileStatus status) =>
+        (status & (FileStatus.NewInIndex
+            | FileStatus.ModifiedInIndex
+            | FileStatus.DeletedFromIndex
+            | FileStatus.RenamedInIndex
+            | FileStatus.TypeChangeInIndex
+            | FileStatus.Conflicted)) != 0;
+
+    private static bool IsWorkdir(FileStatus status) =>
+        (status & (FileStatus.NewInWorkdir
+            | FileStatus.ModifiedInWorkdir
+            | FileStatus.DeletedFromWorkdir
+            | FileStatus.RenamedInWorkdir
+            | FileStatus.TypeChangeInWorkdir
+            | FileStatus.Conflicted)) != 0;
+
+    private static string NormalizePath(string path) => path.Replace('\\', '/');
+
+    private static bool IsIgnored(Repository repo, string relativePath)
+    {
+        try
+        {
+            return repo.Ignore.IsPathIgnored(relativePath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private static (int Step, int Total) ReadRebaseProgress(string rebaseMerge, string rebaseApply)
     {

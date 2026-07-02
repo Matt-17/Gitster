@@ -23,6 +23,7 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
     private FileSystemWatcher? _workingDirWatcher;
     private readonly Timer _debounceTimer;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
     private RepositoryStateSnapshot? _lastSnapshot;
     private bool _pendingWorkingTreeChange;
     private bool _pendingGitMetadataChange;
@@ -39,6 +40,9 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
 
     [ObservableProperty]
     private int _gitMetadataVersion;
+
+    [ObservableProperty]
+    private bool _isOperationRunning;
 
     public RepositoryStateService(IGitBackend git)
     {
@@ -158,13 +162,16 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 "Updating repository status.",
                 80));
 
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher is null || dispatcher.CheckAccess())
             {
-                WorkingTreeState = result.state;
-                CurrentBranch = result.branch.Name;
-                if (gitMetadataChanged)
-                    GitMetadataVersion++;
-            });
+                ApplyRefreshResult(result.state, result.branch.Name, gitMetadataChanged);
+            }
+            else
+            {
+                await dispatcher.InvokeAsync(() =>
+                    ApplyRefreshResult(result.state, result.branch.Name, gitMetadataChanged));
+            }
 
             _lastSnapshot = result.snapshot;
             _pendingWorkingTreeChange = false;
@@ -189,6 +196,36 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
     {
         _pendingWorkingTreeChange = true;
         RequestRefresh();
+    }
+
+    private void ApplyRefreshResult(
+        WorkingTreeState state,
+        string branchName,
+        bool gitMetadataChanged)
+    {
+        WorkingTreeState = state;
+        CurrentBranch = branchName;
+        if (gitMetadataChanged)
+            GitMetadataVersion++;
+    }
+
+    public async Task<IDisposable> BeginOperationAsync(CancellationToken ct = default)
+    {
+        await _operationGate.WaitAsync(ct);
+        SetOperationRunning(true);
+        return new OperationLease(this);
+    }
+
+    public void ThrowIfIndexLocked()
+    {
+        if (RepositoryPath is null)
+            return;
+
+        var lockPath = Path.Combine(ResolveGitDir(RepositoryPath), "index.lock");
+        if (File.Exists(lockPath))
+            throw new InvalidOperationException(
+                "Another Git process appears to be running because .git/index.lock exists. " +
+                "Wait for it to finish, then retry the operation.");
     }
 
     private void OnGitMetadataChanged(object sender, FileSystemEventArgs e)
@@ -242,6 +279,19 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
         DetachWatchers();
         _debounceTimer.Dispose();
         _refreshGate.Dispose();
+        _operationGate.Dispose();
+    }
+
+    private void SetOperationRunning(bool value)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            IsOperationRunning = value;
+            return;
+        }
+
+        _ = dispatcher.InvokeAsync(() => IsOperationRunning = value);
     }
 
     private static RepositoryStateSnapshot CaptureSnapshot(string repoPath)
@@ -366,4 +416,21 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
     }
 
     private sealed record RepositoryStateSnapshot(string GitToken, string IndexToken);
+
+    private sealed class OperationLease : IDisposable
+    {
+        private RepositoryStateService? _owner;
+
+        public OperationLease(RepositoryStateService owner) => _owner = owner;
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            if (owner is null)
+                return;
+
+            owner.SetOperationRunning(false);
+            owner._operationGate.Release();
+        }
+    }
 }

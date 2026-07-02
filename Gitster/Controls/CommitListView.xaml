@@ -22,12 +22,18 @@
 
         <Style x:Key="CommitItemStyle" TargetType="ListViewItem">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="AllowDrop" Value="True"/>
             <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"/>
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="CommitItem_PreviewMouseLeftButtonDown"/>
+            <EventSetter Event="PreviewMouseMove" Handler="CommitItem_PreviewMouseMove"/>
+            <EventSetter Event="DragOver" Handler="CommitItem_DragOver"/>
+            <EventSetter Event="DragLeave" Handler="CommitItem_DragLeave"/>
+            <EventSetter Event="Drop" Handler="CommitItem_Drop"/>
             <EventSetter Event="PreviewMouseRightButtonDown" Handler="CommitItem_PreviewMouseRightButtonDown"/>
             <Setter Property="ContextMenu">
                 <Setter.Value>
@@ -104,18 +110,12 @@
                             </Border>
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <DataTrigger Binding="{Binding IsHistoryEditTransitive}" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentInfoBackground}"/>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsHistoryEditDirect}" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentWarningBackground}"/>
-                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentBlueBackground}"/>
-                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -124,19 +124,19 @@
         </Style>
 
         <Style x:Key="CommitPrimaryTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="CommitSecondaryTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -152,17 +152,17 @@
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="Padding" Value="5,0"/>
             <Setter Property="CornerRadius" Value="3"/>
-            <Setter Property="Background" Value="{StaticResource BackgroundPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderSecondary}"/>
+            <Setter Property="Background" Value="{DynamicResource BackgroundPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSecondary}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static git:CommitRefKind.RemoteBranch}">
-                    <Setter Property="Background" Value="{StaticResource AccentInfoBackground}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                    <Setter Property="Background" Value="{DynamicResource AccentInfoBackground}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
-                    <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                    <Setter Property="Background" Value="{DynamicResource AccentBlue}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -171,10 +171,10 @@
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static git:CommitRefKind.RemoteBranch}">
-                    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
                     <Setter Property="Foreground" Value="White"/>
@@ -188,8 +188,8 @@
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="Padding" Value="5,0"/>
             <Setter Property="CornerRadius" Value="3"/>
-            <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
+            <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
@@ -209,16 +209,16 @@
 
         <DataTemplate x:Key="SectionHeaderTemplate">
             <Border Padding="0"
-                    BorderBrush="{StaticResource BorderTertiary}"
+                    BorderBrush="{DynamicResource BorderTertiary}"
                     BorderThickness="0,0,0,1"
                     TextElement.FontFamily="{StaticResource FontFamilyUi}"
                     ToolTip="{Binding RemoteUrlDisplay}">
                 <Border.Style>
                     <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource IncomingHeaderBackground}"/>
+                        <Setter Property="Background" Value="{DynamicResource IncomingHeaderBackground}"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsOutgoing}" Value="True">
-                                <Setter Property="Background" Value="{StaticResource OutgoingHeaderBackground}"/>
+                                <Setter Property="Background" Value="{DynamicResource OutgoingHeaderBackground}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -235,10 +235,10 @@
                             Margin="0,0,8,0">
                         <Border.Style>
                             <Style TargetType="Border">
-                                <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="Background" Value="{DynamicResource AccentBlue}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsOutgoing}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource AccentWarning}"/>
+                                        <Setter Property="Background" Value="{DynamicResource AccentWarning}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -257,10 +257,10 @@
                         <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="SemiBold" FontSize="11">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsOutgoing}" Value="True">
-                                            <Setter Property="Foreground" Value="{StaticResource AccentWarning}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentWarning}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -269,22 +269,22 @@
                         <TextBlock Grid.Column="1"
                                    Text=" &#x2022; "
                                    FontSize="11"
-                                   Foreground="{StaticResource TextTertiary}"
+                                   Foreground="{DynamicResource TextTertiary}"
                                    Visibility="{Binding HasRemoteName, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <TextBlock Grid.Column="2"
                                    Text="{Binding RemoteNameDisplay}"
                                    FontSize="11"
-                                   Foreground="{StaticResource TextSecondary}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    Visibility="{Binding HasRemoteName, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <TextBlock Grid.Column="3"
                                    Text=" &#x2022; "
                                    FontSize="11"
-                                   Foreground="{StaticResource TextTertiary}"
+                                   Foreground="{DynamicResource TextTertiary}"
                                    Visibility="{Binding HasRemoteUrl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <TextBlock Grid.Column="4"
                                    Text="{Binding RemoteUrlDisplay}"
                                    FontSize="10"
-                                   Foreground="{StaticResource TextTertiary}"
+                                   Foreground="{DynamicResource TextTertiary}"
                                    TextTrimming="CharacterEllipsis"
                                    Visibility="{Binding HasRemoteUrl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </Grid>
@@ -294,13 +294,12 @@
 
         <DataTemplate x:Key="SectionEmptyRowTemplate">
             <Border Height="24"
-                    BorderBrush="{StaticResource BorderTertiary}"
+                    BorderBrush="{DynamicResource BorderTertiary}"
                     BorderThickness="0,0,0,1"
-                    Background="{StaticResource BackgroundPrimary}"
+                    Background="{DynamicResource BackgroundPrimary}"
                     TextElement.FontFamily="{StaticResource FontFamilyUi}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="142"/>
@@ -311,7 +310,7 @@
                     <Border Grid.Column="0"
                             Width="{Binding DataContext.GraphColumnWidth, RelativeSource={RelativeSource AncestorType=ListView}}"/>
 
-                    <TextBlock Grid.Column="2"
+                    <TextBlock Grid.Column="1"
                                Text="{Binding Message}"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Center"
@@ -319,15 +318,24 @@
                                Margin="2,0,8,0"
                                FontSize="11"
                                FontStyle="Italic"
-                               Foreground="{StaticResource TextTertiary}"/>
+                               Foreground="{DynamicResource TextTertiary}"/>
                 </Grid>
             </Border>
         </DataTemplate>
 
         <DataTemplate x:Key="CommitRowTemplate">
             <Grid Height="24">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="TextElement.FontWeight" Value="Normal"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasHistoryEditOverlay}" Value="True">
+                                <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="142"/>
@@ -342,66 +350,42 @@
                                            RemoteState="{Binding RemoteState}"
                                            IsSelectedRow="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListViewItem}}"/>
                     <TextBlock Text="*" FontSize="8" HorizontalAlignment="Right" VerticalAlignment="Top"
-                               Margin="0,1,0,0" Foreground="{StaticResource AccentWarning}"
+                               Margin="0,1,0,0" Foreground="{DynamicResource AccentWarning}"
                                ToolTip="Same commit, rewritten. Push (force-with-lease) to replace the remote copy."
                                Visibility="{Binding IsOrphanedPair, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
 
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Left"
+                <DockPanel Grid.Column="1" LastChildFill="True" Margin="2,0,8,0" VerticalAlignment="Center">
+                    <Border DockPanel.Dock="Left"
+                            Width="16"
+                            Height="16"
+                            CornerRadius="3"
                             Margin="0,0,5,0"
-                            ToolTip="{Binding HistoryEditTooltip}"
-                            Visibility="{Binding HasAnyHistoryEditIcon, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Path Width="12"
-                          Height="12"
-                          Stretch="Uniform"
-                          Stroke="{StaticResource AccentWarning}"
-                          StrokeThickness="1.6"
-                          Fill="Transparent"
-                          Data="{StaticResource HistoryEditMessageGlyph}"
-                          Margin="0,0,3,0"
-                          Visibility="{Binding HasPendingMessageChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Path Width="12"
-                          Height="12"
-                          Stretch="Uniform"
-                          Stroke="{StaticResource AccentWarning}"
-                          StrokeThickness="1.5"
-                          Fill="Transparent"
-                          Data="{StaticResource HistoryEditAuthorGlyph}"
-                          Margin="0,0,3,0"
-                          Visibility="{Binding HasPendingAuthorChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Path Width="12"
-                          Height="12"
-                          Stretch="Uniform"
-                          Stroke="{StaticResource AccentWarning}"
-                          StrokeThickness="1.5"
-                          Fill="Transparent"
-                          Data="{StaticResource HistoryEditTimeGlyph}"
-                          Margin="0,0,3,0"
-                          Visibility="{Binding HasPendingTimeChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Path Width="12"
-                          Height="12"
-                          Stretch="Uniform"
-                          Stroke="{StaticResource TextTertiary}"
-                          StrokeThickness="1.4"
-                          Fill="Transparent"
-                          Data="{StaticResource HistoryEditFileGlyph}"
-                          Margin="0,0,3,0"
-                          Visibility="{Binding HasPendingFileChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Path Width="12"
-                          Height="12"
-                          Stretch="Uniform"
-                          Stroke="{StaticResource AccentBlue}"
-                          StrokeThickness="1.7"
-                          Fill="Transparent"
-                          Data="{StaticResource HistoryEditTransitiveGlyph}"
-                          Margin="0,0,3,0"
-                          Visibility="{Binding IsHistoryEditTransitive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </StackPanel>
-
-                <DockPanel Grid.Column="2" LastChildFill="True" Margin="2,0,8,0" VerticalAlignment="Center">
+                            ToolTip="{Binding SigningBadgeTooltip}"
+                            Visibility="{Binding HasSigningBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SigningStatus}" Value="Good">
+                                        <Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding SigningStatus}" Value="Bad">
+                                        <Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding SigningStatus}" Value="Untrusted">
+                                        <Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding SigningBadgeText}"
+                                   FontSize="10"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </Border>
                     <ItemsControl DockPanel.Dock="Left"
                                   ItemsSource="{Binding VisibleRefLabels}"
                                   Visibility="{Binding HasVisibleRefLabels, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -428,13 +412,66 @@
                                    FontSize="10"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource TextSecondary}"/>
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </Border>
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right"
+                                Margin="8,0,0,0"
+                                ToolTip="{Binding HistoryEditTooltip}"
+                                Visibility="{Binding HasAnyHistoryEditIcon, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Path Width="12"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource AccentWarning}"
+                              StrokeThickness="1.6"
+                              Fill="Transparent"
+                              Data="{StaticResource HistoryEditMessageGlyph}"
+                              Margin="0,0,3,0"
+                              Visibility="{Binding HasPendingMessageChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Path Width="12"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource AccentWarning}"
+                              StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="{StaticResource HistoryEditAuthorGlyph}"
+                              Margin="0,0,3,0"
+                              Visibility="{Binding HasPendingAuthorChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Path Width="12"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource AccentWarning}"
+                              StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="{StaticResource HistoryEditTimeGlyph}"
+                              Margin="0,0,3,0"
+                              Visibility="{Binding HasPendingTimeChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Path Width="12"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource TextTertiary}"
+                              StrokeThickness="1.4"
+                              Fill="Transparent"
+                              Data="{StaticResource HistoryEditFileGlyph}"
+                              Margin="0,0,3,0"
+                              Visibility="{Binding HasPendingFileChange, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Path Width="12"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource AccentBlue}"
+                              StrokeThickness="1.7"
+                              Fill="Transparent"
+                              Data="{StaticResource HistoryEditTransitiveGlyph}"
+                              Margin="0,0,3,0"
+                              Visibility="{Binding IsHistoryEditTransitive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </StackPanel>
                     <TextBlock Text="{Binding DisplayMessage}" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                Style="{StaticResource CommitPrimaryTextStyle}"/>
                 </DockPanel>
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <local:Avatar Email="{Binding DisplayAuthorEmail}" DisplayName="{Binding DisplayAuthorName}"
                                   Margin="0,0,5,0"
                                   Enabled="{Binding DataContext.Ui.GravatarEnabled, RelativeSource={RelativeSource AncestorType=ListView}}"/>
@@ -442,7 +479,7 @@
                                TextTrimming="CharacterEllipsis"
                                Style="{StaticResource CommitSecondaryTextStyle}"/>
                 </StackPanel>
-                <TextBlock Grid.Column="4" VerticalAlignment="Center" FontSize="11"
+                <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="11"
                            Style="{StaticResource CommitSecondaryTextStyle}">
                     <TextBlock.Text>
                         <MultiBinding Converter="{StaticResource DateCellConverter}">
@@ -459,7 +496,7 @@
                         </MultiBinding>
                     </TextBlock.ToolTip>
                 </TextBlock>
-                <TextBlock Grid.Column="5" Text="{Binding CommitId}" VerticalAlignment="Center"
+                <TextBlock Grid.Column="4" Text="{Binding CommitId}" VerticalAlignment="Center"
                            Style="{StaticResource CommitMonoTextStyle}"/>
             </Grid>
         </DataTemplate>
@@ -474,8 +511,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="{StaticResource BackgroundSecondary}"
-                BorderBrush="{StaticResource BorderTertiary}"
+                Background="{DynamicResource BackgroundSecondary}"
+                BorderBrush="{DynamicResource BorderTertiary}"
                 BorderThickness="0,0,0,1"
                 Padding="6,6,6,5">
             <Grid>
@@ -514,25 +551,26 @@
                             Margin="8,2,0,2"
                             Padding="8,2"
                             CornerRadius="12"
-                            Background="{StaticResource BackgroundPrimary}"
-                            BorderBrush="{StaticResource BorderTertiary}"
+                            Background="{DynamicResource BackgroundPrimary}"
+                            BorderBrush="{DynamicResource BorderTertiary}"
                             BorderThickness="1">
                         <TextBlock Text="{Binding HistoryStatusText}"
                                    FontSize="11"
                                    FontWeight="SemiBold"
                                    TextAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource TextSecondary}"/>
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </Border>
 
                     <Button Grid.Column="3"
                             Width="28" Height="28" Margin="6,0,0,0"
                             Command="{Binding ClearAllFiltersCommand}"
                             ToolTip="Reset filter"
+                            AutomationProperties.Name="Reset history filter"
                             Visibility="{Binding HasActiveFilters, Converter={StaticResource BooleanToVisibilityConverter}}"
                             Style="{StaticResource GhostButton}">
                         <Path Stretch="Uniform" Width="12" Height="12"
-                              Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5"
+                              Stroke="{DynamicResource TextSecondary}" StrokeThickness="1.5"
                               Fill="Transparent"
                               Data="M4,4 L16,16 M16,4 L4,16"/>
                     </Button>
@@ -541,7 +579,7 @@
                 <DockPanel Grid.Row="1" Margin="2,4,0,0">
                     <TextBlock Text="author:Name  message:&quot;fix bug&quot;  sha:abc  after:2026-01-01"
                                FontSize="11"
-                               Foreground="{StaticResource TextTertiary}"
+                               Foreground="{DynamicResource TextTertiary}"
                                TextTrimming="CharacterEllipsis"/>
                 </DockPanel>
             </Grid>
@@ -565,10 +603,10 @@
             </ListView.ItemsPanel>
 
             <ListView.Resources>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#CCE4F7"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F1F1F"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#CCE4F7"/>
-                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1F1F1F"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{DynamicResource SelectionBackgroundColor}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{DynamicResource SelectionTextColor}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{DynamicResource SelectionBackgroundColor}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{DynamicResource SelectionTextColor}"/>
             </ListView.Resources>
 
             <ListView.ItemContainerStyleSelector>
@@ -587,7 +625,7 @@
 
         <GridSplitter Grid.Row="2"
                       HorizontalAlignment="Stretch"
-                      Background="{StaticResource BorderTertiary}"
+                      Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="CommitListView.DiffHeight"
                       helper:PersistedGridSplitter.DefinitionKind="Row"

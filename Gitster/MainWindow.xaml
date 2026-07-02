@@ -14,7 +14,7 @@
        WindowStyle="None"
        ResizeMode="CanResize"
        Title="{Binding WindowTitle}" Height="850" Width="1100" ContentRendered="Window_ContentRendered" Activated="Window_Activated"
-       Icon="pack://application:,,,/Assets/Icon.ico">
+       Icon="pack://application:,,,/Gitster;component/Assets/Icon.ico">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="38" ResizeBorderThickness="6"
                             GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
@@ -23,6 +23,9 @@
         <KeyBinding Key="O"  Modifiers="Ctrl" Command="{Binding BrowseFolderCommand}"/>
         <KeyBinding Key="K"  Modifiers="Ctrl" Command="{Binding OpenCommitPanelCommand}"/>
         <KeyBinding Key="F"  Modifiers="Ctrl" Command="{Binding CommitListVM.FocusSearchCommand}"/>
+        <KeyBinding Key="OemQuestion" Modifiers="Ctrl" Command="{Binding OpenShortcutsCommand}"/>
+        <KeyBinding Key="F1" Command="{Binding OpenShortcutsCommand}"/>
+        <KeyBinding Key="P" Modifiers="Ctrl+Shift" Command="{Binding OpenCommandPaletteCommand}"/>
         <KeyBinding Key="Z"  Modifiers="Ctrl" Command="{Binding UndoBarVM.UndoCommand}"/>
         <KeyBinding Key="F5"                  Command="{Binding FetchCommand}"/>
         <KeyBinding Key="Enter" Modifiers="Ctrl" Command="{Binding AmendCommitCommand}"/>
@@ -64,10 +67,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ChromeHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#40FFFFFF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ChromePressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -84,10 +87,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#E81123"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ChromeCloseHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#C50F1F"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ChromeClosePressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -97,13 +100,13 @@
     </Window.Resources>
 
     <Border x:Name="RootContainer"
-            Background="{StaticResource BackgroundPrimary}"
-            BorderBrush="{StaticResource WindowBorderBrush}"
+            Background="{DynamicResource BackgroundPrimary}"
+            BorderBrush="{DynamicResource WindowBorderBrush}"
             BorderThickness="1"
             SnapsToDevicePixels="True">
         <DockPanel>
             <!-- ── Custom-chrome top bar (accent) ───────────────────────────── -->
-            <Grid DockPanel.Dock="Top" Height="38" Background="{StaticResource AccentBlue}">
+            <Grid DockPanel.Dock="Top" Height="38" Background="{DynamicResource AccentBlue}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -111,7 +114,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Image Grid.Column="0" Source="pack://application:,,,/Assets/Icon.ico"
+                <Image Grid.Column="0" Source="pack://application:,,,/Gitster;component/Assets/Icon.ico"
                        Width="18" Height="18" Margin="10,0,8,0" VerticalAlignment="Center"/>
 
                 <Menu Grid.Column="1" Background="Transparent" VerticalAlignment="Center"
@@ -137,6 +140,8 @@
                         <MenuItem Header="Archive current HEAD..."
                                   helper:Capability.Requires="SourceArchive"
                                   Command="{Binding ArchiveHeadCommand}"/>
+                        <MenuItem Header="Append .gitignore template..."
+                                  Command="{Binding AppendGitIgnoreTemplateCommand}"/>
                         <Separator/>
                         <MenuItem Header="Fetch"   Command="{Binding FetchCommand}" InputGestureText="F5"/>
                         <MenuItem Header="Pull"    Command="{Binding PullCommand}"/>
@@ -146,6 +151,7 @@
                         <MenuItem Header="Switch branch..."      Command="{Binding SwitchBranchCommand}"/>
                         <Separator/>
                         <MenuItem Header="Operations log..."     Command="{Binding OpenOperationsLogCommand}"/>
+                        <MenuItem Header="Snapshots..."          Command="{Binding OpenSnapshotBrowserCommand}"/>
                         <MenuItem Header="Repository settings..." Command="{Binding OpenRepoSettingsCommand}"/>
                         <Separator/>
                         <MenuItem Header="Repair author..."           Command="{Binding OpenAuthorRepairCommand}"/>
@@ -173,8 +179,23 @@
                         <MenuItem Header="Show avatars (Gravatar)" IsCheckable="True" IsChecked="{Binding Ui.GravatarEnabled}"
                                   ToolTip="Fetches avatars from Gravatar using a hash of the author email."/>
                         <Separator/>
-                        <MenuItem Header="Dark mode" IsCheckable="True" IsChecked="{Binding IsDarkMode}"
-                                  IsEnabled="False" ToolTip="Coming in a future release"/>
+                        <MenuItem Header="Theme">
+                            <MenuItem Header="Light"
+                                      IsCheckable="True"
+                                      IsChecked="{Binding Ui.IsLightTheme, Mode=OneWay}"
+                                      Command="{Binding SetThemeCommand}"
+                                      CommandParameter="{x:Static models:ThemePreference.Light}"/>
+                            <MenuItem Header="Dark"
+                                      IsCheckable="True"
+                                      IsChecked="{Binding Ui.IsDarkTheme, Mode=OneWay}"
+                                      Command="{Binding SetThemeCommand}"
+                                      CommandParameter="{x:Static models:ThemePreference.Dark}"/>
+                            <MenuItem Header="Follow Windows"
+                                      IsCheckable="True"
+                                      IsChecked="{Binding Ui.IsSystemTheme, Mode=OneWay}"
+                                      Command="{Binding SetThemeCommand}"
+                                      CommandParameter="{x:Static models:ThemePreference.System}"/>
+                        </MenuItem>
                     </MenuItem>
 
                     <MenuItem Header="_Tools" x:Name="ToolsMenu" SubmenuOpened="ToolsMenu_SubmenuOpened" Style="{StaticResource ChromeMenuItem}">
@@ -184,6 +205,12 @@
                     <MenuItem Header="_Help" Style="{StaticResource ChromeMenuItem}">
                         <MenuItem Header="Documentation"       Command="{Binding OpenDocsCommand}"/>
                         <MenuItem Header="Keyboard shortcuts"  Command="{Binding OpenShortcutsCommand}"/>
+                        <MenuItem Header="Command palette"     Command="{Binding OpenCommandPaletteCommand}" InputGestureText="Ctrl+Shift+P"/>
+                        <Separator/>
+                        <MenuItem Header="Enable update checks" IsCheckable="True" IsChecked="{Binding Ui.UpdateChecksEnabled}"/>
+                        <MenuItem Header="Enable persistent diagnostic logs" IsCheckable="True" IsChecked="{Binding Ui.PersistentLoggingEnabled}"
+                                  ToolTip="Writes diagnostic log files after the next restart."/>
+                        <MenuItem Header="Check for updates" Command="{Binding CheckForUpdatesCommand}"/>
                         <Separator/>
                         <MenuItem Header="About Gitster"       Command="{Binding OpenAboutCommand}"/>
                     </MenuItem>
@@ -192,17 +219,20 @@
                 <!-- App + repo identity (muted, right of center) -->
                 <TextBlock Grid.Column="2" Text="{Binding WindowTitle}" VerticalAlignment="Center"
                            HorizontalAlignment="left" Margin="24,0"
-                           Foreground="#66FFFFFF" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                           Foreground="{DynamicResource TitleMutedOnAccent}" FontSize="12" TextTrimming="CharacterEllipsis"/>
 
                 <!-- Window controls -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
-                    <Button Style="{StaticResource ChromeButton}" Click="OnMinimize" ToolTip="Minimize">
+                    <Button Style="{StaticResource ChromeButton}" Click="OnMinimize" ToolTip="Minimize"
+                            AutomationProperties.Name="Minimize window">
                         <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </Button>
-                    <Button Style="{StaticResource ChromeButton}" Click="OnMaxRestore" ToolTip="Maximize/Restore">
+                    <Button Style="{StaticResource ChromeButton}" Click="OnMaxRestore" ToolTip="Maximize/Restore"
+                            AutomationProperties.Name="Maximize or restore window">
                         <TextBlock x:Name="MaxRestoreGlyph" Text="&#xE922;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </Button>
-                    <Button x:Name="CloseButton" Style="{StaticResource CloseChromeButton}" Click="OnCloseWindow" ToolTip="Close">
+                    <Button x:Name="CloseButton" Style="{StaticResource CloseChromeButton}" Click="OnCloseWindow" ToolTip="Close"
+                            AutomationProperties.Name="Close window">
                         <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </Button>
                 </StackPanel>

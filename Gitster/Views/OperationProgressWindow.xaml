@@ -22,6 +22,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
@@ -52,6 +53,15 @@
                        Margin="0,16,0,0"
                        Foreground="{DynamicResource TextTertiary}"
                        FontFamily="{DynamicResource FontFamilyMono}"/>
+
+            <Button Grid.Row="4"
+                    Content="Cancel"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0"
+                    Padding="12,7"
+                    IsEnabled="{Binding CanCancel}"
+                    AutomationProperties.Name="Cancel operation"
+                    Click="Cancel_Click"/>
         </Grid>
     </Border>
 </Window>

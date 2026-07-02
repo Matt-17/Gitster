@@ -73,6 +73,27 @@ public partial class CommitPanelViewModel : BaseViewModel
         SnapshotService snapshots,
         AuthorDirectoryService authorDir,
         IWindowService? windowService,
+        RepositoryCommandContext commandContext)
+        : this(
+            git,
+            feedback,
+            opsLog,
+            snapshots,
+            authorDir,
+            windowService,
+            commandContext.RefreshAll,
+            () => commandContext.CurrentBranch,
+            () => commandContext.SelectedRemote)
+    {
+    }
+
+    public CommitPanelViewModel(
+        IGitBackend git,
+        OperationFeedbackService feedback,
+        OperationsLogService opsLog,
+        SnapshotService snapshots,
+        AuthorDirectoryService authorDir,
+        IWindowService? windowService,
         Func<Task> onChanged,
         Func<string> getBranch,
         Func<string?> getRemote)
@@ -153,11 +174,15 @@ public partial class CommitPanelViewModel : BaseViewModel
     }
 
     private async Task OnFileToggledAsync(CommitFileViewModel file, bool staged)
+        => await SetFileStagedAsync(file.Path, staged);
+
+    public async Task SetFileStagedAsync(string path, bool staged)
     {
         try
         {
-            if (staged) await _git.StageAsync([file.Path]);
-            else await _git.UnstageAsync([file.Path]);
+            await _feedback.RunAsync(
+                staged ? "Stage" : "Unstage",
+                () => staged ? _git.StageAsync([path]) : _git.UnstageAsync([path]));
             await LoadAsync();
         }
         catch (Exception ex)
@@ -197,7 +222,11 @@ public partial class CommitPanelViewModel : BaseViewModel
     [RelayCommand]
     private async Task StageAll()
     {
-        try { await _git.StageAllAsync(); await LoadAsync(); }
+        try
+        {
+            await _feedback.RunAsync("Stage all", () => _git.StageAllAsync());
+            await LoadAsync();
+        }
         catch (Exception ex) { _windowService.Warning(ex.Message, "Stage failed"); }
     }
 
@@ -206,7 +235,8 @@ public partial class CommitPanelViewModel : BaseViewModel
     {
         try
         {
-            await _git.UnstageAsync(Staged.Select(f => f.Path).ToList());
+            var paths = Staged.Select(f => f.Path).ToList();
+            await _feedback.RunAsync("Unstage all", () => _git.UnstageAsync(paths));
             await LoadAsync();
         }
         catch (Exception ex) { _windowService.Warning(ex.Message, "Unstage failed"); }

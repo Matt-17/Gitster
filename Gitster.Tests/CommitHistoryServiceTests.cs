@@ -36,6 +36,20 @@ public sealed class CommitHistoryServiceTests
     }
 
     [TestMethod]
+    public async Task EnsureCompleteAsync_UnbornRepository_ReturnsEmptyRows()
+    {
+        using var repo = new GitTestRepo();
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+        var rows = await history.EnsureCompleteAsync(progress: null);
+
+        Assert.AreEqual(0, rows.Count);
+    }
+
+    [TestMethod]
     public async Task OpenAsync_WhenHeadAdvances_PrependsNewRowsAndKeepsCachedTail()
     {
         using var repo = new GitTestRepo();
@@ -217,6 +231,26 @@ public sealed class CommitHistoryServiceTests
             scope: HistoryScope.CurrentBranch);
 
         Assert.AreEqual(0, rows.Single(r => r.FullSha == tip).RefLabels!.Count);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_WhenCacheDatabaseIsCorrupt_RebuildsSilently()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("c1", "a.txt", "1");
+
+        using var cache = new TempCacheDir();
+        var dbPath = Path.Combine(cache.Path, "history.sqlite");
+        File.WriteAllText(dbPath, "not a sqlite database");
+
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+        var rows = await history.EnsureCompleteAsync(progress: null);
+
+        Assert.AreEqual(1, rows.Count);
+        Assert.AreEqual("c1", rows[0].Message);
     }
 
     private static void BlankGraphColumns(string cachePath)

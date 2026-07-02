@@ -46,6 +46,16 @@ public partial class RecentReposService : ObservableObject
         Load();
     }
 
+    public RecentReposService(string storagePath)
+    {
+        var dir = Path.GetDirectoryName(storagePath);
+        if (!string.IsNullOrWhiteSpace(dir))
+            Directory.CreateDirectory(dir);
+
+        _storagePath = storagePath;
+        Load();
+    }
+
     public void Record(string path)
     {
         var existing = Entries.FirstOrDefault(e =>

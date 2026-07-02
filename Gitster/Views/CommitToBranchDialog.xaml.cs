@@ -26,13 +26,13 @@ public partial class CommitToBranchDialog : Window
         var target = (BranchCombo.Text ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(target))
         {
-            System.Windows.MessageBox.Show("Choose or type a target branch.", "Commit to branch",
+            GitsterDialog.Show(this, "Choose or type a target branch.", "Commit to branch",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (string.IsNullOrWhiteSpace(MessageBox.Text))
         {
-            System.Windows.MessageBox.Show("Enter a commit message.", "Commit to branch",
+            GitsterDialog.Show(this, "Enter a commit message.", "Commit to branch",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }

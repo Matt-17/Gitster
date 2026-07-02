@@ -13,12 +13,6 @@ public sealed class CommitGraphCell : FrameworkElement
     private const double OutgoingMarkerRadius = 2.1;
     private const double LeftPadding = 6;
 
-    private static readonly Brush[] Palette = CommitGraphPalette.HexColors
-        .Select(Brush)
-        .ToArray();
-    private static readonly Brush SyncedFill = Brush("#FFFFFF");
-    private static readonly Brush LocalOnlyBrush = Brush("#D97706");
-
     public static readonly DependencyProperty GraphRowProperty =
         DependencyProperty.Register(
             nameof(GraphRow),
@@ -75,23 +69,23 @@ public sealed class CommitGraphCell : FrameworkElement
             DrawEdge(dc, edge);
 
         var center = Anchor(row.NodeLane, CommitGraphAnchor.Center);
-        var laneStroke = Palette[row.NodeColorIndex % Palette.Length];
+        var laneStroke = GraphBrush(row.NodeColorIndex);
         dc.DrawEllipse(
-            SyncedFill,
+            ResourceBrush("CommitGraphNodeFillBrush", SystemColors.WindowBrush),
             new Pen(laneStroke, IsSelectedRow ? 1.8 : 1.5),
             center,
             NodeRadius,
             NodeRadius);
 
         if (HasOutgoingMarker)
-            dc.DrawEllipse(LocalOnlyBrush, null, center, OutgoingMarkerRadius, OutgoingMarkerRadius);
+            dc.DrawEllipse(ResourceBrush("CommitGraphLocalOnlyBrush", SystemColors.HighlightBrush), null, center, OutgoingMarkerRadius, OutgoingMarkerRadius);
     }
 
     private void DrawEdge(DrawingContext dc, CommitGraphEdge edge)
     {
         var from = Anchor(edge.FromLane, edge.FromAnchor);
         var to = Anchor(edge.ToLane, edge.ToAnchor);
-        var pen = new Pen(Palette[edge.ColorIndex % Palette.Length], 1.7)
+        var pen = new Pen(GraphBrush(edge.ColorIndex), 1.7)
         {
             StartLineCap = PenLineCap.Round,
             EndLineCap = PenLineCap.Round,
@@ -146,10 +140,12 @@ public sealed class CommitGraphCell : FrameworkElement
     private bool HasOutgoingMarker =>
         RemoteState is CommitRemoteState.LocalOnly or CommitRemoteState.NoTrackingBranch;
 
-    private static SolidColorBrush Brush(string color)
+    private static Brush GraphBrush(int colorIndex)
     {
-        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
-        brush.Freeze();
-        return brush;
+        var keys = CommitGraphPalette.BrushKeys;
+        return ResourceBrush(keys[colorIndex % keys.Count], SystemColors.HighlightBrush);
     }
+
+    private static Brush ResourceBrush(string key, Brush fallback) =>
+        Application.Current?.TryFindResource(key) as Brush ?? fallback;
 }
