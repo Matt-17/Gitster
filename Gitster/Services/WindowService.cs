@@ -1,4 +1,5 @@
 using System.Windows;
+using Gitster.Views;
 using Microsoft.Win32;
 
 namespace Gitster.Services;
@@ -37,10 +38,7 @@ public sealed class WindowService : IWindowService
         MessageBoxButton button = MessageBoxButton.OK,
         MessageBoxImage image = MessageBoxImage.None)
     {
-        var owner = ResolveOwner();
-        return owner is null
-            ? MessageBox.Show(text, caption, button, image)
-            : MessageBox.Show(owner, text, caption, button, image);
+        return GitsterDialog.Show(ResolveOwner(), text, caption, button, image);
     }
 
     public bool Confirm(string text, string caption)

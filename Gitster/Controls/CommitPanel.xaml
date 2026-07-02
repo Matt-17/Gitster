@@ -11,12 +11,13 @@
         <Style x:Key="BorderlessTextBox" TargetType="TextBox" BasedOn="{StaticResource GitsterTextBox}">
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
         <!-- A file row: checkbox · badge · path · +/- counts -->
         <DataTemplate x:Key="FileRowTemplate">
-            <Grid Height="24">
+            <Grid Height="24"
+                  PreviewMouseMove="FileRow_PreviewMouseMove">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="20"/>
@@ -28,35 +29,35 @@
                 <Border Grid.Column="1" Width="14" Height="14" CornerRadius="2" VerticalAlignment="Center">
                     <Border.Style>
                         <Style TargetType="Border">
-                            <Setter Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                            <Setter Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding Badge}" Value="A"><Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/></DataTrigger>
-                                <DataTrigger Binding="{Binding Badge}" Value="U"><Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/></DataTrigger>
-                                <DataTrigger Binding="{Binding Badge}" Value="D"><Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/></DataTrigger>
+                                <DataTrigger Binding="{Binding Badge}" Value="A"><Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/></DataTrigger>
+                                <DataTrigger Binding="{Binding Badge}" Value="U"><Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/></DataTrigger>
+                                <DataTrigger Binding="{Binding Badge}" Value="D"><Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/></DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
                     <TextBlock Text="{Binding Badge}" FontFamily="{StaticResource FontFamilyMono}"
                                FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"/>
+                               Foreground="{DynamicResource TextSecondary}"/>
                 </Border>
                 <TextBlock Grid.Column="2" Text="{Binding Path}" VerticalAlignment="Center" Margin="6,0,0,0"
                            FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
-                           TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextPrimary}"/>
+                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextPrimary}"/>
                 <TextBlock Grid.Column="3" VerticalAlignment="Center" FontFamily="{StaticResource FontFamilyMono}" FontSize="10">
-                    <Run Text="+" Foreground="{StaticResource AccentSuccess}"/><Run Text="{Binding Added, Mode=OneWay}" Foreground="{StaticResource AccentSuccess}"/><Run Text=" −" Foreground="{StaticResource AccentDanger}"/><Run Text="{Binding Deleted, Mode=OneWay}" Foreground="{StaticResource AccentDanger}"/>
+                    <Run Text="+" Foreground="{DynamicResource AccentSuccess}"/><Run Text="{Binding Added, Mode=OneWay}" Foreground="{DynamicResource AccentSuccess}"/><Run Text=" −" Foreground="{DynamicResource AccentDanger}"/><Run Text="{Binding Deleted, Mode=OneWay}" Foreground="{DynamicResource AccentDanger}"/>
                 </TextBlock>
             </Grid>
         </DataTemplate>
     </UserControl.Resources>
 
-    <Border Background="{StaticResource BackgroundPrimary}"
-            BorderBrush="{StaticResource BorderTertiary}"
+    <Border Background="{DynamicResource BackgroundPrimary}"
+            BorderBrush="{DynamicResource BorderTertiary}"
             BorderThickness="1"
             CornerRadius="10"
             Padding="12">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="90" Opacity="0.22" Color="#000000"/>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Direction="90" Opacity="0.22" Color="{DynamicResource OverlayShadowColor}"/>
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
@@ -71,13 +72,14 @@
             <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,8">
                 <TextBlock Text="Commit" FontWeight="SemiBold" FontSize="14"
-                           Foreground="{StaticResource TextPrimary}"/>
+                           Foreground="{DynamicResource TextPrimary}"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Summary}" VerticalAlignment="Center"
-                               FontSize="11" Foreground="{StaticResource TextTertiary}" Margin="0,0,8,0"/>
+                               FontSize="11" Foreground="{DynamicResource TextTertiary}" Margin="0,0,8,0"/>
                     <Button Width="22" Height="22" Padding="0" Style="{StaticResource IconButton}"
-                            Command="{Binding CloseCommand}" ToolTip="Close (Esc)">
-                        <Path Width="9" Height="9" Stretch="Uniform" Stroke="{StaticResource TextSecondary}"
+                            Command="{Binding CloseCommand}" ToolTip="Close (Esc)"
+                            AutomationProperties.Name="Close commit panel">
+                        <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextSecondary}"
                               StrokeThickness="1.5" Data="M2,2 L10,10 M10,2 L2,10"/>
                     </Button>
                 </StackPanel>
@@ -85,10 +87,10 @@
 
             <!-- Message -->
             <Border Grid.Row="1"
-                    BorderBrush="{StaticResource BorderTertiary}" BorderThickness="0.5"
+                    BorderBrush="{DynamicResource BorderTertiary}" BorderThickness="0.5"
                     CornerRadius="6" Padding="2" Margin="0,0,0,6">
                 <Grid>
-                    <TextBlock Text="Message (required)" Foreground="{StaticResource TextTertiary}"
+                    <TextBlock Text="Message (required)" Foreground="{DynamicResource TextTertiary}"
                                Margin="4,3" FontStyle="Italic" IsHitTestVisible="False">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -110,7 +112,7 @@
             <!-- Amend + author -->
             <Grid Grid.Row="2" Margin="0,0,0,8">
                 <CheckBox Content="Amend last commit" IsChecked="{Binding AmendLastCommit}"
-                          VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}"/>
+                          VerticalAlignment="Center" Foreground="{DynamicResource TextSecondary}"/>
                 <Button HorizontalAlignment="Right" Style="{StaticResource GhostButton}"
                         Padding="8,3" FontSize="11"
                         Command="{Binding EditAuthorCommand}"
@@ -125,12 +127,15 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid Grid.Row="0">
-                    <TextBlock Text="Staged" FontWeight="Medium" FontSize="11" Foreground="{StaticResource AccentSuccess}"/>
+                    <TextBlock Text="Staged" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource AccentSuccess}"/>
                     <Button HorizontalAlignment="Right" Style="{StaticResource GhostButton}" Padding="6,1" FontSize="10"
                             Content="Unstage all" Command="{Binding UnstageAllCommand}"/>
                 </Grid>
                 <ItemsControl Grid.Row="1" ItemsSource="{Binding Staged}" ItemTemplate="{StaticResource FileRowTemplate}"
-                              MaxHeight="120"/>
+                              MaxHeight="120"
+                              AllowDrop="True"
+                              DragOver="FileList_DragOver"
+                              Drop="Staged_Drop"/>
             </Grid>
 
             <!-- Changes section -->
@@ -140,15 +145,18 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Grid Grid.Row="0" Margin="0,2,0,2">
-                    <TextBlock Text="Changes" FontWeight="Medium" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                    <TextBlock Text="Changes" FontWeight="Medium" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
                     <Button HorizontalAlignment="Right" Style="{StaticResource GhostButton}" Padding="6,1" FontSize="10"
                             Content="Stage all" Command="{Binding StageAllCommand}"
                             Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <ItemsControl ItemsSource="{Binding Changes}" ItemTemplate="{StaticResource FileRowTemplate}"/>
-                        <TextBlock Text="No changes" Foreground="{StaticResource TextTertiary}" FontStyle="Italic"
+                        <ItemsControl ItemsSource="{Binding Changes}" ItemTemplate="{StaticResource FileRowTemplate}"
+                                      AllowDrop="True"
+                                      DragOver="FileList_DragOver"
+                                      Drop="Changes_Drop"/>
+                        <TextBlock Text="No changes" Foreground="{DynamicResource TextTertiary}" FontStyle="Italic"
                                    Margin="2,6" Visibility="{Binding HasChanges, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
                     </StackPanel>
                 </ScrollViewer>
@@ -170,14 +178,15 @@
                     <Button Grid.Column="0" Style="{StaticResource PrimaryButton}" MinWidth="120"
                             Content="Commit" Command="{Binding CommitCommand}"/>
                     <ToggleButton x:Name="CommitMore" Grid.Column="1" Margin="3,0,0,0" Width="26"
-                                  Background="{StaticResource AccentBlue}" Foreground="White" BorderThickness="0"
-                                  ToolTip="More commit actions">
+                                  Background="{DynamicResource AccentBlue}" Foreground="White" BorderThickness="0"
+                                  ToolTip="More commit actions"
+                                  AutomationProperties.Name="More commit actions">
                         <Path Width="8" Height="5" Data="M0,0 L4,4 L8,0" Stroke="White" StrokeThickness="1.5"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Fill="Transparent"/>
                     </ToggleButton>
                     <Popup IsOpen="{Binding IsChecked, ElementName=CommitMore}" PlacementTarget="{Binding ElementName=CommitMore}"
                            Placement="Top" StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{StaticResource BackgroundPrimary}" BorderBrush="{StaticResource BorderTertiary}"
+                        <Border Background="{DynamicResource BackgroundPrimary}" BorderBrush="{DynamicResource BorderTertiary}"
                                 BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="200">
                             <StackPanel>
                                 <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left"
@@ -203,15 +212,16 @@
                             Command="{Binding StashAllCommand}"/>
                     <ToggleButton x:Name="StashMore" Grid.Column="1" Margin="3,0,0,0" Width="26"
                                   Style="{x:Null}" Background="Transparent"
-                                  BorderBrush="{StaticResource BorderSecondary}" BorderThickness="1"
-                                  ToolTip="More stash actions">
-                        <Path Width="8" Height="5" Data="M0,0 L4,4 L8,0" Stroke="{StaticResource TextSecondary}"
+                                  BorderBrush="{DynamicResource BorderSecondary}" BorderThickness="1"
+                                  ToolTip="More stash actions"
+                                  AutomationProperties.Name="More stash actions">
+                        <Path Width="8" Height="5" Data="M0,0 L4,4 L8,0" Stroke="{DynamicResource TextSecondary}"
                               StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                               StrokeLineJoin="Round" Fill="Transparent"/>
                     </ToggleButton>
                     <Popup IsOpen="{Binding IsChecked, ElementName=StashMore}" PlacementTarget="{Binding ElementName=StashMore}"
                            Placement="Top" StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{StaticResource BackgroundPrimary}" BorderBrush="{StaticResource BorderTertiary}"
+                        <Border Background="{DynamicResource BackgroundPrimary}" BorderBrush="{DynamicResource BorderTertiary}"
                                 BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="200">
                             <StackPanel>
                                 <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left"

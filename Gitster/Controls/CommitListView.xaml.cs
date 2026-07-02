@@ -9,7 +9,9 @@ namespace Gitster.Controls;
 
 public partial class CommitListView : UserControl
 {
+    private const string CommitDragFormat = "Gitster.CommitItem";
     private CommitListViewModel? _vm;
+    private Point _dragStart;
 
     public CommitListView()
     {
@@ -83,6 +85,80 @@ public partial class CommitListView : UserControl
         _vm.SelectedCommits = CommitListBox.SelectedItems
             .OfType<CommitItem>()
             .ToList();
+    }
+
+    private void CommitItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStart = e.GetPosition(null);
+    }
+
+    private void CommitItem_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed
+            || sender is not ListViewItem item
+            || item.DataContext is not CommitItem commit)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(null);
+        if (Math.Abs(current.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(current.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        var data = new DataObject();
+        data.SetData(CommitDragFormat, commit);
+        DragDrop.DoDragDrop(item, data, DragDropEffects.Move);
+    }
+
+    private void CommitItem_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = DragDropEffects.None;
+        if (_vm is null
+            || sender is not ListViewItem item
+            || item.DataContext is not CommitItem target
+            || e.Data.GetData(CommitDragFormat) is not CommitItem source)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (CommitListViewModel.CanDropCommitForFixup(source, target, out var reason))
+        {
+            e.Effects = DragDropEffects.Move;
+            item.ToolTip = $"Fixup {source.CommitId} into {target.CommitId}";
+        }
+        else
+        {
+            item.ToolTip = reason;
+        }
+
+        e.Handled = true;
+    }
+
+    private void CommitItem_DragLeave(object sender, DragEventArgs e)
+    {
+        if (sender is ListViewItem item)
+            item.ClearValue(ToolTipProperty);
+    }
+
+    private async void CommitItem_Drop(object sender, DragEventArgs e)
+    {
+        if (_vm is null
+            || sender is not ListViewItem item
+            || item.DataContext is not CommitItem target
+            || e.Data.GetData(CommitDragFormat) is not CommitItem source)
+        {
+            return;
+        }
+
+        if (!CommitListViewModel.CanDropCommitForFixup(source, target, out _))
+            return;
+
+        item.ClearValue(ToolTipProperty);
+        await _vm.DropCommitForFixupAsync(source, target);
     }
 }
 

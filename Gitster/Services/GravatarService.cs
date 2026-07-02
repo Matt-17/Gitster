@@ -13,6 +13,8 @@ namespace Gitster.Services;
 /// </summary>
 public static class GravatarService
 {
+    private const int MaxCachedEntries = 200;
+    private static readonly object CachePruneLock = new();
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
 
     private static readonly string CacheDir =
@@ -53,25 +55,86 @@ public static class GravatarService
 
         try
         {
-            if (File.Exists(miss)) return null;
-            if (File.Exists(file)) return Load(file);
+            if (File.Exists(miss))
+            {
+                Touch(miss);
+                return null;
+            }
+
+            if (File.Exists(file))
+            {
+                Touch(file);
+                return Load(file);
+            }
 
             Directory.CreateDirectory(CacheDir);
+            PruneCacheDirectory(CacheDir, MaxCachedEntries);
             var url = $"https://www.gravatar.com/avatar/{hash}?s={size}&d=404";
             using var resp = await Http.GetAsync(url);
             if (!resp.IsSuccessStatusCode)
             {
                 try { await File.WriteAllTextAsync(miss, string.Empty); } catch { /* ignore */ }
+                PruneCacheDirectory(CacheDir, MaxCachedEntries);
                 return null;
             }
 
             var bytes = await resp.Content.ReadAsByteArrayAsync();
             await File.WriteAllBytesAsync(file, bytes);
+            PruneCacheDirectory(CacheDir, MaxCachedEntries);
             return Load(file);
         }
         catch
         {
             return null; // offline or any failure → initials fallback
+        }
+    }
+
+    internal static int PruneCacheDirectory(string cacheDir, int maxEntries)
+    {
+        if (maxEntries < 1)
+            throw new ArgumentOutOfRangeException(nameof(maxEntries), "Cache must keep at least one entry.");
+
+        if (!Directory.Exists(cacheDir))
+            return 0;
+
+        lock (CachePruneLock)
+        {
+            var files = Directory.EnumerateFiles(cacheDir, "*.*", SearchOption.TopDirectoryOnly)
+                .Where(path => path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                    || path.EndsWith(".none", StringComparison.OrdinalIgnoreCase))
+                .Select(path => new FileInfo(path))
+                .OrderByDescending(info => info.LastAccessTimeUtc)
+                .ThenByDescending(info => info.LastWriteTimeUtc)
+                .ThenBy(info => info.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var deleted = 0;
+            foreach (var file in files.Skip(maxEntries))
+            {
+                try
+                {
+                    file.Delete();
+                    deleted++;
+                }
+                catch
+                {
+                    // Best effort: an in-use cache file should never break avatar fallback.
+                }
+            }
+
+            return deleted;
+        }
+    }
+
+    private static void Touch(string path)
+    {
+        try
+        {
+            File.SetLastAccessTimeUtc(path, DateTime.UtcNow);
+        }
+        catch
+        {
+            // Cache recency is only an optimization.
         }
     }
 

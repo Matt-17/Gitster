@@ -11,11 +11,13 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0" Cursor="Hand" Padding="10,0"
                     Background="Transparent" BorderThickness="0"
                     ToolTip="Open commit panel (Ctrl+K)"
+                    AutomationProperties.Name="Open commit panel"
                     Command="{Binding DataContext.OpenCommitPanelCommand, RelativeSource={RelativeSource AncestorType=Window}}">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
@@ -25,6 +27,9 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BackgroundPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -58,7 +63,8 @@
                             Width="16" Height="16"
                             Command="{Binding DismissFeedbackCommand}"
                             Visibility="{Binding IsFailure, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            ToolTip="Dismiss">
+                            ToolTip="Dismiss"
+                            AutomationProperties.Name="Dismiss feedback">
                         <Path Stretch="Uniform" Width="8" Height="8"
                               Stroke="{DynamicResource TextSecondary}" StrokeThickness="1.5"
                               Data="M2,2 L10,10 M10,2 L2,10"/>
@@ -66,10 +72,22 @@
                 </StackPanel>
             </Grid>
 
-            <Button Grid.Column="2" Cursor="Hand" Padding="10,0"
+            <Border Grid.Column="2"
+                    Padding="10,0"
+                    BorderBrush="{DynamicResource BorderTertiary}"
+                    BorderThickness="1,0,0,0"
+                    Visibility="{Binding HasSubmoduleStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding SubmoduleStatusText}"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondary}"/>
+            </Border>
+
+            <Button Grid.Column="3" Cursor="Hand" Padding="10,0"
                     Background="Transparent" BorderThickness="0"
                     Command="{Binding OpenRepositoryFolderCommand}"
-                    ToolTip="{Binding RepositoryPath}">
+                    ToolTip="{Binding RepositoryPath}"
+                    AutomationProperties.Name="Open repository folder">
                 <Button.ContextMenu>
                     <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                         <MenuItem Header="Copy full path"
@@ -84,6 +102,9 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BackgroundPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

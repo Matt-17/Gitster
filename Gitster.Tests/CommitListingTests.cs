@@ -67,6 +67,32 @@ public sealed class CommitListingTests
     }
 
     [TestMethod]
+    public async Task GetWorkingTreeStatus_IgnoresIgnoredBuildArtifactsAndKeepsRealUntrackedFile()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "a.txt", "1\n");
+        repo.Commit("ignore build outputs", ".gitignore", "bin/\nobj/\n.vs/\n");
+
+        WriteFile(repo.Path, "bin/temp.dll", "ignored");
+        WriteFile(repo.Path, "obj/temp.cache", "ignored");
+        WriteFile(repo.Path, ".vs/state.json", "ignored");
+        WriteFile(repo.Path, "loose.txt", "visible");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var status = await backend.GetWorkingTreeStatusAsync();
+        var unstagedPaths = status.Unstaged
+            .Select(file => NormalizePath(file.Path))
+            .ToArray();
+
+        CollectionAssert.DoesNotContain(unstagedPaths, "bin/temp.dll");
+        CollectionAssert.DoesNotContain(unstagedPaths, "obj/temp.cache");
+        CollectionAssert.DoesNotContain(unstagedPaths, ".vs/state.json");
+        CollectionAssert.Contains(unstagedPaths, "loose.txt");
+    }
+
+    [TestMethod]
     public async Task Commit_CreatesCommitOnBranch_WithoutDetaching()
     {
         using var repo = new GitTestRepo();
@@ -148,4 +174,16 @@ public sealed class CommitListingTests
         Assert.IsTrue(file.Lines?.Any(line => line.Kind == DiffLineKind.Added && line.Text == "+line-two") == true);
         Assert.IsTrue(file.Lines?.Any(line => line.Kind == DiffLineKind.Added && line.Text == "+line3") == true);
     }
+
+    private static void WriteFile(string root, string relativePath, string content)
+    {
+        var path = System.IO.Path.Combine(root, relativePath);
+        var dir = System.IO.Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(dir))
+            System.IO.Directory.CreateDirectory(dir);
+
+        System.IO.File.WriteAllText(path, content);
+    }
+
+    private static string NormalizePath(string path) => path.Replace('\\', '/');
 }

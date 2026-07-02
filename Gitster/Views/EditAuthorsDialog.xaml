@@ -9,17 +9,17 @@
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        Background="{StaticResource BackgroundPrimary}">
+        Background="{DynamicResource BackgroundPrimary}">
 
     <Window.Resources>
         <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Padding" Value="0,0,0,3"/>
         </Style>
     </Window.Resources>
 
-    <Border Padding="16" Background="{StaticResource BackgroundPrimary}">
+    <Border Padding="16" Background="{DynamicResource BackgroundPrimary}">
         <StackPanel>
 
             <!-- Author row -->
@@ -37,14 +37,15 @@
                           Text="{Binding AuthorText, UpdateSourceTrigger=PropertyChanged}"
                           Height="28"
                           FontSize="12"
-                          Foreground="{StaticResource TextPrimary}"
-                          BorderBrush="{StaticResource BorderTertiary}"/>
+                          Foreground="{DynamicResource TextPrimary}"
+                          BorderBrush="{DynamicResource BorderTertiary}"/>
                 <Button Grid.Column="1"
                         Content="+"
                         Command="{Binding AddAuthorCommand}"
                         Width="28" Height="28"
                         Margin="4,0,0,0"
                         ToolTip="Add new identity"
+                        AutomationProperties.Name="Add author identity"
                         Style="{StaticResource GhostButton}"/>
             </Grid>
 
@@ -64,8 +65,8 @@
                           Text="{Binding CommitterText, UpdateSourceTrigger=PropertyChanged}"
                           Height="28"
                           FontSize="12"
-                          Foreground="{StaticResource TextPrimary}"
-                          BorderBrush="{StaticResource BorderTertiary}"/>
+                          Foreground="{DynamicResource TextPrimary}"
+                          BorderBrush="{DynamicResource BorderTertiary}"/>
                 <Button Grid.Column="1"
                         Content="+"
                         Command="{Binding AddAuthorCommand}"
@@ -73,13 +74,14 @@
                         Margin="4,0,0,0"
                         IsEnabled="{Binding IsCommitterEnabled}"
                         ToolTip="Add new identity"
+                        AutomationProperties.Name="Add committer identity"
                         Style="{StaticResource GhostButton}"/>
             </Grid>
 
             <!-- Sync checkbox -->
             <CheckBox Content="Sync author and committer"
                       IsChecked="{Binding SyncAuthorCommitter}"
-                      Foreground="{StaticResource TextSecondary}"
+                      Foreground="{DynamicResource TextSecondary}"
                       FontSize="12"
                       Margin="0,0,0,16"/>
 

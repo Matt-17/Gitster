@@ -3,6 +3,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
+using Gitster.Services.Features;
 using Gitster.Services.Git;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
@@ -24,6 +25,8 @@ public partial class QuickActionsViewModel : BaseViewModel
     private readonly Func<List<CommitItem>>   _getMultiSelected;
     private readonly Func<Task>               _onRefresh;
 
+    public Func<Task> RefreshAfterActionAsync { get; set; } = () => Task.CompletedTask;
+
     public QuickActionsViewModel(
         IGitBackend             git,
         OperationFeedbackService feedback,
@@ -44,6 +47,26 @@ public partial class QuickActionsViewModel : BaseViewModel
         _getSelected      = getSelected;
         _getMultiSelected = getMultiSelected;
         _onRefresh        = onRefresh;
+    }
+
+    public QuickActionsViewModel(
+        IGitBackend git,
+        OperationFeedbackService feedback,
+        OperationsLogService opsLog,
+        SnapshotService snapshots,
+        SourceArchiveService archiveService,
+        IWindowService windowService,
+        ISelectionContext selectionContext)
+    {
+        _git = git;
+        _feedback = feedback;
+        _opsLog = opsLog;
+        _snapshots = snapshots;
+        _archiveService = archiveService;
+        _windowService = windowService;
+        _getSelected = () => selectionContext.SelectedCommit;
+        _getMultiSelected = () => selectionContext.SelectedCommits.ToList();
+        _onRefresh = () => RefreshAfterActionAsync();
     }
 
     // ── Reword (Step G) ───────────────────────────────────────────────────
@@ -106,6 +129,9 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Reword", ex))
+                return;
+
             _windowService.Error($"Reword failed:\n{ex.Message}", "Gitster");
         }
     }
@@ -158,6 +184,9 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Fixup", ex))
+                return;
+
             _windowService.Error($"Fixup failed:\n{ex.Message}", "Gitster");
         }
     }
@@ -229,6 +258,9 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Squash", ex))
+                return;
+
             _windowService.Error($"Squash failed:\n{ex.Message}", "Gitster");
         }
     }
@@ -295,6 +327,9 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Cherry-pick", ex))
+                return;
+
             _windowService.Error($"Cherry-pick failed:\n{ex.Message}", "Gitster");
         }
     }

@@ -23,6 +23,14 @@ public partial class OperationProgressViewModel : ObservableObject, IDisposable
 
     public string TitleText { get; }
 
+    public event EventHandler? CancelRequested;
+
+    [ObservableProperty]
+    public partial bool CanCancel { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsCancelRequested { get; set; }
+
     [ObservableProperty]
     public partial string StageText { get; set; }
 
@@ -44,6 +52,17 @@ public partial class OperationProgressViewModel : ObservableObject, IDisposable
         DetailText = progress.Detail;
         ProgressMaximum = progress.Maximum <= 0 ? 100 : progress.Maximum;
         ProgressValue = Math.Clamp(progress.Value, 0, ProgressMaximum);
+    }
+
+    public void Cancel()
+    {
+        if (!CanCancel || IsCancelRequested)
+            return;
+
+        IsCancelRequested = true;
+        StageText = "Canceling";
+        DetailText = "Stopping the Git operation...";
+        CancelRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshElapsed()

@@ -1,5 +1,7 @@
 using System.IO;
+using System.Xml.Linq;
 
+using Gitster.Models;
 using Gitster.Services;
 
 namespace Gitster.Tests;
@@ -98,10 +100,99 @@ public sealed class UiPreferencesServiceTests
         Assert.IsNull(reloaded.GetSplitterLength("zero"));
     }
 
+    [TestMethod]
+    public void ThemePreference_SavesAndReloadsValue()
+    {
+        var path = CreateSettingsPath();
+        var service = new UiPreferencesService(path);
+
+        service.ThemePreference = ThemePreference.Dark;
+
+        var reloaded = new UiPreferencesService(path);
+        Assert.AreEqual(ThemePreference.Dark, reloaded.ThemePreference);
+        Assert.IsTrue(reloaded.IsDarkTheme);
+        Assert.IsFalse(reloaded.IsLightTheme);
+        Assert.IsFalse(reloaded.IsSystemTheme);
+    }
+
+    [TestMethod]
+    public void UpdateChecksEnabled_FilePathConstructor_SavesAndReloadsValue()
+    {
+        var path = CreateSettingsPath();
+        var service = new UiPreferencesService(path);
+
+        service.UpdateChecksEnabled = true;
+
+        var reloaded = new UiPreferencesService(path);
+        Assert.IsTrue(reloaded.UpdateChecksEnabled);
+    }
+
+    [TestMethod]
+    public void PersistentLoggingEnabled_FilePathConstructor_DefaultsFalseAndRoundTrips()
+    {
+        var path = CreateSettingsPath();
+        var service = new UiPreferencesService(path);
+
+        Assert.IsFalse(service.PersistentLoggingEnabled);
+
+        service.PersistentLoggingEnabled = true;
+
+        var reloaded = new UiPreferencesService(path);
+        Assert.IsTrue(reloaded.PersistentLoggingEnabled);
+    }
+
+    [TestMethod]
+    public void ResolveEffectiveTheme_SystemUsesWindowsTheme()
+    {
+        Assert.AreEqual(
+            ThemePreference.Light,
+            ThemeService.ResolveEffectiveTheme(ThemePreference.System, () => true));
+        Assert.AreEqual(
+            ThemePreference.Dark,
+            ThemeService.ResolveEffectiveTheme(ThemePreference.System, () => false));
+    }
+
+    [TestMethod]
+    public void PaletteDictionaries_ExposeSameKeys()
+    {
+        var root = FindRepositoryRoot();
+        var light = ReadResourceKeys(Path.Combine(root, "Gitster", "Themes", "Palette.Light.xaml"));
+        var dark = ReadResourceKeys(Path.Combine(root, "Gitster", "Themes", "Palette.Dark.xaml"));
+
+        CollectionAssert.AreEqual(light.Order().ToArray(), dark.Order().ToArray());
+    }
+
     private static string CreateSettingsPath()
     {
         var dir = Path.Combine(Path.GetTempPath(), "Gitster.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, "ui-settings.json");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (!string.IsNullOrWhiteSpace(dir))
+        {
+            if (File.Exists(Path.Combine(dir, "Gitster.sln")))
+                return dir;
+
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+
+        throw new DirectoryNotFoundException("Could not find Gitster.sln from test output directory.");
+    }
+
+    private static string[] ReadResourceKeys(string path)
+    {
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+        return XDocument.Load(path)
+            .Root!
+            .Elements()
+            .Select(e => (string?)e.Attribute(xaml + "Key"))
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Cast<string>()
+            .Order(StringComparer.Ordinal)
+            .ToArray();
     }
 }

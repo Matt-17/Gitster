@@ -23,6 +23,7 @@
             <Button Content="Cancel"
                     Style="{StaticResource GhostButton}"
                     Margin="0,0,8,0"
+                    IsCancel="True"
                     Click="OnCancel"/>
             <Button Content="{Binding RewriteButtonText}"
                     Style="{StaticResource PrimaryButton}"
@@ -37,10 +38,10 @@
                 <!-- Section: commit range -->
                 <TextBlock Text="Commit range"
                            FontWeight="SemiBold" FontSize="13"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            Margin="0,0,0,8"/>
                 <TextBlock Text="{Binding LoadStatusText}"
-                           Foreground="{StaticResource TextSecondary}"
+                           Foreground="{DynamicResource TextSecondary}"
                            FontSize="11"
                            Margin="0,0,0,8"/>
 
@@ -58,7 +59,7 @@
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="From (oldest)"
                                VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12"/>
                     <ComboBox Grid.Row="0" Grid.Column="1"
                               Height="30"
@@ -69,7 +70,7 @@
                                 <TextBlock>
                                     <Run Text="{Binding CommitId, Mode=OneWay}"
                                          FontFamily="{StaticResource FontFamilyMono}"
-                                         Foreground="{StaticResource TextSecondary}"/>
+                                         Foreground="{DynamicResource TextSecondary}"/>
                                     <Run Text="  "/>
                                     <Run Text="{Binding Message, Mode=OneWay}"/>
                                 </TextBlock>
@@ -80,7 +81,7 @@
                     <TextBlock Grid.Row="2" Grid.Column="0"
                                Text="To (newest)"
                                VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12"/>
                     <ComboBox Grid.Row="2" Grid.Column="1"
                               Height="30"
@@ -91,7 +92,7 @@
                                 <TextBlock>
                                     <Run Text="{Binding CommitId, Mode=OneWay}"
                                          FontFamily="{StaticResource FontFamilyMono}"
-                                         Foreground="{StaticResource TextSecondary}"/>
+                                         Foreground="{DynamicResource TextSecondary}"/>
                                     <Run Text="  "/>
                                     <Run Text="{Binding Message, Mode=OneWay}"/>
                                 </TextBlock>
@@ -101,12 +102,12 @@
                 </Grid>
 
                 <!-- Divider -->
-                <Border Height="0.5" Background="{StaticResource BorderTertiary}" Margin="0,0,0,16"/>
+                <Border Height="0.5" Background="{DynamicResource BorderTertiary}" Margin="0,0,0,16"/>
 
                 <!-- Section: shift offset -->
                 <TextBlock Text="Shift all timestamps by offset"
                            FontWeight="SemiBold" FontSize="13"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            Margin="0,0,0,10"/>
 
                 <Grid Margin="0,0,0,16">
@@ -123,32 +124,32 @@
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="Direction"
                                VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12"/>
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
                         <RadioButton Content="Earlier"
                                      IsChecked="{Binding ShiftEarlier}"
-                                     Foreground="{StaticResource TextPrimary}"
+                                     Foreground="{DynamicResource TextPrimary}"
                                      VerticalAlignment="Center"
                                      Margin="0,0,20,0"/>
                         <RadioButton Content="Later"
                                      IsChecked="{Binding ShiftLater}"
-                                     Foreground="{StaticResource TextPrimary}"
+                                     Foreground="{DynamicResource TextPrimary}"
                                      VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <TextBlock Grid.Row="2" Grid.Column="0"
                                Text="Amount"
                                VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"
+                               Foreground="{DynamicResource TextSecondary}"
                                FontSize="12"/>
                     <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
                         <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged}"
                                  Width="60" Height="30"
-                                 BorderBrush="{StaticResource BorderTertiary}"
+                                 BorderBrush="{DynamicResource BorderTertiary}"
                                  BorderThickness="1"
-                                 Background="{StaticResource BackgroundPrimary}"
-                                 Foreground="{StaticResource TextPrimary}"/>
+                                 Background="{DynamicResource BackgroundPrimary}"
+                                 Foreground="{DynamicResource TextPrimary}"/>
                         <ComboBox ItemsSource="{Binding UnitOptions}"
                                   SelectedItem="{Binding Unit}"
                                   Height="30" Width="80"
@@ -157,38 +158,38 @@
                 </Grid>
 
                 <!-- Divider -->
-                <Border Height="0.5" Background="{StaticResource BorderTertiary}" Margin="0,0,0,16"/>
+                <Border Height="0.5" Background="{DynamicResource BorderTertiary}" Margin="0,0,0,16"/>
 
                 <!-- Options -->
                 <StackPanel Margin="0,0,0,12">
                     <CheckBox Content="Update author timestamp"
                               IsChecked="{Binding UpdateAuthorTimestamp}"
-                              Foreground="{StaticResource TextPrimary}"
+                              Foreground="{DynamicResource TextPrimary}"
                               Margin="0,0,0,6"/>
                     <CheckBox Content="Update committer timestamp"
                               IsChecked="{Binding UpdateCommitterTimestamp}"
-                              Foreground="{StaticResource TextPrimary}"/>
+                              Foreground="{DynamicResource TextPrimary}"/>
                 </StackPanel>
 
                 <!-- Warning banner (OnRemote commits in range) -->
                 <Border Visibility="{Binding HasUnsafeCommits,
                                              Converter={StaticResource BooleanToVisibilityConverter}}"
-                        Background="{StaticResource AccentWarningBackground}"
-                        BorderBrush="{StaticResource AccentWarning}"
+                        Background="{DynamicResource AccentWarningBackground}"
+                        BorderBrush="{DynamicResource AccentWarning}"
                         BorderThickness="0.5"
                         CornerRadius="{StaticResource CornerRadiusMd}"
                         Padding="10,7"
                         Margin="0,0,0,12">
                     <TextBlock TextWrapping="Wrap" FontSize="11">
-                        <Run Text="⚠" Foreground="{StaticResource AccentWarning}"/>
+                        <Run Text="⚠" Foreground="{DynamicResource AccentWarning}"/>
                         <Run Text=" Some commits in this range are already on the remote. Rewriting will require a force-push and will affect anyone who has pulled them."
-                             Foreground="{StaticResource TextPrimary}"/>
+                             Foreground="{DynamicResource TextPrimary}"/>
                     </TextBlock>
                 </Border>
 
                 <!-- Preview header -->
                 <TextBlock FontWeight="SemiBold" FontSize="13"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            Margin="0,0,0,8">
                     <Run Text="Preview ("/>
                     <Run Text="{Binding PreviewCount, Mode=OneWay}"/>
@@ -196,7 +197,7 @@
                 </TextBlock>
 
                 <!-- Preview list -->
-                <Border BorderBrush="{StaticResource BorderTertiary}"
+                <Border BorderBrush="{DynamicResource BorderTertiary}"
                         BorderThickness="0.5"
                         CornerRadius="{StaticResource CornerRadiusMd}"
                         MaxHeight="220"
@@ -216,13 +217,13 @@
                                                    Text="{Binding Sha, Mode=OneWay}"
                                                    FontFamily="{StaticResource FontFamilyMono}"
                                                    FontSize="11"
-                                                   Foreground="{StaticResource TextSecondary}"
+                                                   Foreground="{DynamicResource TextSecondary}"
                                                    VerticalAlignment="Center"/>
 
                                         <TextBlock Grid.Column="1"
                                                    Text="{Binding Message, Mode=OneWay}"
                                                    TextTrimming="CharacterEllipsis"
-                                                   Foreground="{StaticResource TextPrimary}"
+                                                   Foreground="{DynamicResource TextPrimary}"
                                                    FontSize="12"
                                                    VerticalAlignment="Center"
                                                    Margin="6,0"/>
@@ -230,10 +231,10 @@
                                         <StackPanel Grid.Column="2">
                                             <TextBlock Text="{Binding OriginalDate, StringFormat='dd.MM. HH:mm'}"
                                                        FontSize="10"
-                                                       Foreground="{StaticResource TextTertiary}"
+                                                       Foreground="{DynamicResource TextTertiary}"
                                                        HorizontalAlignment="Right"/>
                                             <TextBlock FontSize="10"
-                                                       Foreground="{StaticResource AccentBlue}"
+                                                       Foreground="{DynamicResource AccentBlue}"
                                                        HorizontalAlignment="Right">
                                                 <Run Text="→ "/>
                                                 <Run Text="{Binding NewDate, StringFormat='dd.MM. HH:mm', Mode=OneWay}"/>

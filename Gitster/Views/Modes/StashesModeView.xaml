@@ -56,22 +56,13 @@
                         Padding="10,4"/>
             </Grid>
 
-            <!-- Empty state -->
-            <StackPanel Grid.Row="1"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Opacity="0.5"
-                        Visibility="{Binding HasStashes, Converter={StaticResource InverseBoolVis}}">
-                <TextBlock Text="No stashes"
-                           FontSize="15"
-                           Foreground="{StaticResource TextPrimary}"
-                           HorizontalAlignment="Center"/>
-                <TextBlock Text="Use 'New stash...' to save your working tree changes."
-                           FontSize="12"
-                           Margin="0,6,0,0"
-                           Foreground="{StaticResource TextTertiary}"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
+            <controls:EmptyStateControl Grid.Row="1"
+                                        Icon="S"
+                                        Title="No stashes"
+                                        Message="Save your current working tree changes as a named stash, then return to them later."
+                                        ActionText="New stash"
+                                        ActionCommand="{Binding NewStashCommand}"
+                                        Visibility="{Binding HasStashes, Converter={StaticResource InverseBoolVis}}"/>
 
             <!-- Stash list -->
             <ListView Grid.Row="1"
@@ -90,7 +81,7 @@
                                     <TextBlock Text="{Binding Ref}"
                                                FontFamily="{StaticResource FontFamilyMono}"
                                                FontSize="11"
-                                               Foreground="{StaticResource TextSecondary}"/>
+                                               Foreground="{DynamicResource TextSecondary}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
@@ -101,7 +92,7 @@
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DisplayName}"
                                                FontSize="12"
-                                               Foreground="{StaticResource TextPrimary}"
+                                               Foreground="{DynamicResource TextPrimary}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
@@ -114,7 +105,7 @@
                                     <TextBlock Text="{Binding BranchName}"
                                                FontFamily="{StaticResource FontFamilyMono}"
                                                FontSize="11"
-                                               Foreground="{StaticResource TextSecondary}"
+                                               Foreground="{DynamicResource TextSecondary}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
@@ -126,7 +117,7 @@
                                 <DataTemplate>
                                     <TextBlock Text="{Binding CreatedAt, Converter={StaticResource RelativeDate}}"
                                                FontSize="11"
-                                               Foreground="{StaticResource TextSecondary}"/>
+                                               Foreground="{DynamicResource TextSecondary}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
@@ -138,7 +129,7 @@
         <!-- Splitter -->
         <GridSplitter Grid.Row="0" Grid.Column="1"
                       HorizontalAlignment="Stretch"
-                      Background="{StaticResource BorderTertiary}"
+                      Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="StashesMode.DetailPanelWidth"
                       helper:PersistedGridSplitter.DefinitionKind="Column"
@@ -153,7 +144,7 @@
                 <!-- "No selection" hint -->
                 <TextBlock Text="Select a stash to see details"
                            FontSize="13"
-                           Foreground="{StaticResource TextTertiary}"
+                           Foreground="{DynamicResource TextTertiary}"
                            HorizontalAlignment="Center"
                            Margin="0,40,0,0"
                            Visibility="{Binding HasSelectedStash, Converter={StaticResource InverseBoolVis}}"/>
@@ -167,12 +158,12 @@
                             <TextBlock Text="{Binding SelectedStash.DisplayName}"
                                        FontSize="14"
                                        FontWeight="Medium"
-                                       Foreground="{StaticResource TextPrimary}"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        TextWrapping="Wrap"/>
                             <TextBlock Text="{Binding SelectedStash.MetaLine}"
                                        FontSize="11"
                                        FontFamily="{StaticResource FontFamilyMono}"
-                                       Foreground="{StaticResource TextSecondary}"
+                                       Foreground="{DynamicResource TextSecondary}"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
@@ -219,7 +210,7 @@
                                 Content="Drop"
                                 Style="{StaticResource GhostButton}"
                                 Command="{Binding DropCommand}"
-                                Foreground="{StaticResource AccentDanger}"
+                                Foreground="{DynamicResource AccentDanger}"
                                 HorizontalAlignment="Stretch"/>
                     </Grid>
 
@@ -230,7 +221,7 @@
         <GridSplitter Grid.Row="1"
                       Grid.ColumnSpan="3"
                       HorizontalAlignment="Stretch"
-                      Background="{StaticResource BorderTertiary}"
+                      Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="StashesMode.DiffHeight"
                       helper:PersistedGridSplitter.DefinitionKind="Row"

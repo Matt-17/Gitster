@@ -16,7 +16,7 @@
                 <TextBlock Text="⏱" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBlock Text="New Timestamp"
                            FontWeight="Medium"
-                           Foreground="{StaticResource TextPrimary}"
+                           Foreground="{DynamicResource TextPrimary}"
                            VerticalAlignment="Center"/>
             </StackPanel>
 
@@ -49,6 +49,23 @@
                         ToolTip="Load HEAD's time into the editor"/>
             </StackPanel>
 
+            <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0"
+                          ItemsSource="{Binding Presets}"
+                          DisplayMemberPath="Label"
+                          SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"/>
+                <Button Grid.Column="2"
+                        Content="Apply preset"
+                        Command="{Binding ApplySelectedPresetCommand}"
+                        Style="{StaticResource GhostButton}"
+                        Padding="8,3"/>
+            </Grid>
+
             <!-- Preset buttons -->
             <ItemsControl ItemsSource="{Binding Presets}" Margin="0,0,0,10">
                 <ItemsControl.ItemsPanel>
@@ -70,7 +87,7 @@
             </ItemsControl>
 
             <!-- Before / After preview — timestamp row always shown; author row shown when author changes -->
-            <Border Background="{StaticResource BackgroundSecondary}"
+            <Border Background="{DynamicResource BackgroundSecondary}"
                     CornerRadius="{StaticResource CornerRadiusMd}"
                     Padding="8,6"
                     Margin="0,0,0,10">
@@ -83,12 +100,12 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="timestamp"
-                                   Foreground="{StaticResource TextTertiary}"
+                                   Foreground="{DynamicResource TextTertiary}"
                                    FontSize="10"/>
                         <TextBlock Grid.Column="1"
                                    FontFamily="{StaticResource FontFamilyMono}"
                                    FontSize="11"
-                                   Foreground="{StaticResource TextSecondary}"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    Text="{Binding PreviewBefore}"/>
                     </Grid>
                     <Grid Margin="0,0,0,4">
@@ -97,12 +114,12 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="→ new"
-                                   Foreground="{StaticResource AccentWarning}"
+                                   Foreground="{DynamicResource AccentWarning}"
                                    FontSize="10"/>
                         <TextBlock Grid.Column="1"
                                    FontFamily="{StaticResource FontFamilyMono}"
                                    FontSize="11">
-                            <Run Text="{Binding PreviewAfter, Mode=OneWay}" Foreground="{StaticResource TextPrimary}"/>
+                            <Run Text="{Binding PreviewAfter, Mode=OneWay}" Foreground="{DynamicResource TextPrimary}"/>
                         </TextBlock>
                     </Grid>
 
@@ -116,13 +133,13 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="→ author"
-                                   Foreground="{StaticResource AccentWarning}"
+                                   Foreground="{DynamicResource AccentWarning}"
                                    FontSize="10"/>
                         <TextBlock Grid.Column="1"
                                    FontFamily="{StaticResource FontFamilyMono}"
                                    FontSize="11"
                                    TextTrimming="CharacterEllipsis"
-                                   Foreground="{StaticResource TextPrimary}"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    Text="{Binding DataContext.AuthorPanelVM.AuthorText,
                                                   RelativeSource={RelativeSource AncestorType=Window}}"/>
                     </Grid>
@@ -134,16 +151,16 @@
             <Border Visibility="{Binding DataContext.IsAmendUnsafe,
                                          RelativeSource={RelativeSource AncestorType=Window},
                                          Converter={StaticResource BooleanToVisibilityConverter}}"
-                    Background="{StaticResource AccentWarningBackground}"
-                    BorderBrush="{StaticResource AccentWarning}"
+                    Background="{DynamicResource AccentWarningBackground}"
+                    BorderBrush="{DynamicResource AccentWarning}"
                     BorderThickness="0.5"
                     CornerRadius="{StaticResource CornerRadiusMd}"
                     Padding="10,7"
                     Margin="0,0,0,8">
                 <TextBlock TextWrapping="Wrap" FontSize="11">
-                    <Run Text="⚠" Foreground="{StaticResource AccentWarning}"/>
+                    <Run Text="⚠" Foreground="{DynamicResource AccentWarning}"/>
                     <Run Text=" This commit is already on the remote. Amending it will require a force-push."
-                         Foreground="{StaticResource TextPrimary}"/>
+                         Foreground="{DynamicResource TextPrimary}"/>
                 </TextBlock>
             </Border>
 

@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Gitster.Models;
 using Gitster.Services;
+using Gitster.Services.Features;
 
 namespace Gitster.ViewModels;
 
@@ -15,15 +16,19 @@ public partial class StatusBarViewModel : BaseViewModel
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
     private readonly IWindowService _windowService;
+    private readonly GitFeatureService _features;
+    private int _submoduleRequestVersion;
 
     public StatusBarViewModel(
         RepositoryStateService stateService,
         OperationFeedbackService feedbackService,
-        IWindowService windowService)
+        IWindowService windowService,
+        GitFeatureService features)
     {
         _stateService = stateService;
         _feedbackService = feedbackService;
         _windowService = windowService;
+        _features = features;
 
         _stateService.PropertyChanged += OnServiceChanged;
         _feedbackService.PropertyChanged += OnServiceChanged;
@@ -63,6 +68,12 @@ public partial class StatusBarViewModel : BaseViewModel
 
     [ObservableProperty]
     public partial string RepositoryPathDisplay { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool HasSubmoduleStatus { get; set; }
+
+    [ObservableProperty]
+    public partial string SubmoduleStatusText { get; set; } = string.Empty;
 
     public bool HasRepositoryPath => !string.IsNullOrWhiteSpace(RepositoryPath);
 
@@ -118,6 +129,7 @@ public partial class StatusBarViewModel : BaseViewModel
     {
         RepositoryPath = _stateService.RepositoryPath;
         RepositoryPathDisplay = ToCompactPath(RepositoryPath);
+        _ = RefreshSubmoduleStatusAsync(RepositoryPath);
 
         var branch = _stateService.CurrentBranch;
         switch (_stateService.WorkingTreeState)
@@ -208,6 +220,47 @@ public partial class StatusBarViewModel : BaseViewModel
 
     private static string ShortSha(string sha)
         => string.IsNullOrEmpty(sha) ? string.Empty : sha[..Math.Min(7, sha.Length)];
+
+    private async Task RefreshSubmoduleStatusAsync(string? repoPath)
+    {
+        var version = Interlocked.Increment(ref _submoduleRequestVersion);
+        if (string.IsNullOrWhiteSpace(repoPath))
+        {
+            HasSubmoduleStatus = false;
+            SubmoduleStatusText = string.Empty;
+            return;
+        }
+
+        try
+        {
+            var statuses = await _features.GetSubmoduleStatusAsync(repoPath);
+            if (version != _submoduleRequestVersion)
+                return;
+
+            if (statuses.Count == 0)
+            {
+                HasSubmoduleStatus = false;
+                SubmoduleStatusText = string.Empty;
+                return;
+            }
+
+            var dirty = statuses.Count(s => s.HasChanges);
+            var uninitialized = statuses.Count(s => !s.IsInitialized);
+            var detail = dirty > 0
+                ? $"{dirty} dirty"
+                : uninitialized > 0 ? $"{uninitialized} uninitialized" : "clean";
+            SubmoduleStatusText = $"{statuses.Count} submodules: {detail}";
+            HasSubmoduleStatus = true;
+        }
+        catch
+        {
+            if (version != _submoduleRequestVersion)
+                return;
+
+            HasSubmoduleStatus = false;
+            SubmoduleStatusText = string.Empty;
+        }
+    }
 
     private static Brush ResolveBrush(string key, Brush fallback)
     {

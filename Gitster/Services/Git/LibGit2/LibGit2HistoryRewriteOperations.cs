@@ -369,6 +369,194 @@ internal sealed class LibGit2HistoryRewriteOperations
         return Task.FromResult(visited == commits.Count);
     }
 
+    public Task ReorderCommitsAsync(
+        IReadOnlyList<string> shasNewestFirst,
+        IReadOnlyList<string> reorderedShasNewestFirst,
+        string? branchName = null)
+    {
+        if (shasNewestFirst.Count < 2)
+            throw new InvalidOperationException("Select at least two commits to reorder.");
+        if (shasNewestFirst.Count != reorderedShasNewestFirst.Count)
+            throw new InvalidOperationException("The reordered commit list must contain the same commits.");
+
+        using var repo = _context.OpenRepository();
+        var branch = AttachBranchForHistoryRewrite(repo, branchName, "reorder commits");
+        var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+        EnsureCleanWorkingTree(repo, "reorder commits");
+
+        var chain = GetFirstParentChainOldestFirst(branchTip);
+        var selected = ResolveCommitsInChain(chain, shasNewestFirst);
+        var reordered = ResolveCommitsInChain(chain, reorderedShasNewestFirst);
+        EnsureSameCommitSet(selected, reordered);
+
+        var selectedSet = selected.Select(c => c.Sha).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var startIndex = chain.FindIndex(c => selectedSet.Contains(c.Sha));
+        var selectedRange = chain.Skip(startIndex).Take(selected.Count).ToList();
+        if (selectedRange.Count != selected.Count || selectedRange.Any(c => !selectedSet.Contains(c.Sha)))
+            throw new InvalidOperationException("Only contiguous first-parent commit ranges can be reordered.");
+
+        EnsureNoMergeCommits(selectedRange, "reorder commits");
+        EnsureNoOverlappingPathChanges(repo, selectedRange, "reorder commits");
+
+        var reorderedOldestFirst = reordered.AsEnumerable().Reverse().ToList();
+        var mapping = chain.Take(startIndex).ToDictionary(c => c.Sha, c => c, StringComparer.OrdinalIgnoreCase);
+        Commit? newParent = selectedRange[0].Parents.FirstOrDefault();
+
+        foreach (var oldCommit in reorderedOldestFirst)
+        {
+            var oldParentTree = oldCommit.Parents.FirstOrDefault()?.Tree;
+            var newTree = BuildReplayedTree(repo, oldParentTree, oldCommit.Tree, newParent?.Tree, excludedPath: null);
+            var newCommit = CreateReplayedCommit(repo, oldCommit, newTree, ParentList(newParent));
+            mapping[oldCommit.Sha] = newCommit;
+            newParent = newCommit;
+        }
+
+        foreach (var oldCommit in chain.Skip(startIndex + selectedRange.Count))
+        {
+            var oldParents = oldCommit.Parents.ToList();
+            var newParents = oldParents
+                .Select(p => mapping.TryGetValue(p.Sha, out var mapped) ? mapped : p)
+                .ToList();
+            var newTree = BuildReplayedTree(
+                repo,
+                oldParents.FirstOrDefault()?.Tree,
+                oldCommit.Tree,
+                newParents.FirstOrDefault()?.Tree,
+                excludedPath: null);
+            var newCommit = CreateReplayedCommit(repo, oldCommit, newTree, newParents);
+            mapping[oldCommit.Sha] = newCommit;
+            newParent = newCommit;
+        }
+
+        var newHead = newParent ?? throw new InvalidOperationException("Could not build reordered history.");
+        repo.Refs.UpdateTarget(branch.Reference, newHead.Id, "reorder commits");
+        _context.RaiseHeadChanged();
+        return Task.CompletedTask;
+    }
+
+    public Task SplitCommitAsync(
+        string sha,
+        IReadOnlyList<string> firstCommitPaths,
+        string firstMessage,
+        string secondMessage,
+        string? branchName = null)
+    {
+        if (firstCommitPaths.Count == 0)
+            throw new InvalidOperationException("Choose at least one file for the first split commit.");
+        if (string.IsNullOrWhiteSpace(firstMessage) || string.IsNullOrWhiteSpace(secondMessage))
+            throw new InvalidOperationException("Both split commit messages are required.");
+
+        using var repo = _context.OpenRepository();
+        var branch = AttachBranchForHistoryRewrite(repo, branchName, "split a commit");
+        var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+        EnsureCleanWorkingTree(repo, "split a commit");
+
+        var chain = GetFirstParentChainOldestFirst(branchTip);
+        var targetIndex = chain.FindIndex(c => ShaMatches(c, sha));
+        if (targetIndex < 0)
+            throw new InvalidOperationException("The selected commit is not on the current branch's first-parent history.");
+
+        var affected = chain.Skip(targetIndex).ToList();
+        EnsureNoMergeCommits(affected, "split a commit");
+
+        var target = chain[targetIndex];
+        var parent = target.Parents.FirstOrDefault();
+        var changes = repo.Diff.Compare<TreeChanges>(parent?.Tree, target.Tree).ToList();
+        var changedPaths = changes.SelectMany(ChangePaths).ToHashSet(StringComparer.Ordinal);
+        var firstSet = firstCommitPaths.Select(NormalizeRepoPath).ToHashSet(StringComparer.Ordinal);
+        if (!firstSet.All(changedPaths.Contains))
+            throw new InvalidOperationException("The split file list contains paths not changed by the selected commit.");
+        if (changedPaths.All(firstSet.Contains))
+            throw new InvalidOperationException("Leave at least one changed file for the second split commit.");
+
+        var mapping = chain.Take(targetIndex).ToDictionary(c => c.Sha, c => c, StringComparer.OrdinalIgnoreCase);
+        var firstTree = BuildTreeFromChanges(
+            repo,
+            parent?.Tree,
+            target.Tree,
+            parent?.Tree,
+            change => ChangeTouchesAnyPath(change, firstSet));
+        var firstCommit = CreateReplayedCommit(repo, target, firstTree, ParentList(parent), firstMessage);
+
+        var secondTree = BuildTreeFromChanges(
+            repo,
+            parent?.Tree,
+            target.Tree,
+            firstTree,
+            change => !ChangeTouchesAnyPath(change, firstSet));
+        var secondCommit = CreateReplayedCommit(repo, target, secondTree, [firstCommit], secondMessage);
+        mapping[target.Sha] = secondCommit;
+
+        Commit newParent = secondCommit;
+        foreach (var oldCommit in chain.Skip(targetIndex + 1))
+        {
+            var oldParents = oldCommit.Parents.ToList();
+            var newParents = oldParents
+                .Select(p => mapping.TryGetValue(p.Sha, out var mapped) ? mapped : p)
+                .ToList();
+            var newTree = BuildReplayedTree(
+                repo,
+                oldParents.FirstOrDefault()?.Tree,
+                oldCommit.Tree,
+                newParents.FirstOrDefault()?.Tree,
+                excludedPath: null);
+            newParent = CreateReplayedCommit(repo, oldCommit, newTree, newParents);
+            mapping[oldCommit.Sha] = newParent;
+        }
+
+        repo.Refs.UpdateTarget(branch.Reference, newParent.Id, $"split {ShortSha(target.Sha)}");
+        _context.RaiseHeadChanged();
+        return Task.CompletedTask;
+    }
+
+    public Task<string> CreateOrphanBranchAsync(string branchName, bool commitCurrentTree)
+    {
+        if (string.IsNullOrWhiteSpace(branchName))
+            throw new ArgumentException("Branch name is required.", nameof(branchName));
+
+        using var repo = _context.OpenRepository();
+        EnsureCleanWorkingTree(repo, "create an orphan branch");
+        if (repo.Branches[branchName] is not null)
+            throw new InvalidOperationException($"Branch already exists: {branchName}");
+
+        var tree = commitCurrentTree && repo.Head.Tip is { } head
+            ? head.Tree
+            : repo.ObjectDatabase.CreateTree(new TreeDefinition());
+        var sig = repo.Config.BuildSignature(DateTimeOffset.Now)
+            ?? new Signature("Gitster", "gitster@local", DateTimeOffset.Now);
+        var commit = repo.ObjectDatabase.CreateCommit(
+            sig,
+            sig,
+            commitCurrentTree ? "Initial orphan branch snapshot" : "Initial empty orphan branch",
+            tree,
+            [],
+            prettifyMessage: false);
+        var branch = repo.Branches.Add(branchName.Trim(), commit);
+        Commands.Checkout(repo, branch);
+        repo.Reset(ResetMode.Hard, commit);
+
+        _context.RaiseHeadChanged();
+        return Task.FromResult(branch.FriendlyName);
+    }
+
+    public Task<string> RescueDetachedHeadAsync(string branchName)
+    {
+        if (string.IsNullOrWhiteSpace(branchName))
+            throw new ArgumentException("Branch name is required.", nameof(branchName));
+
+        using var repo = _context.OpenRepository();
+        if (!repo.Info.IsHeadDetached)
+            throw new InvalidOperationException("HEAD is not detached.");
+        var head = repo.Head.Tip ?? throw new InvalidOperationException("No detached HEAD commit.");
+        if (repo.Branches[branchName] is not null)
+            throw new InvalidOperationException($"Branch already exists: {branchName}");
+
+        var branch = repo.Branches.Add(branchName.Trim(), head);
+        Commands.Checkout(repo, branch);
+        _context.RaiseHeadChanged();
+        return Task.FromResult(branch.FriendlyName);
+    }
+
     public Task<string?> GetPriorTipFromReflogAsync()
     {
         using var repo = _context.OpenRepository();
@@ -394,6 +582,19 @@ internal sealed class LibGit2HistoryRewriteOperations
         Tree oldCommitTree,
         Tree? newParentTree,
         string? excludedPath)
+        => BuildTreeFromChanges(
+            repo,
+            oldParentTree,
+            oldCommitTree,
+            newParentTree,
+            change => excludedPath is null || !ChangeTouchesPath(change, excludedPath));
+
+    private static Tree BuildTreeFromChanges(
+        Repository repo,
+        Tree? oldParentTree,
+        Tree oldCommitTree,
+        Tree? newParentTree,
+        Func<TreeEntryChanges, bool> includeChange)
     {
         var definition = newParentTree is null
             ? new TreeDefinition()
@@ -401,7 +602,7 @@ internal sealed class LibGit2HistoryRewriteOperations
 
         foreach (var change in repo.Diff.Compare<TreeChanges>(oldParentTree, oldCommitTree))
         {
-            if (excludedPath is not null && ChangeTouchesPath(change, excludedPath))
+            if (!includeChange(change))
                 continue;
 
             ApplyTreeChange(definition, oldCommitTree, change);
@@ -409,6 +610,20 @@ internal sealed class LibGit2HistoryRewriteOperations
 
         return repo.ObjectDatabase.CreateTree(definition);
     }
+
+    private static Commit CreateReplayedCommit(
+        Repository repo,
+        Commit oldCommit,
+        Tree newTree,
+        IReadOnlyList<Commit> newParents,
+        string? message = null) =>
+        repo.ObjectDatabase.CreateCommit(
+            oldCommit.Author,
+            oldCommit.Committer,
+            message ?? oldCommit.Message,
+            newTree,
+            newParents,
+            prettifyMessage: false);
 
     private static void ApplyTreeChange(TreeDefinition definition, Tree oldCommitTree, TreeEntryChanges change)
     {
@@ -439,6 +654,21 @@ internal sealed class LibGit2HistoryRewriteOperations
         PathMatches(change.Path, normalizedPath)
         || (!string.IsNullOrWhiteSpace(change.OldPath) && PathMatches(change.OldPath, normalizedPath));
 
+    private static bool ChangeTouchesAnyPath(TreeEntryChanges change, IReadOnlySet<string> normalizedPaths) =>
+        ChangePaths(change).Any(normalizedPaths.Contains);
+
+    private static IEnumerable<string> ChangePaths(TreeEntryChanges change)
+    {
+        var path = NormalizeRepoPath(change.Path);
+        yield return path;
+        if (!string.IsNullOrWhiteSpace(change.OldPath))
+        {
+            var oldPath = NormalizeRepoPath(change.OldPath);
+            if (!string.Equals(path, oldPath, StringComparison.Ordinal))
+                yield return oldPath;
+        }
+    }
+
     private static bool PathMatches(string path, string normalizedPath) =>
         string.Equals(NormalizeRepoPath(path), normalizedPath, StringComparison.Ordinal);
 
@@ -455,6 +685,52 @@ internal sealed class LibGit2HistoryRewriteOperations
         commits.Reverse();
         return commits;
     }
+
+    private static List<Commit> ResolveCommitsInChain(IReadOnlyList<Commit> chain, IReadOnlyList<string> shas)
+    {
+        var result = new List<Commit>(shas.Count);
+        foreach (var sha in shas)
+        {
+            var match = chain.FirstOrDefault(c => ShaMatches(c, sha))
+                ?? throw new InvalidOperationException($"Commit not found on the current branch: {sha}");
+            result.Add(match);
+        }
+
+        return result;
+    }
+
+    private static void EnsureSameCommitSet(IReadOnlyList<Commit> first, IReadOnlyList<Commit> second)
+    {
+        var firstSet = first.Select(c => c.Sha).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var secondSet = second.Select(c => c.Sha).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!firstSet.SetEquals(secondSet))
+            throw new InvalidOperationException("The reordered commit list must contain the same commits.");
+    }
+
+    private static void EnsureNoMergeCommits(IEnumerable<Commit> commits, string operation)
+    {
+        var merge = commits.FirstOrDefault(c => c.Parents.Count() > 1);
+        if (merge is not null)
+            throw new InvalidOperationException($"Cannot {operation} through merge commit {ShortSha(merge.Sha)}.");
+    }
+
+    private static void EnsureNoOverlappingPathChanges(Repository repo, IReadOnlyList<Commit> commits, string operation)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var commit in commits)
+        {
+            foreach (var path in repo.Diff.Compare<TreeChanges>(commit.Parents.FirstOrDefault()?.Tree, commit.Tree)
+                         .SelectMany(ChangePaths))
+            {
+                if (!seen.Add(path))
+                    throw new InvalidOperationException(
+                        $"Cannot {operation} because multiple selected commits change '{path}'.");
+            }
+        }
+    }
+
+    private static IReadOnlyList<Commit> ParentList(Commit? parent) =>
+        parent is null ? [] : [parent];
 
     private static void EnsureCleanWorkingTree(Repository repo, string operation)
     {

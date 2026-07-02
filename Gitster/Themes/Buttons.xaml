@@ -4,9 +4,10 @@
     <!-- ── PrimaryButton ─────────────────────────────────────────── -->
     <!-- Accent background, white text. Used for "Amend ausführen".  -->
     <Style x:Key="PrimaryButton" TargetType="Button">
-        <Setter Property="Background"  Value="{StaticResource AccentBlue}"/>
+        <Setter Property="Background"  Value="{DynamicResource AccentBlue}"/>
         <Setter Property="Foreground"  Value="White"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding"     Value="12,6"/>
         <Setter Property="FontSize"    Value="13"/>
         <Setter Property="FontFamily"  Value="{StaticResource FontFamilyUi}"/>
@@ -16,6 +17,8 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Root"
                             Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{StaticResource CornerRadiusMd}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center"
@@ -23,14 +26,17 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Root" Property="Background" Value="#005FA3"/>
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource PrimaryButtonHoverBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Root" Property="Background" Value="#004F87"/>
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource PrimaryButtonPressedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource WindowBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Root" Property="Background" Value="{StaticResource BorderTertiary}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BorderTertiary}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -42,8 +48,8 @@
     <!-- Transparent background, thin border, hover revealed.        -->
     <Style x:Key="GhostButton" TargetType="Button">
         <Setter Property="Background"       Value="Transparent"/>
-        <Setter Property="Foreground"       Value="{StaticResource TextPrimary}"/>
-        <Setter Property="BorderBrush"      Value="{StaticResource BorderSecondary}"/>
+        <Setter Property="Foreground"       Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BorderSecondary}"/>
         <Setter Property="BorderThickness"  Value="1"/>
         <Setter Property="Padding"          Value="10,5"/>
         <Setter Property="FontSize"         Value="12"/>
@@ -63,16 +69,19 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Root" Property="Background" Value="{StaticResource BackgroundSecondary}"/>
-                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Root" Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{StaticResource TextTertiary}"/>
-                            <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource BorderTertiary}"/>
-                            <Setter TargetName="Root" Property="Background" Value="{StaticResource SoftDisabledBackground}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource BorderTertiary}"/>
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource SoftDisabledBackground}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

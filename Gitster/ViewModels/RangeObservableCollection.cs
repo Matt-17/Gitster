@@ -13,8 +13,26 @@ public sealed class RangeObservableCollection<T> : ObservableCollection<T>
 {
     public void ReplaceAll(IEnumerable<T> items)
     {
+        var replacement = items is IList<T> list ? list : items.ToList();
+        if (Items.Count == replacement.Count)
+        {
+            var comparer = EqualityComparer<T>.Default;
+            var unchanged = true;
+            for (var i = 0; i < replacement.Count; i++)
+            {
+                if (!comparer.Equals(Items[i], replacement[i]))
+                {
+                    unchanged = false;
+                    break;
+                }
+            }
+
+            if (unchanged)
+                return;
+        }
+
         Items.Clear();
-        foreach (var item in items)
+        foreach (var item in replacement)
             Items.Add(item);
 
         OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
@@ -24,7 +42,11 @@ public sealed class RangeObservableCollection<T> : ObservableCollection<T>
 
     public void AddRange(IEnumerable<T> items)
     {
-        foreach (var item in items)
+        var additions = items is IList<T> list ? list : items.ToList();
+        if (additions.Count == 0)
+            return;
+
+        foreach (var item in additions)
             Items.Add(item);
 
         OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));

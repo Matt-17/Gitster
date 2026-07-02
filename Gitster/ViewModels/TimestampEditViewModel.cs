@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Models;
+using Gitster.Services;
+using Gitster.Services.Features;
 
 namespace Gitster.ViewModels;
 
@@ -23,6 +25,10 @@ public partial class TimestampEditViewModel : BaseViewModel
 
     public ObservableCollection<TimestampPreset> Presets { get; }
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplySelectedPresetCommand))]
+    public partial TimestampPreset? SelectedPreset { get; set; }
+
     public TimestampEditViewModel(
         Func<CommitItem?> getSelectedCommit,
         Func<DateTime?> getCurrentCommitDate)
@@ -36,14 +42,17 @@ public partial class TimestampEditViewModel : BaseViewModel
         [
             new TimestampPreset("Now",              () => DateTime.Now),
             new TimestampPreset("−1 h",             () => DateTime.Now.AddHours(-1)),
-            new TimestampPreset("Yesterday 18:00",  () => DateTime.Today.AddDays(-1).AddHours(18)),
-            new TimestampPreset("Fri 17:30",        () =>
-            {
-                var d = DateTime.Today;
-                while (d.DayOfWeek != DayOfWeek.Friday) d = d.AddDays(-1);
-                return d.Date.AddHours(17).AddMinutes(30);
-            }),
+            new TimestampPreset("yesterday 09:00",  () => TimestampPresetResolver.Resolve("yesterday 09:00", DateTime.Now)),
+            new TimestampPreset("last Friday 17:30", () => TimestampPresetResolver.Resolve("last Friday 17:30", DateTime.Now)),
         ];
+        SelectedPreset = Presets.FirstOrDefault();
+    }
+
+    public TimestampEditViewModel(ISelectionContext selectionContext)
+        : this(
+            () => selectionContext.SelectedCommit,
+            () => selectionContext.CurrentCommitDate)
+    {
     }
 
     partial void OnSelectedDateChanged(DateTime? value) =>
@@ -52,6 +61,15 @@ public partial class TimestampEditViewModel : BaseViewModel
     [RelayCommand]
     private void ApplyPreset(TimestampPreset preset) =>
         SelectedDate = preset.Resolve();
+
+    [RelayCommand(CanExecute = nameof(HasSelectedPreset))]
+    private void ApplySelectedPreset()
+    {
+        if (SelectedPreset is not null)
+            SelectedDate = SelectedPreset.Resolve();
+    }
+
+    private bool HasSelectedPreset() => SelectedPreset is not null;
 
     [RelayCommand]
     private void ReadFromSelectedCommit()

@@ -1,0 +1,44 @@
+<UserControl x:Class="Gitster.Controls.EmptyStateControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <Border Style="{StaticResource PanelCard}"
+            MaxWidth="420"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+        <StackPanel>
+            <TextBlock Text="{Binding Icon, ElementName=Root}"
+                       FontSize="24"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource AccentBlue}"
+                       Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding Title, ElementName=Root}"
+                       FontSize="{DynamicResource FontSizeHeader}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding Message, ElementName=Root}"
+                       FontSize="{DynamicResource FontSizeBase}"
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="0,6,0,0"/>
+            <Button Content="{Binding ActionText, ElementName=Root}"
+                    Command="{Binding ActionCommand, ElementName=Root}"
+                    HorizontalAlignment="Center"
+                    Margin="0,14,0,0">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ActionCommand, ElementName=Root}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Border>
+</UserControl>

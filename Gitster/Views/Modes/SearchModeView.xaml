@@ -34,8 +34,8 @@
                     <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsCommits}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -47,8 +47,8 @@
                     <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsPickaxe}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -60,8 +60,8 @@
                     <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsDiffRegex}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -72,8 +72,8 @@
                     <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsBlame}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -85,8 +85,8 @@
                     <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsRangeDiff}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -97,8 +97,20 @@
                     <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsCompareRefs}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Reflog" Command="{Binding SetKindCommand}" CommandParameter="{x:Static vm:SearchKind.Reflog}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SearchTab}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsReflog}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -148,7 +160,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <controls:SearchBox Grid.Column="0" Text="{Binding BaseRef, UpdateSourceTrigger=PropertyChanged}" Placeholder="base ref (A)"/>
-                        <TextBlock Grid.Column="1" Text="↔" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource TextSecondary}"/>
+                        <TextBlock Grid.Column="1" Text="↔" VerticalAlignment="Center" Margin="8,0" Foreground="{DynamicResource TextSecondary}"/>
                         <controls:SearchBox Grid.Column="2" Text="{Binding CompareRef, UpdateSourceTrigger=PropertyChanged}" Placeholder="compare ref (B)"/>
                         <CheckBox Grid.Column="3" Content="three-dot (A...B)" IsChecked="{Binding ThreeDot}" Margin="10,0"
                                   VerticalAlignment="Center" ToolTip="On: changes since A and B diverged. Off: commits on B not on A."/>
@@ -166,7 +178,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <controls:SearchBox Grid.Column="0" Text="{Binding Range1, UpdateSourceTrigger=PropertyChanged}" Placeholder="range 1 (e.g. @{u})"/>
-                    <TextBlock Grid.Column="1" Text="vs" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource TextSecondary}"/>
+                    <TextBlock Grid.Column="1" Text="vs" VerticalAlignment="Center" Margin="8,0" Foreground="{DynamicResource TextSecondary}"/>
                     <controls:SearchBox Grid.Column="2" Text="{Binding Range2, UpdateSourceTrigger=PropertyChanged}" Placeholder="range 2 (e.g. HEAD)"/>
                     <Button Grid.Column="3" Content="Before/after rebase" Style="{StaticResource GhostButton}" Margin="6,0"
                             Command="{Binding UseRebasePresetCommand}" ToolTip="Use the prior HEAD tip (reflog) as range 1"/>
@@ -190,6 +202,32 @@
                           ToolTip="git blame -C -C -C — slower, but follows code across moves/renames"/>
                 <Button Grid.Column="4" Content="Blame" Style="{StaticResource PrimaryButton}" Command="{Binding RunCommand}"/>
             </Grid>
+
+            <Grid Visibility="{Binding IsReflog, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding QueryHint}"
+                           Foreground="{DynamicResource TextSecondary}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+                <Button Grid.Column="1" Content="Load reflog"
+                        Style="{StaticResource PrimaryButton}"
+                        Margin="8,0,0,0"
+                        Command="{Binding RunCommand}"/>
+                <Button Grid.Column="2" Content="Branch here"
+                        Style="{StaticResource GhostButton}"
+                        Margin="6,0,0,0"
+                        Command="{Binding BranchFromReflogCommand}"/>
+                <Button Grid.Column="3" Content="Copy SHA"
+                        Style="{StaticResource GhostButton}"
+                        Margin="6,0,0,0"
+                        Command="{Binding CopyReflogShaCommand}"/>
+            </Grid>
         </Grid>
 
         <!-- ── Results ───────────────────────────────────────────────────── -->
@@ -200,11 +238,11 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="{Binding Explanation}" Foreground="{StaticResource TextSecondary}"
+                <TextBlock Grid.Row="0" Text="{Binding Explanation}" Foreground="{DynamicResource TextSecondary}"
                            TextWrapping="Wrap" Margin="2,0,2,6"
                            Visibility="{Binding IsCompareRefs, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 <ListView Grid.Row="1" ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResult}"
-                          BorderThickness="0,0.5,0,0" BorderBrush="{StaticResource BorderTertiary}"
+                          BorderThickness="0,0.5,0,0" BorderBrush="{DynamicResource BorderTertiary}"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
@@ -218,8 +256,8 @@
                                     <ColumnDefinition Width="64"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="{Binding Message}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Grid.Column="1" Text="{Binding AuthorName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}"/>
-                                <TextBlock Grid.Column="2" Text="{Binding CommitId}" VerticalAlignment="Center" FontFamily="{StaticResource FontFamilyMono}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding AuthorName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSecondary}"/>
+                                <TextBlock Grid.Column="2" Text="{Binding CommitId}" VerticalAlignment="Center" FontFamily="{StaticResource FontFamilyMono}" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -229,7 +267,7 @@
             <!-- Blame results -->
             <ListView Visibility="{Binding IsBlame, Converter={StaticResource BooleanToVisibilityConverter}}"
                       ItemsSource="{Binding BlameLines}" SelectedItem="{Binding SelectedBlameLine}"
-                      BorderThickness="0,0.5,0,0" BorderBrush="{StaticResource BorderTertiary}"
+                      BorderThickness="0,0.5,0,0" BorderBrush="{DynamicResource BorderTertiary}"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
                 <ListView.ItemContainerStyle>
@@ -245,10 +283,10 @@
                                 <ColumnDefinition Width="40"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding ShortSha}" FontFamily="{StaticResource FontFamilyMono}" FontSize="10" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Author}" FontSize="10" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="{Binding DateText}" FontSize="10" Foreground="{StaticResource TextTertiary}" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="3" Text="{Binding LineNumber}" FontFamily="{StaticResource FontFamilyMono}" FontSize="10" Foreground="{StaticResource TextTertiary}" TextAlignment="Right" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="0" Text="{Binding ShortSha}" FontFamily="{StaticResource FontFamilyMono}" FontSize="10" Foreground="{DynamicResource AccentBlue}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Author}" FontSize="10" Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="{Binding DateText}" FontSize="10" Foreground="{DynamicResource TextTertiary}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="{Binding LineNumber}" FontFamily="{StaticResource FontFamilyMono}" FontSize="10" Foreground="{DynamicResource TextTertiary}" TextAlignment="Right" Margin="0,0,6,0" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="4" Text="{Binding Content}" FontFamily="{StaticResource FontFamilyMono}" FontSize="11" VerticalAlignment="Center" TextWrapping="NoWrap"/>
                         </Grid>
                     </DataTemplate>
@@ -258,7 +296,7 @@
             <!-- Range-diff results -->
             <ListView Visibility="{Binding IsRangeDiff, Converter={StaticResource BooleanToVisibilityConverter}}"
                       ItemsSource="{Binding RangeResults}"
-                      BorderThickness="0,0.5,0,0" BorderBrush="{StaticResource BorderTertiary}">
+                      BorderThickness="0,0.5,0,0" BorderBrush="{DynamicResource BorderTertiary}">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
                 </ListView.ItemContainerStyle>
@@ -272,15 +310,15 @@
                             <Border Grid.Column="0" CornerRadius="3" Padding="6,0" Margin="0,2,8,2" HorizontalAlignment="Left">
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                        <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Status}" Value="Added"><Setter Property="Background" Value="{StaticResource AccentSuccessBackground}"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Removed"><Setter Property="Background" Value="{StaticResource AccentDangerBackground}"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding Status}" Value="Modified"><Setter Property="Background" Value="{StaticResource AccentWarningBackground}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Added"><Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Removed"><Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding Status}" Value="Modified"><Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/></DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="{Binding Status}" FontSize="10" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="{Binding Status}" FontSize="10" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimary}"/>
                             </Border>
                             <TextBlock Grid.Column="1" Text="{Binding Summary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource FontFamilyMono}" FontSize="11"/>
                         </Grid>
@@ -288,15 +326,52 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- Empty hint -->
-            <TextBlock Text="{Binding QueryHint}" Foreground="{StaticResource TextTertiary}" FontStyle="Italic"
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,40,0,0" TextWrapping="Wrap" MaxWidth="420"
-                       Visibility="{Binding IsBlame, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
+            <ListView Visibility="{Binding IsReflog, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ItemsSource="{Binding ReflogEntries}"
+                      SelectedItem="{Binding SelectedReflogEntry}"
+                      BorderThickness="0,0.5,0,0"
+                      BorderBrush="{DynamicResource BorderTertiary}"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="25">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="72"/>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding Selector}" FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
+                                       Foreground="{DynamicResource AccentBlue}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Sha}" FontFamily="{StaticResource FontFamilyMono}" FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Action}" FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="3" Text="{Binding Message}" FontSize="12"
+                                       Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <controls:EmptyStateControl Icon="?"
+                                        Title="No results"
+                                        Message="{Binding QueryHint}"
+                                        ActionText="Run"
+                                        ActionCommand="{Binding RunCommand}"
+                                        Visibility="{Binding IsEmpty, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
 
         <GridSplitter Grid.Row="3"
                       HorizontalAlignment="Stretch"
-                      Background="{StaticResource BorderTertiary}"
+                      Background="{DynamicResource BorderTertiary}"
                       helper:PersistedGridSplitter.Key="SearchMode.DiffHeight"
                       helper:PersistedGridSplitter.DefinitionKind="Row"
                       helper:PersistedGridSplitter.TargetIndex="4"/>

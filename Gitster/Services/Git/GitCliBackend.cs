@@ -12,6 +12,8 @@ namespace Gitster.Services.Git;
 /// </summary>
 public sealed class GitCliBackend : IGitBackend
 {
+    private static readonly TimeSpan RemoteOperationTimeout = TimeSpan.FromMinutes(10);
+
     public string? RepositoryPath { get; private set; }
 
     public event EventHandler? HeadChanged;
@@ -39,6 +41,7 @@ public sealed class GitCliBackend : IGitBackend
     {
         EnsurePath();
         EnsureCli();
+        await EnsureNotShallowRepositoryAsync("fix up commits");
 
         var sha7 = targetSha.Length >= 7 ? targetSha[..7] : targetSha;
 
@@ -81,6 +84,65 @@ public sealed class GitCliBackend : IGitBackend
 
     // ── Reword (Step G) ───────────────────────────────────────────────────
 
+    public async Task FixupCommitIntoCommitAsync(string sourceSha, string targetSha)
+    {
+        EnsurePath();
+        EnsureCli();
+        await EnsureNotShallowRepositoryAsync("fix up commits");
+
+        if (string.IsNullOrWhiteSpace(sourceSha))
+            throw new ArgumentException("Source commit SHA is required.", nameof(sourceSha));
+        if (string.IsNullOrWhiteSpace(targetSha))
+            throw new ArgumentException("Target commit SHA is required.", nameof(targetSha));
+
+        var source = await ResolveCommitAsync(sourceSha);
+        var target = await ResolveCommitAsync(targetSha);
+        if (source.Equals(target, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Choose two different commits for fixup.");
+
+        var sourceOnHead = await GitCli.RunAsync(RepositoryPath, ["merge-base", "--is-ancestor", source, "HEAD"]);
+        if (!sourceOnHead.Success)
+            throw new InvalidOperationException("The source commit must be on the current branch.");
+
+        var targetBeforeSource = await GitCli.RunAsync(RepositoryPath, ["merge-base", "--is-ancestor", target, source]);
+        if (!targetBeforeSource.Success)
+            throw new InvalidOperationException("Drop onto an older commit on the same branch.");
+
+        var source7 = ShortSha(source);
+        var target7 = ShortSha(target);
+        var targetParent = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{target}^"]);
+        var upstream = targetParent.Success ? $"{target7}^" : "--root";
+        var originalHead = await GetHeadAsync();
+        string? seqEdPath = null;
+
+        try
+        {
+            seqEdPath = GitCli.WriteTempBat(BuildFixupTodoEditorScript(source7, target7), "fixup-drop-seqed");
+            var rebase = await GitCli.RunAsync(
+                RepositoryPath,
+                $"rebase --interactive {upstream}",
+                new Dictionary<string, string>
+                {
+                    ["GIT_SEQUENCE_EDITOR"] = GitCli.ToEditorArg(seqEdPath),
+                    ["GIT_EDITOR"] = "true",
+                    ["GIT_TERMINAL_PROMPT"] = "0",
+                });
+
+            if (!rebase.Success)
+            {
+                await AbortRebaseAndRestoreAsync(originalHead, keepStaged: false);
+                throw new InvalidOperationException(
+                    $"Fixup rebase hit a conflict and was aborted - history is unchanged.\n\n{rebase.Output}");
+            }
+
+            HeadChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            GitCli.CleanupTemp(seqEdPath);
+        }
+    }
+
     /// <summary>
     /// Rewords an older commit's message via a scripted interactive rebase.
     /// For HEAD rewording use <see cref="LibGit2Backend"/> directly.
@@ -89,6 +151,7 @@ public sealed class GitCliBackend : IGitBackend
     {
         EnsurePath();
         EnsureCli();
+        await EnsureNotShallowRepositoryAsync("reword commits");
 
         var sha7 = sha.Length >= 7 ? sha[..7] : sha;
 
@@ -151,6 +214,7 @@ public sealed class GitCliBackend : IGitBackend
     {
         EnsurePath();
         EnsureCli();
+        await EnsureNotShallowRepositoryAsync("squash commits");
 
         // shas are newest-first; oldest is last
         var orderedOldestFirst = shas.Reverse().ToList();
@@ -386,28 +450,38 @@ public sealed class GitCliBackend : IGitBackend
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => NSVoid();
 
     // Remote server operations. Keep these on the Git CLI path only.
-    public async Task FetchAsync(string remoteName = "origin")
+    public async Task FetchAsync(string remoteName = "origin", CancellationToken ct = default)
     {
         EnsurePath();
         EnsureCli();
 
         var remote = NormalizeRemoteName(remoteName);
-        await EnsureRemoteExistsAsync(remote);
+        await EnsureRemoteExistsAsync(remote, ct);
 
-        var r = await GitCli.RunAsync(RepositoryPath, ["fetch", remote], NoPromptEnvironment());
+        var r = await GitCli.RunAsync(
+            RepositoryPath,
+            ["fetch", remote],
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
         if (!r.Success)
             throw new InvalidOperationException($"Fetch failed:\n{r.Output}");
     }
 
-    public async Task PullAsync(string remoteName = "origin")
+    public async Task PullAsync(string remoteName = "origin", CancellationToken ct = default)
     {
         EnsurePath();
         EnsureCli();
 
         var remote = NormalizeRemoteName(remoteName);
-        await EnsureRemoteExistsAsync(remote);
+        await EnsureRemoteExistsAsync(remote, ct);
 
-        var r = await GitCli.RunAsync(RepositoryPath, ["pull", remote], NoPromptEnvironment());
+        var r = await GitCli.RunAsync(
+            RepositoryPath,
+            ["pull", remote],
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
         if (!r.Success)
             throw new InvalidOperationException($"Pull failed:\n{r.Output}");
 
@@ -415,12 +489,12 @@ public sealed class GitCliBackend : IGitBackend
     }
 
     /// <summary>Real <c>git push</c> — the only path that can do a true --force-with-lease.</summary>
-    public async Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal)
+    public async Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
     {
         EnsurePath();
         EnsureCli();
         var remote = NormalizeRemoteName(remoteName);
-        await EnsureRemoteExistsAsync(remote);
+        await EnsureRemoteExistsAsync(remote, ct);
 
         var flag = mode switch
         {
@@ -429,16 +503,21 @@ public sealed class GitCliBackend : IGitBackend
             _                       => string.Empty,
         };
 
-        var r = await GitCli.RunAsync(RepositoryPath, $"push {flag}{remote} HEAD", NoPromptEnvironment());
+        var r = await GitCli.RunAsync(
+            RepositoryPath,
+            $"push {flag}{remote} HEAD",
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
         if (!r.Success)
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
 
-        var head = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", "HEAD"]);
+        var head = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", "HEAD"], ct: ct);
         if (head.Success)
-            await UpdateTrackingRefAfterPushAsync(remote, head.Stdout.Trim());
+            await UpdateTrackingRefAfterPushAsync(remote, head.Stdout.Trim(), ct);
     }
 
-    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin")
+    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
     {
         EnsurePath();
         EnsureCli();
@@ -446,35 +525,37 @@ public sealed class GitCliBackend : IGitBackend
         if (string.IsNullOrWhiteSpace(commitSha))
             throw new ArgumentException("Commit SHA is required.", nameof(commitSha));
 
-        var branch = await GitCli.RunAsync(RepositoryPath, ["symbolic-ref", "HEAD"]);
+        var branch = await GitCli.RunAsync(RepositoryPath, ["symbolic-ref", "HEAD"], ct: ct);
         if (!branch.Success)
             throw new InvalidOperationException("Check out a local branch before pushing through a commit.");
 
         var targetRef = branch.Stdout.Trim();
-        var resolved = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{commitSha}^{{commit}}"]);
+        var resolved = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{commitSha}^{{commit}}"], ct: ct);
         if (!resolved.Success)
             throw new InvalidOperationException($"Commit not found: {commitSha}");
 
         var resolvedSha = resolved.Stdout.Trim();
-        var ancestor = await GitCli.RunAsync(RepositoryPath, ["merge-base", "--is-ancestor", resolvedSha, "HEAD"]);
+        var ancestor = await GitCli.RunAsync(RepositoryPath, ["merge-base", "--is-ancestor", resolvedSha, "HEAD"], ct: ct);
         if (!ancestor.Success)
             throw new InvalidOperationException("The selected commit is not on the current branch.");
 
         var remote = NormalizeRemoteName(remoteName);
-        await EnsureRemoteExistsAsync(remote);
+        await EnsureRemoteExistsAsync(remote, ct);
         var r = await GitCli.RunAsync(
             RepositoryPath,
             ["push", remote, $"{resolvedSha}:{targetRef}"],
-            NoPromptEnvironment());
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
         if (!r.Success)
             throw new InvalidOperationException($"Push failed:\n{r.Output}");
 
-        await UpdateTrackingRefAfterPushAsync(remote, resolvedSha);
+        await UpdateTrackingRefAfterPushAsync(remote, resolvedSha, ct);
     }
 
-    private async Task UpdateTrackingRefAfterPushAsync(string remoteName, string commitSha)
+    private async Task UpdateTrackingRefAfterPushAsync(string remoteName, string commitSha, CancellationToken ct = default)
     {
-        var upstream = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--symbolic-full-name", "@{u}"]);
+        var upstream = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--symbolic-full-name", "@{u}"], ct: ct);
         if (!upstream.Success)
             return;
 
@@ -482,7 +563,7 @@ public sealed class GitCliBackend : IGitBackend
         if (!upstreamRef.StartsWith($"refs/remotes/{remoteName}/", StringComparison.Ordinal))
             return;
 
-        await GitCli.RunAsync(RepositoryPath, ["update-ref", upstreamRef, commitSha]);
+        await GitCli.RunAsync(RepositoryPath, ["update-ref", upstreamRef, commitSha], ct: ct);
     }
 
     public async Task<HistoryStitchResult> StitchHistoryAsync(string sourceRef)
@@ -584,24 +665,26 @@ public sealed class GitCliBackend : IGitBackend
             .ToList();
     }
 
-    public async Task PushTagAsync(string tagName, string remoteName = "origin")
+    public async Task PushTagAsync(string tagName, string remoteName = "origin", CancellationToken ct = default)
     {
         EnsurePath();
         EnsureCli();
 
         var name = NormalizeTagName(tagName);
         var remote = NormalizeRemoteName(remoteName);
-        await EnsureRemoteExistsAsync(remote);
+        await EnsureRemoteExistsAsync(remote, ct);
         var tagRef = $"refs/tags/{name}";
 
-        var verify = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{tagRef}^{{object}}"]);
+        var verify = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{tagRef}^{{object}}"], ct: ct);
         if (!verify.Success)
             throw new InvalidOperationException($"Tag not found: {name}");
 
         var push = await GitCli.RunAsync(
             RepositoryPath,
             ["push", remote, $"{tagRef}:{tagRef}"],
-            NoPromptEnvironment());
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
         if (!push.Success)
             throw new InvalidOperationException($"Push tag failed:\n{push.Output}");
     }
@@ -619,6 +702,10 @@ public sealed class GitCliBackend : IGitBackend
     public Task<IReadOnlyList<BranchSummary>> GetBranchesAsync()               => NS<IReadOnlyList<BranchSummary>>();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200) => NS<IReadOnlyList<CommitInfo>>();
     public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)    => NS<bool>();
+    public Task ReorderCommitsAsync(IReadOnlyList<string> shasNewestFirst, IReadOnlyList<string> reorderedShasNewestFirst, string? branchName = null) => NSVoid();
+    public Task SplitCommitAsync(string sha, IReadOnlyList<string> firstCommitPaths, string firstMessage, string secondMessage, string? branchName = null) => NSVoid();
+    public Task<string> CreateOrphanBranchAsync(string branchName, bool commitCurrentTree) => NS<string>();
+    public Task<string> RescueDetachedHeadAsync(string branchName) => NS<string>();
 
     // Branch ops / commit-to-branch / snapshot are libgit2 — never routed here.
     public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync()            => NS<IReadOnlyList<BranchListItem>>();
@@ -856,6 +943,39 @@ public sealed class GitCliBackend : IGitBackend
         return r.Stdout.Trim();
     }
 
+    private async Task<string> ResolveCommitAsync(string sha)
+    {
+        var result = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{sha}^{{commit}}"]);
+        if (!result.Success)
+            throw new InvalidOperationException($"Commit not found: {sha}");
+
+        return result.Stdout.Trim();
+    }
+
+    private static string BuildFixupTodoEditorScript(string source7, string target7)
+    {
+        return "@powershell -NoProfile -Command \"& { " +
+               "$f = '%1'; " +
+               "$lines = Get-Content $f; " +
+               $"$src = $lines | Where-Object {{ $_ -match '^pick {source7}\\b' }} | Select-Object -First 1; " +
+               "if ($src -eq $null) { exit 2 }; " +
+               "$out = New-Object System.Collections.Generic.List[string]; " +
+               $"foreach ($line in $lines) {{ if ($line -match '^pick {source7}\\b') {{ continue }} $out.Add($line); if ($line -match '^pick {target7}\\b') {{ $out.Add(($src -replace '^pick', 'fixup')) }} }} " +
+               "[IO.File]::WriteAllLines($f, $out) " +
+               "}\"";
+    }
+
+    private async Task EnsureNotShallowRepositoryAsync(string operation)
+    {
+        var shallow = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--is-shallow-repository"]);
+        if (shallow.Success && shallow.Stdout.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Cannot {operation} in a shallow clone because the rewrite may need commits outside the local history. " +
+                "Fetch the full history, then retry.");
+        }
+    }
+
     /// <summary>
     /// Aborts an in-progress rebase and guarantees the repo is back at
     /// <paramref name="originalHead"/>.  When <paramref name="keepStaged"/> is true the
@@ -905,9 +1025,9 @@ public sealed class GitCliBackend : IGitBackend
         return string.IsNullOrWhiteSpace(result) ? "branch" : result;
     }
 
-    private async Task EnsureRemoteExistsAsync(string remoteName)
+    private async Task EnsureRemoteExistsAsync(string remoteName, CancellationToken ct = default)
     {
-        var remote = await GitCli.RunAsync(RepositoryPath, ["remote", "get-url", remoteName]);
+        var remote = await GitCli.RunAsync(RepositoryPath, ["remote", "get-url", remoteName], ct: ct);
         if (!remote.Success)
             throw new InvalidOperationException($"Remote not found: {remoteName}");
     }

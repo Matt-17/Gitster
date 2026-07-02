@@ -178,6 +178,30 @@ public sealed class CommitListViewModelNavigationTests
         Assert.AreEqual(240, CommitListViewModel.GraphColumnWidthForLaneCount(80));
     }
 
+    [TestMethod]
+    public void CanDropCommitForFixup_WithLocalOnlyCommits_AllowsDrop()
+    {
+        var source = Item("source", remoteState: CommitRemoteState.LocalOnly);
+        var target = Item("target", remoteState: CommitRemoteState.LocalOnly);
+
+        var allowed = CommitListViewModel.CanDropCommitForFixup(source, target, out var reason);
+
+        Assert.IsTrue(allowed);
+        Assert.AreEqual(string.Empty, reason);
+    }
+
+    [TestMethod]
+    public void CanDropCommitForFixup_WithSyncedCommit_BlocksPublishedRewrite()
+    {
+        var source = Item("source", remoteState: CommitRemoteState.LocalOnly);
+        var target = Item("target", remoteState: CommitRemoteState.OnRemote);
+
+        var allowed = CommitListViewModel.CanDropCommitForFixup(source, target, out var reason);
+
+        Assert.IsFalse(allowed);
+        StringAssert.Contains(reason, "published history");
+    }
+
     private static CommitListViewModel CreateViewModel()
     {
         var git = Substitute.For<IGitBackend>();

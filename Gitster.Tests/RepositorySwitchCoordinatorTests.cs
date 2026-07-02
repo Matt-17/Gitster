@@ -110,6 +110,27 @@ public sealed class RepositorySwitchCoordinatorTests
         CollectionAssert.AreEqual(new[] { "second" }, state.CommittedPaths);
     }
 
+    [TestMethod]
+    public async Task LifecycleInitializeAsync_RunsInitialSwitchOnlyOnce()
+    {
+        var lifecycle = new RepositoryLifecycleCoordinator(CreateCoordinator());
+        var opened = new List<string>();
+
+        await lifecycle.InitializeAsync("repo-a", (path, _, _) =>
+        {
+            opened.Add(path);
+            return Task.FromResult(true);
+        });
+        await lifecycle.InitializeAsync("repo-b", (path, _, _) =>
+        {
+            opened.Add(path);
+            return Task.FromResult(true);
+        });
+
+        Assert.IsTrue(lifecycle.InitialRepositoryLoadStarted);
+        CollectionAssert.AreEqual(new[] { "repo-a" }, opened);
+    }
+
     private static RepositorySwitchCoordinator CreateCoordinator() =>
         new(Substitute.For<IWindowService>(), new HeadRefreshCoordinator(TimeSpan.FromMilliseconds(1)));
 

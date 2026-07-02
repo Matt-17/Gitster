@@ -45,13 +45,13 @@ public partial class AddWorktreeDialog : Window
 
         if (string.IsNullOrEmpty(path))
         {
-            MessageBox.Show("Choose a folder for the worktree.", "Add worktree",
+            GitsterDialog.Show(this, "Choose a folder for the worktree.", "Add worktree",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (string.IsNullOrEmpty(branch))
         {
-            MessageBox.Show("Enter the branch to check out (or a new branch name).", "Add worktree",
+            GitsterDialog.Show(this, "Enter the branch to check out (or a new branch name).", "Add worktree",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }

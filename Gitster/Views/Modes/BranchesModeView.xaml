@@ -50,8 +50,8 @@
                             <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding ShowTree}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -77,8 +77,8 @@
                             <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding SortByDateActive}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -92,8 +92,8 @@
                             <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding SortByNameActive}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -102,12 +102,13 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Empty state -->
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5"
-                        Visibility="{Binding HasBranches, Converter={StaticResource InverseBoolVis}}">
-                <TextBlock Text="No branches" FontSize="15"
-                           Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-            </StackPanel>
+            <controls:EmptyStateControl Grid.Row="1"
+                                        Icon="B"
+                                        Title="No branches match"
+                                        Message="Clear the filter or refresh the repository to reload local and remote branches."
+                                        ActionText="Clear filter"
+                                        ActionCommand="{Binding ClearFilterCommand}"
+                                        Visibility="{Binding HasBranches, Converter={StaticResource InverseBoolVis}}"/>
 
             <!-- Branch tree (A13) -->
             <TreeView Grid.Row="1"
@@ -130,7 +131,7 @@
                                               Width="6"
                                               Height="7"
                                               Data="M2,1 L6,5 L2,9 Z"
-                                              Fill="{StaticResource TextTertiary}"
+                                              Fill="{DynamicResource TextTertiary}"
                                               Stretch="Uniform"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
@@ -140,7 +141,7 @@
                                             <Setter TargetName="Arrow" Property="Data" Value="M1,2 L9,2 L5,7 Z"/>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource TextSecondary}"/>
+                                            <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextSecondary}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -202,10 +203,10 @@
                                             <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
                                         </Trigger>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="RowBackground" Property="Background" Value="{StaticResource BackgroundSecondary}"/>
+                                            <Setter TargetName="RowBackground" Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
                                         </Trigger>
                                         <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="RowBackground" Property="Background" Value="{StaticResource AccentBlueBackground}"/>
+                                            <Setter TargetName="RowBackground" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -219,19 +220,19 @@
                             <TextBlock Text="📁 " FontSize="11" VerticalAlignment="Center"
                                        Visibility="{Binding IsBranch, Converter={StaticResource InverseBoolVis}}"/>
                             <Ellipse Width="6" Height="6" Margin="0,0,5,0" VerticalAlignment="Center"
-                                     Fill="{StaticResource AccentBlue}"
+                                     Fill="{DynamicResource AccentBlue}"
                                      Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsBranch}" Value="False">
-                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
                                                 <Setter Property="FontWeight" Value="SemiBold"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                                 <Setter Property="FontWeight" Value="SemiBold"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -256,7 +257,7 @@
                             <DataTemplate>
                                 <TextBlock Text="{Binding Name}"
                                            FontSize="11" FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextSecondary}"
+                                           Foreground="{DynamicResource TextSecondary}"
                                            Margin="10,8,0,4"/>
                             </DataTemplate>
                         </GroupStyle.HeaderTemplate>
@@ -281,7 +282,7 @@
                             <!-- Current-branch accent dot -->
                             <Ellipse Grid.Column="0" Width="6" Height="6" Margin="0,0,6,0"
                                      VerticalAlignment="Center"
-                                     Fill="{StaticResource AccentBlue}"
+                                     Fill="{DynamicResource AccentBlue}"
                                      Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
 
                             <!-- Name + tip message -->
@@ -290,10 +291,10 @@
                                            FontSize="13" TextTrimming="CharacterEllipsis">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
                                                     <Setter Property="FontWeight" Value="SemiBold"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -301,7 +302,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                                 <TextBlock Text="{Binding TipMessage}"
-                                           FontSize="11" Foreground="{StaticResource TextTertiary}"
+                                           FontSize="11" Foreground="{DynamicResource TextTertiary}"
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
 
@@ -310,19 +311,19 @@
                                         VerticalAlignment="Center" Margin="6,0">
                                 <TextBlock Text="{Binding AheadText}" FontSize="11"
                                            FontFamily="{StaticResource FontFamilyMono}"
-                                           Foreground="{StaticResource AccentSuccess}"
+                                           Foreground="{DynamicResource AccentSuccess}"
                                            Margin="0,0,4,0"
                                            Visibility="{Binding ShowAhead, Converter={StaticResource BoolVis}}"/>
                                 <TextBlock Text="{Binding BehindText}" FontSize="11"
                                            FontFamily="{StaticResource FontFamilyMono}"
-                                           Foreground="{StaticResource AccentWarning}"
+                                           Foreground="{DynamicResource AccentWarning}"
                                            Visibility="{Binding ShowBehind, Converter={StaticResource BoolVis}}"/>
                             </StackPanel>
 
                             <!-- Last activity -->
                             <TextBlock Grid.Column="3"
                                        Text="{Binding LastActivityLocal, Converter={StaticResource RelativeDate}}"
-                                       FontSize="11" Foreground="{StaticResource TextSecondary}"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondary}"
                                        VerticalAlignment="Center" Margin="6,0,0,0"/>
                         </Grid>
                     </DataTemplate>
@@ -332,7 +333,7 @@
 
         <!-- Splitter -->
         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch"
-                      Background="{StaticResource BorderTertiary}"
+                      Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="BranchesMode.ActionPanelWidth"
                       helper:PersistedGridSplitter.DefinitionKind="Column"
@@ -342,7 +343,7 @@
         <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="10">
             <StackPanel>
                 <TextBlock Text="Select a branch to manage it"
-                           FontSize="13" Foreground="{StaticResource TextTertiary}"
+                           FontSize="13" Foreground="{DynamicResource TextTertiary}"
                            HorizontalAlignment="Center" Margin="0,40,0,0"
                            Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVis}}"/>
 
@@ -352,15 +353,15 @@
                         <StackPanel>
                             <TextBlock Text="{Binding SelectedBranch.Name}"
                                        FontSize="14" FontWeight="Medium"
-                                       Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                                       Foreground="{DynamicResource TextPrimary}" TextWrapping="Wrap"/>
                             <TextBlock FontSize="11" FontFamily="{StaticResource FontFamilyMono}"
-                                       Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0">
+                                       Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0">
                                 <Run Text="{Binding SelectedBranch.ShortSha, Mode=OneWay}"/>
                                 <Run Text=" · "/>
                                 <Run Text="{Binding SelectedBranch.UpstreamDisplay, Mode=OneWay}"/>
                             </TextBlock>
                             <TextBlock Text="{Binding SelectedBranch.TipMessage}"
-                                       FontSize="11" Foreground="{StaticResource TextTertiary}"
+                                       FontSize="11" Foreground="{DynamicResource TextTertiary}"
                                        TextWrapping="Wrap" Margin="0,4,0,0"/>
                         </StackPanel>
                     </Border>
@@ -402,7 +403,7 @@
                         <Button Grid.Row="2" Grid.Column="0" Content="Delete"
                                 Style="{StaticResource GhostButton}"
                                 Command="{Binding DeleteCommand}"
-                                Foreground="{StaticResource AccentDanger}" HorizontalAlignment="Stretch"/>
+                                Foreground="{DynamicResource AccentDanger}" HorizontalAlignment="Stretch"/>
                         <Button Grid.Row="2" Grid.Column="2" Content="Archive..."
                                 helper:Capability.Requires="SourceArchive"
                                 Style="{StaticResource GhostButton}"

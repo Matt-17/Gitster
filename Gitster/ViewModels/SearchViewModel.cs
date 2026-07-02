@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
+using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -7,14 +8,16 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Models;
 using Gitster.Services;
 using Gitster.Services.Git;
+using Gitster.Services.Features;
 using Gitster.Services.History;
 using Gitster.Services.Search;
+using Gitster.Views;
 
 using Microsoft.Win32;
 
 namespace Gitster.ViewModels;
 
-public enum SearchKind { Commits, Pickaxe, DiffRegex, Blame, RangeDiff, CompareRefs }
+public enum SearchKind { Commits, Pickaxe, DiffRegex, Blame, RangeDiff, CompareRefs, Reflog }
 
 /// <summary>
 /// The Phase-4 Search &amp; Analysis mode (plan B1–B6): a query bar + type selector that swaps
@@ -25,20 +28,31 @@ public partial class SearchViewModel : BaseViewModel
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
     private readonly IWindowService _windowService;
+    private readonly GitFeatureService _features;
     private CancellationTokenSource? _cts;
 
     public SearchViewModel(IGitBackend git, CommitHistoryService history, IWindowService? windowService)
+        : this(git, history, windowService, new GitFeatureService())
+    {
+    }
+
+    public SearchViewModel(
+        IGitBackend git,
+        CommitHistoryService history,
+        IWindowService? windowService,
+        GitFeatureService features)
     {
         _git = git;
         _history = history;
         _windowService = windowService ?? new WindowService();
+        _features = features;
     }
 
     // ── Type selection ───────────────────────────────────────────────────
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCommits), nameof(IsPickaxe), nameof(IsDiffRegex),
         nameof(IsBlame), nameof(IsRangeDiff), nameof(IsCompareRefs),
-        nameof(IsCommitResults), nameof(QueryHint))]
+        nameof(IsReflog), nameof(IsCommitResults), nameof(QueryHint), nameof(HasAnyResults), nameof(IsEmpty))]
     public partial SearchKind CurrentKind { get; set; } = SearchKind.Commits;
 
     public bool IsCommits     => CurrentKind == SearchKind.Commits;
@@ -47,6 +61,7 @@ public partial class SearchViewModel : BaseViewModel
     public bool IsBlame       => CurrentKind == SearchKind.Blame;
     public bool IsRangeDiff   => CurrentKind == SearchKind.RangeDiff;
     public bool IsCompareRefs => CurrentKind == SearchKind.CompareRefs;
+    public bool IsReflog      => CurrentKind == SearchKind.Reflog;
 
     /// <summary>True for the kinds whose result is a commit list (drives the shared list + diff).</summary>
     public bool IsCommitResults => CurrentKind is SearchKind.Commits or SearchKind.Pickaxe
@@ -57,11 +72,18 @@ public partial class SearchViewModel : BaseViewModel
         SearchKind.Commits   => "Query the loaded history — author:Name  message:\"fix\"  after:2026-01-01",
         SearchKind.Pickaxe   => "Find commits that added or removed this exact string (git log -S)",
         SearchKind.DiffRegex => "Find commits whose diff matches this regex (git log -G)",
+        SearchKind.Reflog    => "Load HEAD reflog entries, then create a branch or copy a SHA from a row",
         _ => string.Empty,
     };
 
     [RelayCommand]
     private void SetKind(SearchKind kind) => CurrentKind = kind;
+
+    partial void OnCurrentKindChanged(SearchKind value)
+    {
+        OnPropertyChanged(nameof(HasAnyResults));
+        OnPropertyChanged(nameof(IsEmpty));
+    }
 
     // ── Inputs ────────────────────────────────────────────────────────────
     [ObservableProperty] public partial string QueryText { get; set; } = string.Empty;
@@ -79,21 +101,40 @@ public partial class SearchViewModel : BaseViewModel
     public ObservableCollection<CommitItem> Results { get; } = [];
     public ObservableCollection<BlameLine> BlameLines { get; } = [];
     public ObservableCollection<RangeDiffEntry> RangeResults { get; } = [];
+    public ObservableCollection<ReflogEntry> ReflogEntries { get; } = [];
 
     [ObservableProperty] public partial CommitItem? SelectedResult { get; set; }
     [ObservableProperty] public partial BlameLine? SelectedBlameLine { get; set; }
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BranchFromReflogCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CopyReflogShaCommand))]
+    public partial ReflogEntry? SelectedReflogEntry { get; set; }
 
     [ObservableProperty] public partial List<DiffFileEntry> DiffFiles { get; set; } = [];
     [ObservableProperty] public partial string DiffHeader { get; set; } = "no selection";
     [ObservableProperty] public partial string StatusText { get; set; } = string.Empty;
     [ObservableProperty] public partial string Explanation { get; set; } = string.Empty;
-    [ObservableProperty] public partial bool IsBusy { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    public partial bool IsBusy { get; set; }
 
     public string ResultCountText => CurrentKind == SearchKind.Blame
         ? $"{BlameLines.Count} lines"
         : CurrentKind == SearchKind.RangeDiff
             ? $"{RangeResults.Count} commits"
+            : CurrentKind == SearchKind.Reflog
+                ? $"{ReflogEntries.Count} reflog entries"
             : $"{Results.Count} commits";
+
+    public bool HasAnyResults => CurrentKind switch
+    {
+        SearchKind.Blame => BlameLines.Count > 0,
+        SearchKind.RangeDiff => RangeResults.Count > 0,
+        SearchKind.Reflog => ReflogEntries.Count > 0,
+        _ => Results.Count > 0,
+    };
+
+    public bool IsEmpty => !IsBusy && !HasAnyResults;
 
     partial void OnSelectedResultChanged(CommitItem? value) => _ = LoadDiffAsync(value?.FullSha);
     partial void OnSelectedBlameLineChanged(BlameLine? value) => _ = LoadDiffAsync(value?.Sha);
@@ -132,9 +173,10 @@ public partial class SearchViewModel : BaseViewModel
                 case SearchKind.Blame:     await RunBlameAsync(ct); break;
                 case SearchKind.RangeDiff: await RunRangeDiffAsync(ct); break;
                 case SearchKind.CompareRefs: await RunCompareAsync(ct); break;
+                case SearchKind.Reflog: await RunReflogAsync(ct); break;
             }
             StatusText = ResultCountText;
-            OnPropertyChanged(nameof(ResultCountText));
+            NotifyResultsChanged();
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -193,7 +235,7 @@ public partial class SearchViewModel : BaseViewModel
         var lines = await _git.BlameAsync(BlameFilePath, BlameIgnoreWhitespace, BlameFollowMoves, ct);
         BlameLines.Clear();
         foreach (var l in lines) BlameLines.Add(l);
-        OnPropertyChanged(nameof(ResultCountText));
+        NotifyResultsChanged();
     }
 
     private async Task RunRangeDiffAsync(CancellationToken ct)
@@ -201,7 +243,23 @@ public partial class SearchViewModel : BaseViewModel
         var entries = await _git.RangeDiffAsync(Range1.Trim(), Range2.Trim(), ct);
         RangeResults.Clear();
         foreach (var e in entries) RangeResults.Add(e);
-        OnPropertyChanged(nameof(ResultCountText));
+        NotifyResultsChanged();
+    }
+
+    private async Task RunReflogAsync(CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_git.RepositoryPath))
+        {
+            _windowService.Info("Open a repository before loading the reflog.", "Reflog");
+            return;
+        }
+
+        var entries = await _features.GetReflogAsync(_git.RepositoryPath, ct: ct);
+        ReflogEntries.Clear();
+        foreach (var entry in entries)
+            ReflogEntries.Add(entry);
+        SelectedReflogEntry = ReflogEntries.FirstOrDefault();
+        NotifyResultsChanged();
     }
 
     private async Task RunCompareAsync(CancellationToken ct)
@@ -255,10 +313,13 @@ public partial class SearchViewModel : BaseViewModel
         Results.Clear();
         BlameLines.Clear();
         RangeResults.Clear();
+        ReflogEntries.Clear();
+        SelectedReflogEntry = null;
         DiffFiles = [];
         DiffHeader = "no selection";
         StatusText = string.Empty;
         Explanation = string.Empty;
+        NotifyResultsChanged();
     }
 
     private void ReplaceResults(IEnumerable<CommitItem> items)
@@ -266,7 +327,65 @@ public partial class SearchViewModel : BaseViewModel
         Results.Clear();
         foreach (var i in items) Results.Add(i);
         SelectedResult = Results.FirstOrDefault();
+        NotifyResultsChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseSelectedReflogEntry))]
+    private async Task BranchFromReflog()
+    {
+        if (SelectedReflogEntry is not { } entry)
+            return;
+
+        var shortSha = entry.Sha.Length >= 7 ? entry.Sha[..7] : entry.Sha;
+        var dialog = new TextInputDialog
+        {
+            Title = "Create branch from reflog",
+            Prompt = $"New branch name at {entry.Selector} ({shortSha}):",
+            Value = $"rescue/{shortSha}",
+        };
+
+        if (_windowService.ShowDialog(dialog) != true)
+            return;
+
+        var branchName = dialog.Value.Trim();
+        if (string.IsNullOrWhiteSpace(branchName))
+            return;
+
+        try
+        {
+            await _git.CreateBranchAsync(branchName, entry.Sha);
+            _windowService.Info($"Created branch '{branchName}' at {shortSha}.", "Reflog");
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Reflog");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseSelectedReflogEntry))]
+    private void CopyReflogSha()
+    {
+        if (SelectedReflogEntry is not { } entry)
+            return;
+
+        try
+        {
+            Clipboard.SetText(entry.Sha);
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Copy SHA");
+        }
+    }
+
+    private bool CanUseSelectedReflogEntry() =>
+        SelectedReflogEntry is { Sha.Length: > 0 };
+
+    private void NotifyResultsChanged()
+    {
         OnPropertyChanged(nameof(ResultCountText));
+        OnPropertyChanged(nameof(HasAnyResults));
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     private static CommitItem ToItem(CommitInfo c) =>

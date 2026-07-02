@@ -24,6 +24,14 @@ public partial class TitleBarViewModel : BaseViewModel
     /// <summary>Recent repos excluding pinned — the "Recent" section of the switch-repo dropdown (A4).</summary>
     public ObservableCollection<RecentRepositoryItemViewModel> RecentItems { get; } = [];
 
+    public TitleBarViewModel(
+        AutoFetchService autoFetch,
+        RecentReposService recentRepos,
+        RepositoryCommandContext commandContext)
+        : this(commandContext.BrowseFolder, commandContext.OpenRepositoryPath, autoFetch, recentRepos)
+    {
+    }
+
     public TitleBarViewModel(Action browseFolder, Action<string> openRepo, AutoFetchService autoFetch, RecentReposService recentRepos)
     {
         _browseFolder = browseFolder;

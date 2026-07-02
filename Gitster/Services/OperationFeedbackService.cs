@@ -13,7 +13,17 @@ public abstract record OperationFeedback
 public partial class OperationFeedbackService : ObservableObject
 {
     private const int SuccessFadeOutMs = 3000;
+    private readonly RepositoryStateService? _stateService;
     private CancellationTokenSource? _fadeOutCts;
+
+    public OperationFeedbackService()
+    {
+    }
+
+    public OperationFeedbackService(RepositoryStateService stateService)
+    {
+        _stateService = stateService;
+    }
 
     [ObservableProperty]
     private OperationFeedback? _current;
@@ -25,10 +35,20 @@ public partial class OperationFeedbackService : ObservableObject
 
         try
         {
+            using var lease = _stateService is null
+                ? null
+                : await _stateService.BeginOperationAsync();
+            _stateService?.ThrowIfIndexLocked();
+
             var result = await action();
             Current = new OperationFeedback.Success(verb, detailSelector?.Invoke(result), DateTime.Now);
             ScheduleFadeOut();
             return result;
+        }
+        catch (OperationCanceledException)
+        {
+            Current = null;
+            throw;
         }
         catch (Exception ex)
         {
