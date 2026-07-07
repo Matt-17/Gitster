@@ -28,6 +28,24 @@ public sealed class FeatureServicesTests
     }
 
     [TestMethod]
+    public void CommitItem_HasSigningBadge_HidesUnsignedCommits()
+    {
+        var item = new CommitItem(
+            "Unsigned commit",
+            new DateTime(2026, 1, 1),
+            "abc1234",
+            "Tester",
+            remoteState: Gitster.Services.Git.CommitRemoteState.OnRemote,
+            fullSha: "abc1234-full");
+
+        item.SigningStatus = CommitSigningStatus.NoSignature;
+        Assert.IsFalse(item.HasSigningBadge);
+
+        item.SigningStatus = CommitSigningStatus.Good;
+        Assert.IsTrue(item.HasSigningBadge);
+    }
+
+    [TestMethod]
     public void SubmoduleStatusParser_ReadsInitializedDirtyAndUninitializedRows()
     {
         var rows = SubmoduleStatusParser.Parse("""

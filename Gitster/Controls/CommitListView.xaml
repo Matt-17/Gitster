@@ -356,36 +356,6 @@
                 </Grid>
 
                 <DockPanel Grid.Column="1" LastChildFill="True" Margin="2,0,8,0" VerticalAlignment="Center">
-                    <Border DockPanel.Dock="Left"
-                            Width="16"
-                            Height="16"
-                            CornerRadius="3"
-                            Margin="0,0,5,0"
-                            ToolTip="{Binding SigningBadgeTooltip}"
-                            Visibility="{Binding HasSigningBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SigningStatus}" Value="Good">
-                                        <Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding SigningStatus}" Value="Bad">
-                                        <Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding SigningStatus}" Value="Untrusted">
-                                        <Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <TextBlock Text="{Binding SigningBadgeText}"
-                                   FontSize="10"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                    </Border>
                     <ItemsControl DockPanel.Dock="Left"
                                   ItemsSource="{Binding VisibleRefLabels}"
                                   Visibility="{Binding HasVisibleRefLabels, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -467,9 +437,42 @@
                               Margin="0,0,3,0"
                               Visibility="{Binding IsHistoryEditTransitive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </StackPanel>
-                    <TextBlock Text="{Binding DisplayMessage}" VerticalAlignment="Center"
+                    <TextBlock VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
-                               Style="{StaticResource CommitPrimaryTextStyle}"/>
+                               Style="{StaticResource CommitPrimaryTextStyle}">
+                        <Run Text="{Binding DisplayMessage, Mode=OneWay}"/>
+                        <InlineUIContainer BaselineAlignment="Center">
+                            <Border Width="16"
+                                    Height="16"
+                                    CornerRadius="3"
+                                    Margin="5,0,0,0"
+                                    ToolTip="{Binding SigningBadgeTooltip}"
+                                    Visibility="{Binding HasSigningBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SigningStatus}" Value="Good">
+                                                <Setter Property="Background" Value="{DynamicResource AccentSuccessBackground}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding SigningStatus}" Value="Bad">
+                                                <Setter Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding SigningStatus}" Value="Untrusted">
+                                                <Setter Property="Background" Value="{DynamicResource AccentWarningBackground}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding SigningBadgeText}"
+                                           FontSize="10"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </Border>
+                        </InlineUIContainer>
+                    </TextBlock>
                 </DockPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <local:Avatar Email="{Binding DisplayAuthorEmail}" DisplayName="{Binding DisplayAuthorName}"
