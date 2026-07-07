@@ -1,5 +1,6 @@
 using System.IO;
 
+using Gitster.Models;
 using Gitster.Services.Git;
 using Gitster.Services.History;
 using Gitster.Services.Search;
@@ -33,6 +34,26 @@ public sealed class CommitHistoryServiceTests
         var complete = await history.EnsureCompleteAsync(progress: null);
         Assert.AreEqual(3, complete.Count);
         Assert.AreEqual("c1", complete[2].Message);
+    }
+
+    [TestMethod]
+    public async Task GetPage_DoesNotMarkScopeCompleteWhenOnlyFirstPageIsCached()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("c1", "a.txt", "1");
+        repo.Commit("c2", "a.txt", "2");
+        repo.Commit("c3", "a.txt", "3");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+
+        var page = await history.GetPageAsync(CommitQuery.Parse(""), 0, 2);
+
+        Assert.AreEqual(2, page.Count);
+        Assert.IsFalse(await history.IsCompleteAsync());
     }
 
     [TestMethod]
@@ -89,6 +110,70 @@ public sealed class CommitHistoryServiceTests
         CollectionAssert.AreEqual(
             new[] { "feature gamma", "feature alpha" },
             matches.Select(r => r.Message).ToArray());
+        Assert.IsTrue(await history.IsCompleteAsync());
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_WithPartialCache_CompletesHistoryBeforeReturningMatches()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("early needle", "a.txt", "1");
+        repo.Commit("middle", "a.txt", "2");
+        repo.Commit("latest", "a.txt", "3");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+        await history.GetPageAsync(CommitQuery.Parse(""), 0, 1);
+
+        var matches = await history.SearchAsync(CommitQuery.Parse("message:needle"), 10);
+
+        CollectionAssert.AreEqual(
+            new[] { "early needle" },
+            matches.Select(r => r.Message).ToArray());
+        Assert.IsTrue(await history.IsCompleteAsync());
+    }
+
+    [TestMethod]
+    public async Task SearchAsync_TranslatesFieldFiltersToIndexedRows()
+    {
+        using var repo = new GitTestRepo();
+        var alpha = CommitWithAuthor(repo.Path, "feature alpha", "a.txt", "1", "Alice", "alice@example.test");
+        CommitWithAuthor(repo.Path, "feature beta", "a.txt", "2", "Bob", "bob@example.test");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path);
+
+        var matches = await history.SearchAsync(
+            CommitQuery.Parse($"message:feature author:alice sha:{alpha[..8]} after:2000-01-01 before:2999-12-31"),
+            10);
+
+        CollectionAssert.AreEqual(
+            new[] { "feature alpha" },
+            matches.Select(r => r.Message).ToArray());
+    }
+
+    [TestMethod]
+    public async Task EnsureCompleteAsync_DoesNotWalkHistoryTwiceForCountingProgress()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("c1", "a.txt", "1");
+        repo.Commit("c2", "a.txt", "2");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+        var stages = new List<string>();
+
+        await history.OpenAsync(repo.Path);
+        await history.EnsureCompleteAsync(new Progress<RepositoryLoadProgress>(p => stages.Add(p.Stage)));
+
+        Assert.IsFalse(stages.Contains("Counting history"));
     }
 
     [TestMethod]
@@ -274,6 +359,22 @@ public sealed class CommitHistoryServiceTests
             ? name
             : $"refs/remotes/{name}";
         repo.Refs.Add(canonicalName, sha, allowOverwrite: true);
+    }
+
+    private static string CommitWithAuthor(
+        string repoPath,
+        string message,
+        string fileName,
+        string content,
+        string authorName,
+        string authorEmail)
+    {
+        File.WriteAllText(Path.Combine(repoPath, fileName), content);
+        using var repo = new Repository(repoPath);
+        Commands.Stage(repo, fileName);
+        var author = new Signature(authorName, authorEmail, DateTimeOffset.Now);
+        var committer = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+        return repo.Commit(message, author, committer).Sha;
     }
 
     private sealed class TempCacheDir : IDisposable

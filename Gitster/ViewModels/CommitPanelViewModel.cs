@@ -266,7 +266,7 @@ public partial class CommitPanelViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshots.CaptureAsync(_git, amend ? "Amend (commit panel)" : "Commit");
+            await _snapshots.CaptureAsync(_git, amend ? "Amend (commit panel)" : "Commit");
 
             var beforeSha = await SafeHeadAsync();
             var newSha = await _feedback.RunAsync("Commit",
@@ -336,7 +336,7 @@ public partial class CommitPanelViewModel : BaseViewModel
         var stagedPaths = keepStaged ? Staged.Select(f => f.Path).ToList() : [];
         try
         {
-            _ = _snapshots.CaptureAsync(_git, "Stash (commit panel)");
+            await _snapshots.CaptureAsync(_git, "Stash (commit panel)");
             await _feedback.RunAsync("Stash",
                 () => _git.CreateStashAsync($"WIP on {_getBranch()}", includeUntracked));
 

@@ -142,7 +142,7 @@ public partial class WorktreesViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshots.CaptureAsync(_git, $"Add worktree {dialog.BranchName}");
+            await _snapshots.CaptureAsync(_git, $"Add worktree {dialog.BranchName}");
             await _feedback.RunAsync("Add worktree",
                 () => _git.AddWorktreeAsync(dialog.WorktreePath, dialog.BranchName, dialog.CreateBranch));
             await LoadAsync();
@@ -191,7 +191,7 @@ public partial class WorktreesViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshots.CaptureAsync(_git, $"Remove worktree {w.FolderName}");
+            await _snapshots.CaptureAsync(_git, $"Remove worktree {w.FolderName}");
             await _feedback.RunAsync("Remove worktree", () => _git.RemoveWorktreeAsync(w.Path, force: false));
             await LoadAsync();
         }

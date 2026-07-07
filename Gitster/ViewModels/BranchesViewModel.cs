@@ -546,7 +546,7 @@ public partial class BranchesViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Merge {row.Name}");
+            await _snapshots.CaptureAsync(_git, $"Merge {row.Name}");
 
             var result = await _feedback.RunAsync(
                 "Merge",
@@ -617,7 +617,7 @@ public partial class BranchesViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Before history stitch from {row.Name}");
+            await _snapshots.CaptureAsync(_git, $"Before history stitch from {row.Name}");
 
             var result = await _feedback.RunAsync(
                 "Stitch history",
@@ -669,7 +669,7 @@ public partial class BranchesViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshots.CaptureAsync(_git, $"Rename branch {row.Name} → {newName}");
+            await _snapshots.CaptureAsync(_git, $"Rename branch {row.Name} → {newName}");
             await _feedback.RunAsync("Rename branch", () => _git.RenameBranchAsync(row.Name, newName));
             await AfterChangeAsync();
         }
@@ -695,7 +695,7 @@ public partial class BranchesViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshots.CaptureAsync(_git, $"Delete branch {row.Name}");
+            await _snapshots.CaptureAsync(_git, $"Delete branch {row.Name}");
             await _feedback.RunAsync("Delete branch", () => _git.DeleteBranchAsync(row.Name, force: !row.IsMerged));
             await AfterChangeAsync();
         }
@@ -723,7 +723,7 @@ public partial class BranchesViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshots.CaptureAsync(_git, $"Create branch {name}");
+            await _snapshots.CaptureAsync(_git, $"Create branch {name}");
             await _feedback.RunAsync("Create branch", () => _git.CreateBranchAsync(name, row.Info.TipSha));
             await AfterChangeAsync();
         }

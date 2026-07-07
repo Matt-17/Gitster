@@ -51,7 +51,7 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
         _debounceTimer.Elapsed += async (_, _) => await RefreshAsync();
     }
 
-    public async Task AttachAsync(string repoPath)
+    public async Task AttachAsync(string repoPath, bool refreshImmediately = true)
     {
         DetachWatchers();
         RepositoryPath = repoPath;
@@ -101,7 +101,8 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
         _workingDirWatcher.Deleted += OnWorkingDirChanged;
         _workingDirWatcher.Renamed += OnWorkingDirChanged;
 
-        await RefreshAsync();
+        if (refreshImmediately)
+            await RefreshAsync();
     }
 
     public async Task<RepositoryActivationChange> GetActivationChangesAsync()
@@ -157,6 +158,9 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 || (priorSnapshot is not null
                     && !string.Equals(result.snapshot.GitToken, priorSnapshot.GitToken, StringComparison.Ordinal));
 
+            if (!string.Equals(RepositoryPath, repoPath, StringComparison.OrdinalIgnoreCase))
+                return;
+
             progress?.Report(new OperationProgress(
                 "Refreshing repository",
                 "Updating repository status.",
@@ -165,12 +169,23 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
             var dispatcher = Application.Current?.Dispatcher;
             if (dispatcher is null || dispatcher.CheckAccess())
             {
+                if (!string.Equals(RepositoryPath, repoPath, StringComparison.OrdinalIgnoreCase))
+                    return;
+
                 ApplyRefreshResult(result.state, result.branch.Name, gitMetadataChanged);
             }
             else
             {
-                await dispatcher.InvokeAsync(() =>
-                    ApplyRefreshResult(result.state, result.branch.Name, gitMetadataChanged));
+                var applied = await dispatcher.InvokeAsync(() =>
+                {
+                    if (!string.Equals(RepositoryPath, repoPath, StringComparison.OrdinalIgnoreCase))
+                        return false;
+
+                    ApplyRefreshResult(result.state, result.branch.Name, gitMetadataChanged);
+                    return true;
+                });
+                if (!applied)
+                    return;
             }
 
             _lastSnapshot = result.snapshot;

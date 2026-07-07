@@ -44,17 +44,25 @@ public sealed class AutoFetchServiceTests
     }
 
     [TestMethod]
-    public async Task RunOnceAsync_WhenRemoteOperationIsRunning_SkipsFetch()
+    public async Task RunOnceAsync_WhileFetchInFlight_SkipsOverlappingRun()
     {
         var git = Substitute.For<IGitBackend>();
-        var service = new AutoFetchService(git)
+        var fetchStarted = new TaskCompletionSource();
+        var releaseFetch = new TaskCompletionSource();
+        git.FetchAsync().Returns(_ =>
         {
-            IsRemoteOperationRunning = true,
-        };
+            fetchStarted.TrySetResult();
+            return releaseFetch.Task;
+        });
+        var service = new AutoFetchService(git);
 
-        await service.RunOnceAsync();
+        var first = service.RunOnceAsync();
+        await fetchStarted.Task;
+        await service.RunOnceAsync(); // overlapping tick must be skipped
+        releaseFetch.SetResult();
+        await first;
 
-        await git.DidNotReceive().FetchAsync();
+        await git.Received(1).FetchAsync();
     }
 
     [TestMethod]

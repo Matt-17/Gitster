@@ -273,7 +273,7 @@ public partial class StashesViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshotService.CaptureAsync(_git, "Create stash");
+            await _snapshotService.CaptureAsync(_git, "Create stash");
             await _feedbackService.RunAsync("Stash",
                 () => _git.CreateStashAsync(dialog.StashMessage, dialog.IncludeUntracked));
             await LoadAsync();
@@ -291,7 +291,7 @@ public partial class StashesViewModel : BaseViewModel
     private async Task Apply()
     {
         if (SelectedStash is not { } stash) return;
-        _ = _snapshotService.CaptureAsync(_git, $"Apply {stash.Ref}");
+        await _snapshotService.CaptureAsync(_git, $"Apply {stash.Ref}");
         try
         {
             await _feedbackService.RunAsync("Apply stash",
@@ -312,7 +312,7 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        _ = _snapshotService.CaptureAsync(_git, $"Pop {stash.Ref}");
+        await _snapshotService.CaptureAsync(_git, $"Pop {stash.Ref}");
 
         try
         {
@@ -356,7 +356,7 @@ public partial class StashesViewModel : BaseViewModel
             MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes) return;
 
-        _ = _snapshotService.CaptureAsync(_git, $"Drop {stash.Ref}");
+        await _snapshotService.CaptureAsync(_git, $"Drop {stash.Ref}");
 
         try
         {
@@ -423,7 +423,7 @@ public partial class StashesViewModel : BaseViewModel
             return;
         }
 
-        _ = _snapshotService.CaptureAsync(_git, $"Convert {stash.Ref} to branch '{branchName}'");
+        await _snapshotService.CaptureAsync(_git, $"Convert {stash.Ref} to branch '{branchName}'");
 
         try
         {

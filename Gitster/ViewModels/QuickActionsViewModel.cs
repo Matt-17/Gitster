@@ -105,7 +105,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Reword {commit.CommitId}");
+            await _snapshots.CaptureAsync(_git, $"Reword {commit.CommitId}");
 
             await _feedback.RunAsync("Reword", () => _git.RewordCommitAsync(commit.FullSha, newMessage));
 
@@ -159,7 +159,7 @@ public partial class QuickActionsViewModel : BaseViewModel
             // BeforeSha must be the pre-operation HEAD (the undo target), NOT the fixup
             // target commit — otherwise undo would reset to an older commit and discard work.
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Fixup into {commit.CommitId}");
+            await _snapshots.CaptureAsync(_git, $"Fixup into {commit.CommitId}");
 
             await _feedback.RunAsync("Fixup", () => _git.FixupIntoCommitAsync(commit.FullSha));
 
@@ -233,7 +233,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Squash {commits.Count} commits");
+            await _snapshots.CaptureAsync(_git, $"Squash {commits.Count} commits");
 
             await _feedback.RunAsync("Squash",
                 () => _git.SquashCommitsAsync(selectedShas, dlg.CombinedMessage, dlg.OverrideDate));
@@ -289,7 +289,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Cherry-pick {dlg.SelectedSha[..7]}");
+            await _snapshots.CaptureAsync(_git, $"Cherry-pick {dlg.SelectedSha[..7]}");
 
             if (dlg.OverrideDate.HasValue)
             {
@@ -365,7 +365,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Commit to branch {dlg.TargetBranch}");
+            await _snapshots.CaptureAsync(_git, $"Commit to branch {dlg.TargetBranch}");
 
             // If the user typed a brand-new branch name, create it at the current HEAD first.
             var exists = branches.Any(b => !b.IsRemote &&
@@ -416,7 +416,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         try
         {
             var beforeSha = await _git.GetHeadShaAsync();
-            _ = _snapshots.CaptureAsync(_git, $"Snapshot to branch {dlg.BranchName}");
+            await _snapshots.CaptureAsync(_git, $"Snapshot to branch {dlg.BranchName}");
 
             var created = await _feedback.RunAsync("Snapshot",
                 () => _git.CreateSnapshotBranchAsync(dlg.BranchName, dlg.IncludeUncommitted),

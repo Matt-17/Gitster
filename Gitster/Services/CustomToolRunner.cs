@@ -89,7 +89,7 @@ public sealed class CustomToolRunner
                 return CustomToolRunOutcome.Skipped;
         }
 
-        _ = _snapshotService.CaptureAsync(_gitBackend, $"Before tool: {tool.Name}");
+        await _snapshotService.CaptureAsync(_gitBackend, $"Before tool: {tool.Name}");
 
         try
         {

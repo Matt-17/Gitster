@@ -119,14 +119,14 @@ public sealed class CommitQuery
             QueryField.Author => Contains(authorName, v) || Contains(authorEmail, v),
             QueryField.Message => Contains(message, v),
             QueryField.Sha => StartsWith(sha, v),
-            QueryField.Before => !date.HasValue || (TryDate(v, out var bd) ? date.Value.Date <= bd.Date : true),
-            QueryField.After => !date.HasValue || (TryDate(v, out var ad) ? date.Value.Date >= ad.Date : true),
+            QueryField.Before => !date.HasValue || (TryParseDate(v, out var bd) ? date.Value.Date <= bd.Date : true),
+            QueryField.After => !date.HasValue || (TryParseDate(v, out var ad) ? date.Value.Date >= ad.Date : true),
             _ => Contains(message, v) || Contains(authorName, v)
                  || Contains(authorEmail, v) || StartsWith(sha, v),
         };
     }
 
-    private static bool TryDate(string s, out DateTime date) =>
+    public static bool TryParseDate(string s, out DateTime date) =>
         DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
         || DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out date);
 

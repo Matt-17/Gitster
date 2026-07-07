@@ -42,4 +42,20 @@ public sealed class RepositoryStateServiceTests
         var ex = Assert.ThrowsException<InvalidOperationException>(service.ThrowIfIndexLocked);
         StringAssert.Contains(ex.Message, "index.lock");
     }
+
+    [TestMethod]
+    public async Task AttachAsync_WhenInitialRefreshDisabled_DoesNotQueryWorkingTree()
+    {
+        var repo = Path.Combine(Path.GetTempPath(), "Gitster.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(repo, ".git"));
+
+        var git = Substitute.For<IGitBackend>();
+        using var service = new RepositoryStateService(git);
+
+        await service.AttachAsync(repo, refreshImmediately: false);
+
+        Assert.AreEqual(repo, service.RepositoryPath);
+        _ = git.DidNotReceive().GetWorkingTreeStateAsync();
+        _ = git.DidNotReceive().GetCurrentBranchAsync();
+    }
 }

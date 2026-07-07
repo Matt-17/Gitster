@@ -7,18 +7,25 @@ public enum CommitSectionKind { RemoteIncoming, LocalOutgoing }
 /// </summary>
 public sealed class CommitSectionHeader
 {
-    public CommitSectionHeader(CommitSectionKind kind, int count, string? remoteName = null, string? remoteUrl = null)
+    public CommitSectionHeader(
+        CommitSectionKind kind,
+        int count,
+        string? remoteName = null,
+        string? remoteUrl = null,
+        bool isLoading = false)
     {
         Kind = kind;
         Count = count;
         RemoteName = remoteName;
         RemoteUrl = remoteUrl;
+        IsLoading = isLoading;
     }
 
     public CommitSectionKind Kind { get; }
     public int Count { get; }
     public string? RemoteName { get; }
     public string? RemoteUrl { get; }
+    public bool IsLoading { get; }
 
     public bool IsIncoming => Kind == CommitSectionKind.RemoteIncoming;
     public bool IsOutgoing => Kind == CommitSectionKind.LocalOutgoing;
@@ -29,9 +36,19 @@ public sealed class CommitSectionHeader
         {
             var formattedCount = Count.ToString("N0");
             return IsIncoming
-                ? Count == 0 ? "Remote (0)" : $"Remote ({formattedCount} incoming)"
+                ? RemoteTitle(formattedCount)
                 : Count == 0 ? "Local History (0)" : $"Local History ({formattedCount} outgoing)";
         }
+    }
+
+    private string RemoteTitle(string formattedCount)
+    {
+        if (IsLoading)
+            return "Remote History (checking...)";
+
+        return Count == 0
+            ? "Remote History (0)"
+            : $"Remote History ({formattedCount} incoming)";
     }
 
     public bool HasRemoteName => IsIncoming && !string.IsNullOrWhiteSpace(RemoteName);
