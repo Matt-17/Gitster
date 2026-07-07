@@ -565,6 +565,14 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
+    private void OpenOptions()
+    {
+        if (BranchesVM.Favorites is not { } favorites) return;
+        var window = new OptionsWindow(new OptionsViewModel(favorites));
+        _windowService.ShowDialog(window);
+    }
+
+    [RelayCommand]
     private async Task OpenSnapshotBrowser()
     {
         if (string.IsNullOrWhiteSpace(Path))

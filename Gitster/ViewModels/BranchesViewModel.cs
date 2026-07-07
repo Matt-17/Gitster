@@ -63,6 +63,62 @@ public sealed class BranchTreeNode
     public string? BranchName => Row?.Name;
 }
 
+/// <summary>
+/// A node in the title-bar branch picker: a "/"-path folder or a leaf branch, carrying its
+/// favourite/pin state. Folder expansion is remembered via <see cref="BranchFavoritesService"/>.
+/// </summary>
+public sealed class BranchPickerNode : ObservableObject
+{
+    private readonly BranchFavoritesService? _favorites;
+    private readonly string? _repoPath;
+    private readonly string _folderPath;
+    private bool _isExpanded;
+
+    public BranchPickerNode(
+        string name, BranchRow? row, bool isGlobalFavorite, bool isPinned,
+        BranchFavoritesService? favorites = null, string? repoPath = null, string folderPath = "")
+    {
+        Name = name;
+        Row = row;
+        IsGlobalFavorite = isGlobalFavorite;
+        IsPinned = isPinned;
+        _favorites = favorites;
+        _repoPath = repoPath;
+        _folderPath = folderPath;
+        _isExpanded = row is not null || (favorites?.IsFolderExpanded(repoPath, folderPath) ?? true);
+    }
+
+    public string Name { get; }
+    public BranchRow? Row { get; }
+    public ObservableCollection<BranchPickerNode> Children { get; } = [];
+
+    public bool IsBranch => Row != null;
+    public bool IsFolder => Row == null;
+    public string? FullName => Row?.Name;
+    public bool IsCurrent => Row?.IsCurrent ?? false;
+
+    public bool IsGlobalFavorite { get; }
+    public bool IsPinned { get; }
+    public bool IsFavorite => IsGlobalFavorite || IsPinned;
+    /// <summary>Global favourites are managed in Options and cannot be unpinned from the dropdown.</summary>
+    public bool CanTogglePin => !IsGlobalFavorite;
+    public string PinTooltip => IsGlobalFavorite ? "Global favourite — manage in File ▸ Options"
+                              : IsPinned ? "Unpin branch" : "Pin branch";
+
+    /// <summary>Two-way bound to the folder's expander; persisted per repository.</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded == value) return;
+            _isExpanded = value;
+            OnPropertyChanged();
+            if (IsFolder) _favorites?.SetFolderExpanded(_repoPath, _folderPath, value);
+        }
+    }
+}
+
 public partial class BranchesViewModel : BaseViewModel
 {
     private readonly IGitBackend              _git;
@@ -72,6 +128,7 @@ public partial class BranchesViewModel : BaseViewModel
     private readonly SourceArchiveService     _archiveService;
     private readonly UiPreferencesService     _ui;
     private readonly IWindowService           _windowService;
+    private readonly BranchFavoritesService?  _favorites;
     private readonly Func<Task>               _onChanged;
 
     private List<BranchRow> _all = [];
@@ -129,6 +186,7 @@ public partial class BranchesViewModel : BaseViewModel
         SourceArchiveService     archiveService,
         UiPreferencesService     ui,
         IWindowService?          windowService,
+        BranchFavoritesService   favorites,
         RepositoryCommandContext commandContext)
         : this(
             git,
@@ -138,7 +196,8 @@ public partial class BranchesViewModel : BaseViewModel
             archiveService,
             ui,
             windowService,
-            commandContext.RefreshSidebarBadges)
+            commandContext.RefreshSidebarBadges,
+            favorites)
     {
     }
 
@@ -150,7 +209,8 @@ public partial class BranchesViewModel : BaseViewModel
         SourceArchiveService     archiveService,
         UiPreferencesService     ui,
         IWindowService?          windowService,
-        Func<Task>               onChanged)
+        Func<Task>               onChanged,
+        BranchFavoritesService?  favorites = null)
     {
         _git       = git;
         _feedback  = feedback;
@@ -159,7 +219,11 @@ public partial class BranchesViewModel : BaseViewModel
         _archiveService = archiveService;
         _ui        = ui;
         _windowService = windowService ?? new WindowService();
+        _favorites = favorites;
         _onChanged = onChanged;
+
+        if (_favorites is not null)
+            _favorites.Changed += RebuildPicker;
 
         ShowTree = ui.BranchTreeView;
 
@@ -169,6 +233,18 @@ public partial class BranchesViewModel : BaseViewModel
 
     /// <summary>Branches arranged as a path-segment tree (plan A13). Built alongside the flat list.</summary>
     public ObservableCollection<BranchTreeNode> BranchTree { get; } = [];
+
+    /// <summary>Favourite branches (global + per-repo pins) for the title-bar picker's top section.</summary>
+    public ObservableCollection<BranchPickerNode> FavoriteBranches { get; } = [];
+
+    /// <summary>All local branches as a "/"-folder tree for the title-bar picker.</summary>
+    public ObservableCollection<BranchPickerNode> BranchPickerTree { get; } = [];
+
+    [ObservableProperty]
+    public partial bool HasFavoriteBranches { get; set; }
+
+    /// <summary>Exposed so File ▸ Options can edit global favourites; null only in unit tests.</summary>
+    public BranchFavoritesService? Favorites => _favorites;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowFlat))]
@@ -246,6 +322,103 @@ public partial class BranchesViewModel : BaseViewModel
 
         if (ShowTree)
             RebuildTree(ordered);
+
+        RebuildPicker();
+    }
+
+    /// <summary>Rebuilds the title-bar picker's favourites list and "/"-folder tree from local branches.</summary>
+    private void RebuildPicker()
+    {
+        var repoPath = _git.RepositoryPath;
+        var locals = _all.Where(b => !b.IsRemote).ToList();
+
+        BranchPickerNode Leaf(BranchRow row, string name) => new(
+            name, row,
+            isGlobalFavorite: _favorites?.IsGlobalFavorite(row.Name) ?? false,
+            isPinned:         _favorites?.IsPinned(repoPath, row.Name) ?? false,
+            favorites: _favorites, repoPath: repoPath);
+
+        // Favourites section: global favourites first, then per-repo pins, each alphabetical.
+        FavoriteBranches.Clear();
+        foreach (var row in locals
+                     .Select(r => Leaf(r, r.Name))
+                     .Where(n => n.IsFavorite)
+                     .OrderByDescending(n => n.IsGlobalFavorite)
+                     .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase))
+            FavoriteBranches.Add(row);
+        HasFavoriteBranches = FavoriteBranches.Count > 0;
+
+        // Full "/"-folder tree, alphabetical. Favourites are shown only in the section above,
+        // so they are excluded here (which also prunes folders that would otherwise be empty).
+        var roots = new List<BranchPickerNode>();
+        var folders = new Dictionary<string, BranchPickerNode>(StringComparer.Ordinal);
+
+        bool IsFavorite(BranchRow r) =>
+            (_favorites?.IsGlobalFavorite(r.Name) ?? false) ||
+            (_favorites?.IsPinned(repoPath, r.Name) ?? false);
+
+        foreach (var row in locals
+                     .Where(r => !IsFavorite(r))
+                     .OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var segments = row.Name.Split('/');
+            var path = string.Empty;
+            IList<BranchPickerNode> level = roots;
+
+            for (int i = 0; i < segments.Length; i++)
+            {
+                var isLeaf = i == segments.Length - 1;
+                path = path.Length == 0 ? segments[i] : $"{path}/{segments[i]}";
+
+                if (isLeaf)
+                {
+                    level.Add(Leaf(row, segments[i]));
+                }
+                else if (folders.TryGetValue(path, out var existing))
+                {
+                    level = existing.Children;
+                }
+                else
+                {
+                    var folder = new BranchPickerNode(segments[i], null, false, false, _favorites, repoPath, path);
+                    level.Add(folder);
+                    folders[path] = folder;
+                    level = folder.Children;
+                }
+            }
+        }
+
+        SortPickerLevel(roots);
+        BranchPickerTree.Clear();
+        foreach (var node in roots)
+            BranchPickerTree.Add(node);
+    }
+
+    /// <summary>Sorts a tree level (folders before branches, each alphabetical) and recurses.</summary>
+    private static void SortPickerLevel(IList<BranchPickerNode> level)
+    {
+        var sorted = level
+            .OrderByDescending(n => n.IsFolder)
+            .ThenBy(n => n.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        level.Clear();
+        foreach (var node in sorted)
+        {
+            level.Add(node);
+            if (node.IsFolder)
+                SortPickerLevel(node.Children);
+        }
+    }
+
+    /// <summary>Toggles a per-repo pin (title-bar picker). Global favourites are locked (managed in Options).</summary>
+    [RelayCommand]
+    private void ToggleBranchPin(string? fullName)
+    {
+        if (string.IsNullOrEmpty(fullName)) return;
+        if (_favorites is null || _favorites.IsGlobalFavorite(fullName)) return;
+        _favorites.TogglePin(_git.RepositoryPath, fullName);
+        // Service raises Changed → RebuildPicker refreshes pins.
     }
 
     /// <summary>Builds the path-segment tree from the filtered, ordered rows (A13).</summary>

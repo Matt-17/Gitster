@@ -1,0 +1,94 @@
+<Window x:Class="Gitster.Views.OptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Gitster.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:OptionsViewModel}"
+        Title="Options – Gitster"
+        Width="640" Height="460"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource BackgroundPrimary}">
+
+    <Grid Margin="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="170"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: category list -->
+        <ListBox Grid.Column="0" ItemsSource="{Binding Categories}"
+                 SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                 Background="{DynamicResource BackgroundSecondary}"
+                 BorderBrush="{DynamicResource BorderTertiary}" BorderThickness="0,0,1,0"
+                 Foreground="{DynamicResource TextPrimary}" Padding="4">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="8,6"/>
+                    <Setter Property="Margin" Value="2,1"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+        </ListBox>
+
+        <!-- Right: settings panel (Branches) -->
+        <Grid Grid.Column="1" Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Global favourite branches"
+                       FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="Wrap"
+                       Text="Branch names listed here are treated as favourites in every repository. They appear at the top of the branch picker with a locked green pin and can only be removed here."
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+
+            <!-- Add row: textbox + Add -->
+            <Grid Grid.Row="2" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="NewNameBox" Grid.Column="0" VerticalContentAlignment="Center"
+                         Padding="8,5" FontSize="12"
+                         Text="{Binding NewBranchName, UpdateSourceTrigger=PropertyChanged}"
+                         Background="{DynamicResource BackgroundSecondary}"
+                         Foreground="{DynamicResource TextPrimary}"
+                         BorderBrush="{DynamicResource BorderSecondary}"
+                         ToolTip="e.g. main, develop, release">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding AddFavoriteCommand}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+                <Button Grid.Column="1" Content="Add" Margin="8,0,0,0" Padding="16,5"
+                        Style="{StaticResource PrimaryButton}"
+                        Command="{Binding AddFavoriteCommand}"/>
+            </Grid>
+
+            <!-- Names list -->
+            <ListBox Grid.Row="3" ItemsSource="{Binding FavoriteBranchNames}"
+                     SelectedItem="{Binding SelectedFavoriteName, Mode=TwoWay}"
+                     Background="{DynamicResource BackgroundSecondary}"
+                     BorderBrush="{DynamicResource BorderTertiary}" BorderThickness="1"
+                     Foreground="{DynamicResource TextPrimary}"
+                     FontFamily="{StaticResource FontFamilyMono}" FontSize="12">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="8,5"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+
+            <!-- Remove -->
+            <Button Grid.Row="4" Content="Remove" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    Padding="16,5" Style="{StaticResource GhostButton}"
+                    Command="{Binding RemoveFavoriteCommand}"/>
+        </Grid>
+    </Grid>
+</Window>

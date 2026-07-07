@@ -60,6 +60,7 @@ public sealed class ViewModelDiTests
         services.AddSingleton<RepositoryStateService>();
         services.AddSingleton<OperationFeedbackService>();
         services.AddSingleton<RecentReposService>();
+        services.AddSingleton<BranchFavoritesService>();
         services.AddSingleton<CommitHistoryService>();
         services.AddSingleton<AuthorDirectoryService>();
         services.AddSingleton<AutoFetchService>();
