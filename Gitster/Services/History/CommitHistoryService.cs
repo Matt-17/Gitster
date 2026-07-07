@@ -28,6 +28,24 @@ public sealed class CommitHistoryService
 
     private HistoryContext? _context;
 
+    public async Task<bool> IsCompleteAsync(
+        HistoryScope scope = HistoryScope.CurrentBranch,
+        CancellationToken ct = default)
+    {
+        await EnsureContextAsync(scope, ct);
+
+        await _gate.WaitAsync(ct);
+        try
+        {
+            using var conn = OpenConnection();
+            return GetBranchState(conn, RequireContext())?.IsComplete == true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public CommitHistoryService(IGitBackend git)
         : this(git, Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -122,10 +140,7 @@ public sealed class CommitHistoryService
         await EnsureContextAsync(scope, ct);
 
         if (!query.IsEmpty)
-        {
-            var all = await SearchAsync(query, int.MaxValue, scope, ct);
-            return all.Skip(offset).Take(count).ToList();
-        }
+            return await SearchAsync(query, count, scope, ct, offset);
 
         await _gate.WaitAsync(ct);
         try
@@ -152,20 +167,20 @@ public sealed class CommitHistoryService
         CommitQuery query,
         int maxResults,
         HistoryScope scope = HistoryScope.CurrentBranch,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int offset = 0,
+        IProgress<RepositoryLoadProgress>? progress = null)
     {
-        await EnsureCompleteAsync(progress: null, ct, scope);
+        await EnsureCompleteAsync(progress, ct, scope);
 
         await _gate.WaitAsync(ct);
         try
         {
             var context = RequireContext();
             using var conn = OpenConnection();
-            var rows = ReadRows(conn, context, 0, int.MaxValue);
-            return rows
-                .Where(r => query.Matches(r.Message, r.AuthorName, r.AuthorEmail, r.FullSha, r.Date))
-                .Take(maxResults)
-                .ToList();
+            return query.IsEmpty
+                ? ReadRows(conn, context, offset, maxResults)
+                : SearchRows(conn, context, query, offset, maxResults);
         }
         finally
         {
@@ -540,10 +555,7 @@ public sealed class CommitHistoryService
         CancellationToken ct,
         IProgress<RepositoryLoadProgress>? progress)
     {
-        var totalCount = maxCount == int.MaxValue
-            ? CountCommits(repo, context, ct, progress)
-            : maxCount;
-        var rows = new List<CommitHistoryRow>(maxCount == int.MaxValue ? Math.Max(totalCount, 1) : maxCount);
+        var rows = new List<CommitHistoryRow>(maxCount == int.MaxValue ? DefaultPageSize : maxCount);
         var refLabels = context.Scope == HistoryScope.AllBranches
             ? BuildBranchLabelMap(repo)
             : EmptyRefLabels;
@@ -551,8 +563,7 @@ public sealed class CommitHistoryService
         progress?.Report(new RepositoryLoadProgress(
             "Loading history",
             "Walking commits from HEAD.",
-            0,
-            TotalCommitCount: totalCount));
+            0));
 
         foreach (var commit in QueryCommits(repo, context))
         {
@@ -563,8 +574,7 @@ public sealed class CommitHistoryService
                 progress?.Report(new RepositoryLoadProgress(
                     "Loading history",
                     "Walking commits from HEAD.",
-                    rows.Count,
-                    TotalCommitCount: totalCount));
+                    rows.Count));
             }
             if (rows.Count >= maxCount)
                 break;
@@ -574,35 +584,8 @@ public sealed class CommitHistoryService
             "Loading history",
             "History cache is ready.",
             rows.Count,
-            TotalCommitCount: Math.Max(totalCount, rows.Count)));
+            TotalCommitCount: maxCount == int.MaxValue || rows.Count < maxCount ? rows.Count : maxCount));
         return rows;
-    }
-
-    private static int CountCommits(
-        Repository repo,
-        HistoryContext context,
-        CancellationToken ct,
-        IProgress<RepositoryLoadProgress>? progress)
-    {
-        progress?.Report(new RepositoryLoadProgress(
-            "Counting history",
-            "Counting commits for determinate progress."));
-
-        var count = 0;
-        foreach (var _ in QueryCommits(repo, context))
-        {
-            ct.ThrowIfCancellationRequested();
-            count++;
-            if (count % 1000 == 0)
-            {
-                progress?.Report(new RepositoryLoadProgress(
-                    "Counting history",
-                    "Counting commits for determinate progress.",
-                    count));
-            }
-        }
-
-        return count;
     }
 
     private static IEnumerable<Commit> QueryCommits(Repository repo, HistoryContext context)
@@ -695,6 +678,113 @@ public sealed class CommitHistoryService
         reader.IsDBNull(9) ? null : reader.GetString(9),
         reader.IsDBNull(10) ? Array.Empty<string>() : DeserializeList<string>(reader.GetString(10)),
         reader.IsDBNull(11) ? Array.Empty<CommitRefLabel>() : DeserializeList<CommitRefLabel>(reader.GetString(11)));
+
+    private IReadOnlyList<CommitHistoryRow> SearchRows(
+        SqliteConnection conn,
+        HistoryContext context,
+        CommitQuery query,
+        int offset,
+        int count)
+    {
+        using var cmd = conn.CreateCommand();
+        var clauses = new List<string>
+        {
+            "repo_key = $repo",
+            "branch_name = $branch",
+        };
+        cmd.Parameters.AddWithValue("$repo", context.RepoKey);
+        cmd.Parameters.AddWithValue("$branch", context.BranchName);
+
+        for (var i = 0; i < query.Terms.Count; i++)
+            AddSearchClause(cmd, clauses, query.Terms[i], i);
+
+        cmd.CommandText = $"""
+            SELECT sequence, full_sha, short_sha, message, author_date_ticks, author_name,
+                   author_email, tree_sha, remote_state, orphaned_pair_sha, parent_shas, ref_labels
+            FROM history_commits
+            WHERE {string.Join(" AND ", clauses)}
+            ORDER BY sequence
+            LIMIT $count OFFSET $offset;
+            """;
+        cmd.Parameters.AddWithValue("$count", count == int.MaxValue ? -1 : count);
+        cmd.Parameters.AddWithValue("$offset", offset);
+
+        var rows = new List<CommitHistoryRow>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            rows.Add(ReadRow(reader));
+        return rows;
+    }
+
+    private static void AddSearchClause(
+        SqliteCommand cmd,
+        List<string> clauses,
+        QueryTerm term,
+        int index)
+    {
+        var value = term.Value;
+        var like = $"$like{index}";
+        var prefix = $"$prefix{index}";
+        var ticks = $"$ticks{index}";
+
+        switch (term.Field)
+        {
+            case QueryField.Author:
+                clauses.Add($"(author_name LIKE {like} ESCAPE '\\' COLLATE NOCASE OR author_email LIKE {like} ESCAPE '\\' COLLATE NOCASE)");
+                cmd.Parameters.AddWithValue(like, LikeValue(value));
+                break;
+
+            case QueryField.Message:
+                clauses.Add($"message LIKE {like} ESCAPE '\\' COLLATE NOCASE");
+                cmd.Parameters.AddWithValue(like, LikeValue(value));
+                break;
+
+            case QueryField.Sha:
+                clauses.Add($"(full_sha LIKE {prefix} ESCAPE '\\' COLLATE NOCASE OR short_sha LIKE {prefix} ESCAPE '\\' COLLATE NOCASE)");
+                cmd.Parameters.AddWithValue(prefix, PrefixValue(value));
+                break;
+
+            case QueryField.Before:
+                if (CommitQuery.TryParseDate(value, out var before))
+                {
+                    clauses.Add($"author_date_ticks <= {ticks}");
+                    cmd.Parameters.AddWithValue(ticks, before.Date.AddDays(1).AddTicks(-1).Ticks);
+                }
+                break;
+
+            case QueryField.After:
+                if (CommitQuery.TryParseDate(value, out var after))
+                {
+                    clauses.Add($"author_date_ticks >= {ticks}");
+                    cmd.Parameters.AddWithValue(ticks, after.Date.Ticks);
+                }
+                break;
+
+            default:
+                clauses.Add($"""
+                    (message LIKE {like} ESCAPE '\' COLLATE NOCASE
+                     OR author_name LIKE {like} ESCAPE '\' COLLATE NOCASE
+                     OR author_email LIKE {like} ESCAPE '\' COLLATE NOCASE
+                     OR full_sha LIKE {prefix} ESCAPE '\' COLLATE NOCASE
+                     OR short_sha LIKE {prefix} ESCAPE '\' COLLATE NOCASE)
+                    """);
+                cmd.Parameters.AddWithValue(like, LikeValue(value));
+                cmd.Parameters.AddWithValue(prefix, PrefixValue(value));
+                break;
+        }
+    }
+
+    private static string LikeValue(string value) =>
+        $"%{EscapeLike(value)}%";
+
+    private static string PrefixValue(string value) =>
+        $"{EscapeLike(value)}%";
+
+    private static string EscapeLike(string value) =>
+        value
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
 
     private Dictionary<string, int> ReadCachedSequences(SqliteConnection conn, HistoryContext context)
     {
@@ -965,6 +1055,15 @@ public sealed class CommitHistoryService
 
             CREATE INDEX IF NOT EXISTS ix_history_commits_author
                 ON history_commits(repo_key, branch_name, author_name, author_email);
+
+            CREATE INDEX IF NOT EXISTS ix_history_commits_date
+                ON history_commits(repo_key, branch_name, author_date_ticks);
+
+            CREATE INDEX IF NOT EXISTS ix_history_commits_short_sha
+                ON history_commits(repo_key, branch_name, short_sha);
+
+            CREATE INDEX IF NOT EXISTS ix_history_commits_full_sha
+                ON history_commits(repo_key, branch_name, full_sha);
             """;
         cmd.ExecuteNonQuery();
         EnsureColumn("history_commits", "parent_shas", "TEXT NOT NULL DEFAULT ''");

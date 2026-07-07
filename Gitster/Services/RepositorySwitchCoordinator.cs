@@ -49,6 +49,13 @@ public sealed class RepositorySwitchCoordinator
         if (string.IsNullOrWhiteSpace(request.TargetPath))
             return false;
 
+        if (IsSameRepository(request.TargetPath, LoadedRepositoryPath))
+        {
+            callbacks.CommitRepositoryPath(request.TargetPath, request.RecordRecent);
+            LoadedRepositoryPath = request.TargetPath;
+            return true;
+        }
+
         _repoSwitchCts?.Cancel();
 
         var previousState = callbacks.CaptureState() with { LoadedRepositoryPath = LoadedRepositoryPath };
@@ -153,4 +160,31 @@ public sealed class RepositorySwitchCoordinator
         await loadRepositoryAsync(targetPath, ct, progress);
         return true;
     }
+
+    private static bool IsSameRepository(string targetPath, string? loadedRepositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(loadedRepositoryPath))
+            return false;
+
+        try
+        {
+            return string.Equals(
+                NormalizePath(targetPath),
+                NormalizePath(loadedRepositoryPath),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(
+                TrimTrailingSeparators(targetPath),
+                TrimTrailingSeparators(loadedRepositoryPath),
+                StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static string NormalizePath(string path) =>
+        TrimTrailingSeparators(System.IO.Path.GetFullPath(path));
+
+    private static string TrimTrailingSeparators(string path) =>
+        path.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
 }

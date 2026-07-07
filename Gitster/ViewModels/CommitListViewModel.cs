@@ -37,11 +37,13 @@ public partial class CommitListViewModel : BaseViewModel
     private List<CommitItem> _incomingRows = [];
     private List<CommitItem> _selectedCommits = [];
     private RemoteSets? _remoteSets;
+    private RemoteHistoryState _remoteHistoryState = RemoteHistoryState.Loaded;
     private CommitQuery _query = CommitQuery.Parse(null);
 
     private CancellationTokenSource? _loadCts;
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _diffCts;
+    private Task? _warmHistoryTask;
 
     public CommitListViewModel(
         IGitBackend git,
@@ -227,6 +229,7 @@ public partial class CommitListViewModel : BaseViewModel
         IProgress<RepositoryLoadProgress>? progress = null)
     {
         _loadCts?.Cancel();
+        _filterCts?.Cancel();
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _loadCts = cts;
         var ct = cts.Token;
@@ -248,41 +251,34 @@ public partial class CommitListViewModel : BaseViewModel
             await _history.OpenAsync(_git.RepositoryPath, scope, ct, progress);
 
             progress?.Report(new RepositoryLoadProgress(
-                "Loading full history",
-                "Preparing virtualized commit rows."));
-            var rows = await _history.EnsureCompleteAsync(progress, ct, scope);
+                "Loading history",
+                "Loading the first commit page."));
+            var rows = await _history.GetPageAsync(
+                CommitQuery.Parse(null),
+                0,
+                CommitHistoryService.DefaultPageSize,
+                scope,
+                ct,
+                progress);
             if (ct.IsCancellationRequested) return;
 
             var newAllRows = rows.Select(r => r.ToCommitItem()).ToList();
-            await ApplySigningStatusesAsync(newAllRows, ct);
 
-            RemoteSets sets = RemoteSets.Empty;
-            var newIncomingRows = new List<CommitItem>();
-            if (scope == HistoryScope.CurrentBranch)
-            {
-                progress?.Report(new RepositoryLoadProgress(
-                    "Computing remote state",
-                    "Checking incoming and outgoing commits.",
-                    newAllRows.Count));
-                sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
-                if (ct.IsCancellationRequested) return;
-
-                await _history.ApplyRemoteSetsAsync(sets, ct);
-                ApplyRemoteSets(sets, newAllRows);
-                newIncomingRows = sets.Incoming.Select(ToItem).ToList();
-                await ApplySigningStatusesAsync(newIncomingRows, ct);
-            }
-
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await InvokeOnUiAsync(() =>
             {
                 _allRows = newAllRows;
-                _incomingRows = newIncomingRows;
-                _remoteSets = sets;
+                _incomingRows = [];
+                _remoteSets = null;
+                _remoteHistoryState = scope == HistoryScope.CurrentBranch
+                    ? RemoteHistoryState.Pending
+                    : RemoteHistoryState.Loaded;
                 OnPropertyChanged(nameof(LoadedCommits));
 
-                var remoteRows = BuildRows(FilteredIncoming(), FilteredLocal());
-                ApplyRows(remoteRows, priorSha);
-            }, DispatcherPriority.Normal);
+                ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), priorSha);
+                HistoryLoading = false;
+            });
+
+            _warmHistoryTask = WarmHistoryAndEnrichAsync(scope, cts, progress);
         }
         catch (OperationCanceledException)
         {
@@ -298,9 +294,11 @@ public partial class CommitListViewModel : BaseViewModel
     public void ClearList()
     {
         _loadCts?.Cancel();
+        _filterCts?.Cancel();
         _allRows = [];
         _incomingRows = [];
         _remoteSets = null;
+        _remoteHistoryState = RemoteHistoryState.Loaded;
         OnPropertyChanged(nameof(LoadedCommits));
         Items = [];
         GraphColumnWidth = GraphColumnMinWidth;
@@ -458,14 +456,20 @@ public partial class CommitListViewModel : BaseViewModel
                 rows.Select(r => r.FullSha).Distinct(StringComparer.OrdinalIgnoreCase).Take(500).ToList(),
                 ct);
 
-            foreach (var row in rows)
-                if (statuses.TryGetValue(row.FullSha, out var status))
-                    row.SigningStatus = status;
+            await InvokeOnUiAsync(() =>
+            {
+                foreach (var row in rows)
+                    if (statuses.TryGetValue(row.FullSha, out var status))
+                        row.SigningStatus = status;
+            });
         }
         catch
         {
-            foreach (var row in rows)
-                row.SigningStatus = CommitSigningStatus.Unknown;
+            await InvokeOnUiAsync(() =>
+            {
+                foreach (var row in rows)
+                    row.SigningStatus = CommitSigningStatus.Unknown;
+            });
         }
     }
 
@@ -492,7 +496,9 @@ public partial class CommitListViewModel : BaseViewModel
     private void DebounceFilter()
     {
         _filterCts?.Cancel();
-        var cts = new CancellationTokenSource();
+        var cts = _loadCts is null
+            ? new CancellationTokenSource()
+            : CancellationTokenSource.CreateLinkedTokenSource(_loadCts.Token);
         _filterCts = cts;
         var token = cts.Token;
         var query = _query;
@@ -503,28 +509,61 @@ public partial class CommitListViewModel : BaseViewModel
             catch (TaskCanceledException) { return; }
             if (token.IsCancellationRequested) return;
 
-            var rows = _allRows;
-            var incoming = _incomingRows;
-            var matchedLocal = query.IsEmpty
-                ? rows
-                : rows.Where(c => Match(query, c)).ToList();
-            var matchedIncoming = query.IsEmpty
-                ? incoming
-                : incoming.Where(c => Match(query, c)).ToList();
-            var builtRows = BuildRows(matchedIncoming, ApplyOutgoingIncomingFilter(matchedLocal));
-
             try
             {
+                BuiltCommitRows builtRows;
+                if (query.IsEmpty)
+                {
+                    var rows = _allRows;
+                    var incoming = _incomingRows;
+                    builtRows = BuildRows(incoming, ApplyOutgoingIncomingFilter(rows));
+                }
+                else
+                {
+                    await InvokeOnUiAsync(() =>
+                    {
+                        HistoryLoading = true;
+                        HistoryStatusText = "Indexing history for complete search...";
+                    });
+
+                    var rows = await _history.SearchAsync(
+                        query,
+                        int.MaxValue,
+                        SelectedScope,
+                        token,
+                        offset: 0,
+                        progress: new Progress<RepositoryLoadProgress>(p =>
+                        {
+                            var statusText = string.IsNullOrWhiteSpace(p.CounterText)
+                                ? p.Detail
+                                : $"{p.Detail} {p.CounterText}";
+                            _ = InvokeOnUiAsync(() => HistoryStatusText = statusText);
+                        }));
+                    var matchedLocal = rows.Select(r => r.ToCommitItem()).ToList();
+                    if (_remoteSets is not null)
+                        ApplyRemoteSets(_remoteSets, matchedLocal);
+
+                    var matchedIncoming = _incomingRows.Where(c => Match(query, c)).ToList();
+                    builtRows = BuildRows(matchedIncoming, ApplyOutgoingIncomingFilter(matchedLocal));
+                }
+
                 if (token.IsCancellationRequested) return;
 
-                await Application.Current.Dispatcher.InvokeAsync(() =>
+                await InvokeOnUiAsync(() =>
                 {
                     ApplyRows(builtRows, SelectedCommit?.FullSha);
+                    if (_filterCts == cts)
+                        HistoryLoading = false;
                 });
             }
             catch (OperationCanceledException)
             {
                 // Superseded by another filter.
+            }
+            finally
+            {
+                if (_filterCts == cts)
+                    await InvokeOnUiAsync(() => HistoryLoading = false);
             }
         });
     }
@@ -561,16 +600,28 @@ public partial class CommitListViewModel : BaseViewModel
         for (int i = 0; i < local.Count; i++)
             if (IsOutgoing(local[i])) outgoingCount++;
 
-        bool hasRemote = _remoteSets?.HasRemote ?? false;
+        var showRemoteSection = SelectedScope == HistoryScope.CurrentBranch;
+        var remotePending = _remoteHistoryState == RemoteHistoryState.Pending;
+        var remoteUnavailable = _remoteHistoryState == RemoteHistoryState.Unavailable;
+        var hasRemote = _remoteSets?.HasRemote ?? false;
+        var hasTrackingBranch = _remoteSets?.HasTrackingBranch ?? false;
 
         var result = new List<object>(incoming.Count + local.Count + 2);
 
-        if (hasRemote)
+        if (showRemoteSection)
         {
             result.Add(new CommitSectionHeader(CommitSectionKind.RemoteIncoming, incoming.Count,
-                _remoteSets?.RemoteName, _remoteSets?.RemoteUrl));
+                _remoteSets?.RemoteName, _remoteSets?.RemoteUrl, remotePending));
 
-            if (incoming.Count == 0)
+            if (remotePending)
+                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "checking tracking remote history..."));
+            else if (remoteUnavailable)
+                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "remote history unavailable"));
+            else if (!hasRemote)
+                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no remote configured"));
+            else if (!hasTrackingBranch)
+                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no tracking branch"));
+            else if (incoming.Count == 0)
                 result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no incoming commits"));
             else
             {
@@ -579,7 +630,7 @@ public partial class CommitListViewModel : BaseViewModel
             }
         }
 
-        if (local.Count > 0 || hasRemote)
+        if (local.Count > 0 || showRemoteSection)
             result.Add(new CommitSectionHeader(CommitSectionKind.LocalOutgoing, outgoingCount));
 
         ApplyGraphRows(local);
@@ -657,6 +708,132 @@ public partial class CommitListViewModel : BaseViewModel
     }
 
     private sealed record BuiltCommitRows(IReadOnlyList<object> Items, int LocalCount, int IncomingCount);
+
+    private async Task WarmHistoryAndEnrichAsync(
+        HistoryScope scope,
+        CancellationTokenSource ownerCts,
+        IProgress<RepositoryLoadProgress>? progress)
+    {
+        var ct = ownerCts.Token;
+        try
+        {
+            await Task.Yield();
+            var wasComplete = await _history.IsCompleteAsync(scope, ct);
+            if (!wasComplete)
+                await InvokeOnUiAsync(() =>
+                {
+                    HistoryLoading = true;
+                    HistoryStatusText = "Indexing history...";
+                });
+
+            var rows = await _history.EnsureCompleteAsync(progress, ct, scope);
+            if (ct.IsCancellationRequested || _loadCts != ownerCts)
+                return;
+
+            var completeRows = rows.Select(r => r.ToCommitItem()).ToList();
+            await InvokeOnUiAsync(() =>
+            {
+                _allRows = completeRows;
+                OnPropertyChanged(nameof(LoadedCommits));
+                if (_query.IsEmpty)
+                    ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha);
+                HistoryLoading = false;
+            });
+
+            await EnrichRemoteAndSigningAsync(scope, ownerCts);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer load.
+        }
+        catch
+        {
+            if (_loadCts == ownerCts)
+                await InvokeOnUiAsync(() =>
+                {
+                    HistoryLoading = false;
+                    HistoryStatusText = "History index failed.";
+                });
+        }
+    }
+
+    private async Task EnrichRemoteAndSigningAsync(
+        HistoryScope scope,
+        CancellationTokenSource ownerCts)
+    {
+        var ct = ownerCts.Token;
+        try
+        {
+            await ApplySigningStatusesAsync(_allRows, ct);
+
+            RemoteSets? sets = null;
+            var incomingRows = new List<CommitItem>();
+            if (scope == HistoryScope.CurrentBranch)
+            {
+                sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
+                if (ct.IsCancellationRequested || _loadCts != ownerCts)
+                    return;
+
+                await _history.ApplyRemoteSetsAsync(sets, ct);
+                incomingRows = sets.Incoming.Select(ToItem).ToList();
+                await ApplySigningStatusesAsync(incomingRows, ct);
+            }
+
+            if (ct.IsCancellationRequested || _loadCts != ownerCts)
+                return;
+
+            await InvokeOnUiAsync(() =>
+            {
+                if (sets is not null)
+                {
+                    _remoteSets = sets;
+                    _remoteHistoryState = RemoteHistoryState.Loaded;
+                    _incomingRows = incomingRows;
+                    ApplyRemoteSets(sets, _allRows);
+                }
+
+                if (_query.IsEmpty)
+                    ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha);
+                else
+                    DebounceFilter();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer load.
+        }
+        catch
+        {
+            if (_loadCts == ownerCts && scope == HistoryScope.CurrentBranch)
+                await InvokeOnUiAsync(() =>
+                {
+                    _remoteHistoryState = RemoteHistoryState.Unavailable;
+                    if (_query.IsEmpty)
+                        ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha);
+                    else
+                        DebounceFilter();
+                });
+        }
+    }
+
+    private enum RemoteHistoryState
+    {
+        Pending,
+        Loaded,
+        Unavailable,
+    }
+
+    private static Task InvokeOnUiAsync(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.InvokeAsync(action, DispatcherPriority.Normal).Task;
+    }
 
     partial void OnSelectedCommitChanged(CommitItem? value)
     {

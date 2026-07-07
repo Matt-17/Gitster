@@ -171,6 +171,48 @@ public sealed class CommitListViewModelNavigationTests
     }
 
     [TestMethod]
+    public void ShowOutgoingIncomingOnly_BeforeRemoteSetsLoaded_ShowsRemoteHistoryAsChecking()
+    {
+        var vm = CreateViewModel();
+        var local = Item("local", remoteState: CommitRemoteState.LocalOnly);
+
+        SetPrivateField(vm, "_allRows", new List<CommitItem> { local });
+        SetPrivateField(vm, "_incomingRows", new List<CommitItem>());
+        SetPrivateField<RemoteSets?>(vm, "_remoteSets", null);
+        SetPrivateEnumField(vm, "_remoteHistoryState", "Pending");
+
+        vm.ShowOutgoingIncomingOnly = true;
+
+        var remoteHeader = vm.Items.OfType<CommitSectionHeader>().First(h => h.IsIncoming);
+        var remoteEmpty = vm.Items.OfType<CommitSectionEmptyRow>().First(r => !r.IsOutgoing);
+        var localHeader = vm.Items.OfType<CommitSectionHeader>().First(h => h.IsOutgoing);
+
+        Assert.AreEqual("Remote History (checking...)", remoteHeader.Title);
+        Assert.AreEqual("checking tracking remote history...", remoteEmpty.Message);
+        Assert.AreEqual("Local History (1 outgoing)", localHeader.Title);
+    }
+
+    [TestMethod]
+    public void ShowOutgoingIncomingOnly_WhenNoRemoteConfigured_KeepsRemoteHistoryHeader()
+    {
+        var vm = CreateViewModel();
+        var local = Item("local", remoteState: CommitRemoteState.NoTrackingBranch);
+
+        SetPrivateField(vm, "_allRows", new List<CommitItem> { local });
+        SetPrivateField(vm, "_incomingRows", new List<CommitItem>());
+        SetPrivateField(vm, "_remoteSets", RemoteSets.Empty);
+        SetPrivateEnumField(vm, "_remoteHistoryState", "Loaded");
+
+        vm.ShowOutgoingIncomingOnly = true;
+
+        var remoteHeader = vm.Items.OfType<CommitSectionHeader>().First(h => h.IsIncoming);
+        var remoteEmpty = vm.Items.OfType<CommitSectionEmptyRow>().First(r => !r.IsOutgoing);
+
+        Assert.AreEqual("Remote History (0)", remoteHeader.Title);
+        Assert.AreEqual("no remote configured", remoteEmpty.Message);
+    }
+
+    [TestMethod]
     public void GraphColumnWidthForLaneCount_WithDenseGraph_ExpandsBeyondCompactColumn()
     {
         Assert.AreEqual(28, CommitListViewModel.GraphColumnWidthForLaneCount(1));
@@ -233,5 +275,12 @@ public sealed class CommitListViewModelNavigationTests
         var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException($"Field '{fieldName}' was not found.");
         field.SetValue(target, value);
+    }
+
+    private static void SetPrivateEnumField(object target, string fieldName, string value)
+    {
+        var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Field '{fieldName}' was not found.");
+        field.SetValue(target, Enum.Parse(field.FieldType, value));
     }
 }

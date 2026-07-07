@@ -23,8 +23,7 @@ public partial class AutoFetchService : ObservableObject, IDisposable
     [ObservableProperty]
     private DateTime? _lastFetchAt;
 
-    [ObservableProperty]
-    private bool _isRemoteOperationRunning;
+    private int _fetchGate;
 
     public AutoFetchService(IGitBackend git, RepositoryStateService? stateService = null)
     {
@@ -58,8 +57,10 @@ public partial class AutoFetchService : ObservableObject, IDisposable
 
     public async Task RunOnceAsync()
     {
-        if (IsRemoteOperationRunning || _stateService?.IsOperationRunning == true)
+        if (_stateService?.IsOperationRunning == true)
             return;
+        if (Interlocked.CompareExchange(ref _fetchGate, 1, 0) != 0)
+            return; // a fetch is already in flight; skip this tick
 
         try
         {
@@ -75,6 +76,10 @@ public partial class AutoFetchService : ObservableObject, IDisposable
                 IntervalSeconds = FailureBackoffSeconds;
 
             System.Diagnostics.Debug.WriteLine($"AutoFetch failed: {ex}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _fetchGate, 0);
         }
     }
 

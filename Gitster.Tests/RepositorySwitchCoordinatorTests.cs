@@ -1,3 +1,5 @@
+using System.IO;
+
 using Gitster.Models;
 using Gitster.Services;
 using Gitster.ViewModels;
@@ -108,6 +110,70 @@ public sealed class RepositorySwitchCoordinatorTests
         Assert.IsTrue(second);
         Assert.AreEqual("second", coordinator.LoadedRepositoryPath);
         CollectionAssert.AreEqual(new[] { "second" }, state.CommittedPaths);
+    }
+
+    [TestMethod]
+    public async Task SwitchAsync_SameLoadedRepository_SkipsReload()
+    {
+        var coordinator = CreateCoordinator();
+        var state = new SwitchHarnessState();
+        var loadedPaths = new List<string>();
+        var callbacks = CreateCallbacks(
+            coordinator,
+            state,
+            loadRepositoryAsync: (path, _, _) =>
+            {
+                loadedPaths.Add(path);
+                return Task.CompletedTask;
+            });
+
+        var first = await coordinator.SwitchAsync(
+            new RepositorySwitchRequest("repo", RecordRecent: true, ShowLoadingWindow: false),
+            callbacks);
+        var second = await coordinator.SwitchAsync(
+            new RepositorySwitchRequest("repo", RecordRecent: true, ShowLoadingWindow: false),
+            callbacks);
+
+        Assert.IsTrue(first);
+        Assert.IsTrue(second);
+        CollectionAssert.AreEqual(new[] { "repo" }, loadedPaths);
+        CollectionAssert.AreEqual(new[] { "repo", "repo" }, state.CommittedPaths);
+    }
+
+    [TestMethod]
+    public async Task SwitchAsync_SameLoadedRepositoryWithTrailingSlash_SkipsReload()
+    {
+        var coordinator = CreateCoordinator();
+        var state = new SwitchHarnessState();
+        var loadedPaths = new List<string>();
+        var repoPath = Path.Combine(Path.GetTempPath(), "gitster-switch-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repoPath);
+        try
+        {
+            var callbacks = CreateCallbacks(
+                coordinator,
+                state,
+                loadRepositoryAsync: (path, _, _) =>
+                {
+                    loadedPaths.Add(path);
+                    return Task.CompletedTask;
+                });
+
+            var first = await coordinator.SwitchAsync(
+                new RepositorySwitchRequest(repoPath, RecordRecent: true, ShowLoadingWindow: false),
+                callbacks);
+            var second = await coordinator.SwitchAsync(
+                new RepositorySwitchRequest(repoPath + Path.DirectorySeparatorChar, RecordRecent: true, ShowLoadingWindow: false),
+                callbacks);
+
+            Assert.IsTrue(first);
+            Assert.IsTrue(second);
+            CollectionAssert.AreEqual(new[] { repoPath }, loadedPaths);
+        }
+        finally
+        {
+            Directory.Delete(repoPath);
+        }
     }
 
     [TestMethod]

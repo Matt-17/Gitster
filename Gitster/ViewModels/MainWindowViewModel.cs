@@ -674,7 +674,7 @@ public partial class MainWindowViewModel : BaseViewModel
                     ReflogSelector: null,
                     Status: OperationStatus.Active));
 
-                _ = _snapshotService.CaptureAsync(_gitBackend, "Range timestamp rewrite");
+                await _snapshotService.CaptureAsync(_gitBackend, "Range timestamp rewrite");
             }
         }
         catch (Exception ex)
@@ -919,7 +919,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
 
-            _ = _snapshotService.CaptureAsync(_gitBackend, "Amend");
+            await _snapshotService.CaptureAsync(_gitBackend, "Amend");
 
             ClearPendingHeadRefresh();
             await RefreshAfterHeadChangeAsync();
@@ -1205,7 +1205,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
         try
         {
-            _ = _snapshotService.CaptureAsync(_gitBackend, $"Create branch {name}");
+            await _snapshotService.CaptureAsync(_gitBackend, $"Create branch {name}");
             await _feedbackService.RunAsync("Create branch", () => _gitBackend.CreateBranchAsync(name, commit.FullSha));
             await BranchesVM.LoadAsync();
             SidebarVM.BranchCount = BranchesVM.LocalCount;
@@ -1397,7 +1397,7 @@ public partial class MainWindowViewModel : BaseViewModel
         try
         {
             var beforeSha = await _gitBackend.GetHeadShaAsync();
-            _ = _snapshotService.CaptureAsync(_gitBackend, $"Cherry-pick {shortSha}");
+            await _snapshotService.CaptureAsync(_gitBackend, $"Cherry-pick {shortSha}");
             await _feedbackService.RunAsync($"Cherry-pick {shortSha}", () => _gitBackend.CherryPickAsync(commit.FullSha));
             var afterSha = await _gitBackend.GetHeadShaAsync();
             var branchName = TitleBarVM.CurrentBranch;
@@ -1984,6 +1984,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
         progress?.Report(new RepositoryLoadProgress("Finalizing", "Refreshing author index."));
         _ = _authorDirService.RefreshAsync();
+        _ = _stateService.RefreshAsync();
     }
 
     private bool ApplyHeadState(Repository repo)
@@ -2120,7 +2121,7 @@ public partial class MainWindowViewModel : BaseViewModel
         progress?.Report(new RepositoryLoadProgress(
             "Attaching repository services",
             "Starting repository watchers."));
-        await _stateService.AttachAsync(repoPath);
+        await _stateService.AttachAsync(repoPath, refreshImmediately: false);
         ct.ThrowIfCancellationRequested();
 
         progress?.Report(new RepositoryLoadProgress(
