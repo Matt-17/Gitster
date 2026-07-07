@@ -142,14 +142,16 @@ public partial class CommitItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(SigningBadgeTooltip))]
     public partial CommitSigningStatus SigningStatus { get; set; } = CommitSigningStatus.Unknown;
 
-    public bool HasSigningBadge => SigningStatus != CommitSigningStatus.Unknown;
+    public bool HasSigningBadge => SigningStatus is
+        CommitSigningStatus.Good or
+        CommitSigningStatus.Bad or
+        CommitSigningStatus.Untrusted;
 
     public string SigningBadgeText => SigningStatus switch
     {
         CommitSigningStatus.Good => "S",
         CommitSigningStatus.Bad => "!",
         CommitSigningStatus.Untrusted => "?",
-        CommitSigningStatus.NoSignature => "∅",
         _ => string.Empty,
     };
 
