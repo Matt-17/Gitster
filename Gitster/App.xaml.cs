@@ -56,6 +56,7 @@ public partial class App : Application
 					services.AddSingleton<RepositoryStateService>();
 					services.AddSingleton<OperationFeedbackService>();
 					services.AddSingleton<RecentReposService>();
+					services.AddSingleton<BranchFavoritesService>();
 					services.AddSingleton<CommitHistoryService>();
 					services.AddSingleton<AuthorDirectoryService>();
 					services.AddSingleton<AutoFetchService>();

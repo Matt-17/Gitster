@@ -14,6 +14,28 @@
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+        <!-- "Current" marker: a bold green check inside a light-green checkbox, shown in the icon area. -->
+        <Style x:Key="CurrentCheckMarker" TargetType="Control">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Control">
+                        <Border CornerRadius="3"
+                                Background="{DynamicResource AccentSuccessBackground}"
+                                BorderBrush="{DynamicResource AccentSuccess}" BorderThickness="1">
+                            <TextBlock Text="&#x2713;" FontSize="11" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentSuccess}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="RepoPinButton" TargetType="Button">
             <Setter Property="Width" Value="28"/>
             <Setter Property="Height" Value="28"/>
@@ -119,14 +141,65 @@
             </Setter>
         </Style>
 
-        <!-- A pinned/recent repo row: name + path (opens repo) and a pin toggle -->
+        <!-- Remove-from-list (✕) marker, right-aligned. Hidden for pinned favorites. -->
+        <Style x:Key="RepoRemoveButton" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6">
+                            <Path x:Name="Glyph" Width="10" Height="10" Stretch="Uniform"
+                                  Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.6"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Data="M1,1 L9,9 M9,1 L1,9"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentDangerBackground}"/>
+                                <Setter TargetName="Glyph" Property="Stroke" Value="{DynamicResource AccentDanger}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource RepoDropPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <!-- Reveal on row hover; pinned favourites never show a remove marker. -->
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                    <Setter Property="Opacity" Value="1"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A pinned/recent repo row: [pin] name + path (opens repo) [✕ remove] -->
         <DataTemplate x:Key="RepoDropItemTemplate">
-            <Grid>
+            <Grid Background="Transparent">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Button Grid.Column="0" Style="{StaticResource DropItemButton}" Click="ClosePopup"
+                <Button Grid.Column="0"
+                        Style="{StaticResource RepoPinButton}"
+                        Command="{Binding DataContext.TitleBarVM.TogglePinRepoCommand, ElementName=Root}"
+                        CommandParameter="{Binding FullPath}"
+                        AutomationProperties.Name="{Binding PinTooltip}"
+                        ToolTip="{Binding PinTooltip}">
+                    <Path Style="{StaticResource RepoPinIcon}"/>
+                </Button>
+                <Button Grid.Column="1" Style="{StaticResource DropItemButton}" Click="ClosePopup"
                         Command="{Binding DataContext.OpenRepoCommand, ElementName=Root}"
                         CommandParameter="{Binding FullPath}" ToolTip="{Binding FullPath}" ToolTipService.Placement="Bottom">
                     <StackPanel>
@@ -136,15 +209,169 @@
                                    FontFamily="{StaticResource FontFamilyMono}" FontSize="10" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="1"
-                        Style="{StaticResource RepoPinButton}"
-                        Command="{Binding DataContext.TitleBarVM.TogglePinRepoCommand, ElementName=Root}"
+                <Button Grid.Column="2"
+                        Style="{StaticResource RepoRemoveButton}"
+                        Command="{Binding DataContext.TitleBarVM.RemoveRecentRepoCommand, ElementName=Root}"
                         CommandParameter="{Binding FullPath}"
-                        AutomationProperties.Name="{Binding PinTooltip}"
-                        ToolTip="{Binding PinTooltip}">
-                    <Path Style="{StaticResource RepoPinIcon}"/>
-                </Button>
+                        AutomationProperties.Name="Remove from list"
+                        ToolTip="Remove from recent list"/>
             </Grid>
+        </DataTemplate>
+
+        <!-- ══ Branch picker (A11) ═══════════════════════════════════════════ -->
+
+        <!-- Pin marker for a branch row: green = global favourite (locked), blue = local pin. -->
+        <Style x:Key="BranchPinIcon" TargetType="Path">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
+            <Setter Property="StrokeThickness" Value="1.4"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+            <Setter Property="StrokeStartLineCap" Value="Round"/>
+            <Setter Property="StrokeEndLineCap" Value="Round"/>
+            <Setter Property="Fill" Value="Transparent"/>
+            <Setter Property="Data" Value="{StaticResource IconPinGeometry}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                    <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                    <Setter Property="Stroke" Value="{DynamicResource AccentBlue}"/>
+                    <Setter Property="Fill" Value="{DynamicResource AccentBlue}"/>
+                </DataTrigger>
+                <!-- Global favourite wins: locked green pin. -->
+                <DataTrigger Binding="{Binding IsGlobalFavorite}" Value="True">
+                    <Setter Property="Stroke" Value="{DynamicResource AccentSuccess}"/>
+                    <Setter Property="Fill" Value="{DynamicResource AccentSuccess}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="BranchPinButton" TargetType="Button">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
+                                <Setter Property="Opacity" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                    <Setter Property="Opacity" Value="1"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Collapsible folder header in the branch tree. -->
+        <Style x:Key="BranchFolderToggle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="4" Padding="0,4">
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Recursive branch node: a "/"-folder (collapsible) or a leaf branch (pin + checkout). -->
+        <DataTemplate x:Key="BranchNodeTemplate">
+            <StackPanel>
+                <!-- Folder -->
+                <ToggleButton Style="{StaticResource BranchFolderToggle}"
+                              IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                              Visibility="{Binding IsFolder, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="Chevron" Grid.Column="0" Text="&#xE76C;"
+                                   FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                   FontWeight="Medium" FontSize="12" Foreground="{DynamicResource TextSecondary}"
+                                   FontFamily="{StaticResource FontFamilyMono}" TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+                </ToggleButton>
+
+                <!-- Branch leaf: [current check | name | pin] -->
+                <Grid Background="Transparent"
+                      Visibility="{Binding IsBranch, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Left icon area: only the green check for the checked-out branch -->
+                    <Control Grid.Column="0" Style="{StaticResource CurrentCheckMarker}"
+                             Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}"
+                             ToolTip="Current branch"/>
+                    <Button Grid.Column="1" Style="{StaticResource DropItemButton}" Click="ClosePopup"
+                            Command="{Binding DataContext.BranchesVM.CheckoutNamedCommand, ElementName=Root}"
+                            CommandParameter="{Binding FullName}" ToolTip="{Binding FullName}">
+                        <TextBlock Text="{Binding Name}" FontFamily="{StaticResource FontFamilyMono}" FontSize="12"
+                                   Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontWeight" Value="Normal"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Button>
+                    <!-- Right: pin toggle (green locked global favourite / blue removable local pin) -->
+                    <Button Grid.Column="2" Style="{StaticResource BranchPinButton}"
+                            Command="{Binding DataContext.BranchesVM.ToggleBranchPinCommand, ElementName=Root}"
+                            CommandParameter="{Binding FullName}"
+                            AutomationProperties.Name="{Binding PinTooltip}"
+                            ToolTip="{Binding PinTooltip}">
+                        <Path Style="{StaticResource BranchPinIcon}"/>
+                    </Button>
+                </Grid>
+
+                <!-- Children (folders only; leaves have none) -->
+                <ItemsControl Margin="14,0,0,0" ItemsSource="{Binding Children}"
+                              ItemTemplate="{DynamicResource BranchNodeTemplate}"
+                              Visibility="{Binding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                    <Setter TargetName="Chevron" Property="Text" Value="&#xE70D;"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
 
@@ -185,29 +412,38 @@
                         <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Opacity="0.22" Color="{DynamicResource OverlayShadowColor}"/>
                     </Border.Effect>
                     <StackPanel>
-                        <!-- Current repo header (not clickable) -->
-                        <Border Background="{DynamicResource AccentBlueBackground}" CornerRadius="6" Padding="8,6" Margin="0,0,0,4">
+                        <!-- Current repo header — a static status banner, deliberately not styled
+                             like the selectable rows (accent stripe + pill, no hover affordance). -->
+                        <TextBlock Text="CURRENT REPOSITORY" FontSize="9" FontWeight="SemiBold" Margin="8,2,0,3"
+                                   Foreground="{DynamicResource TextTertiary}"/>
+                        <Border Background="{DynamicResource AccentSuccessBackground}" CornerRadius="6" Padding="0"
+                                Margin="0,0,0,6" BorderBrush="{DynamicResource AccentSuccess}" BorderThickness="1">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <!-- 28px checkmark column mirrors the pin column so the name lines up with the rows. -->
+                                    <ColumnDefinition Width="28"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="📂" FontSize="13" VerticalAlignment="Top" Margin="0,0,8,0"/>
-                                <StackPanel Grid.Column="1">
+                                <TextBlock Grid.Column="0" Text="&#x2713;" FontSize="13" FontWeight="Bold"
+                                           Foreground="{DynamicResource AccentSuccess}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" Margin="8,7,8,7">
                                     <TextBlock Text="{Binding TitleBarVM.RepositoryName}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="{Binding TitleBarVM.CurrentRepositoryPath}" FontSize="10"
                                                FontFamily="{StaticResource FontFamilyMono}"
                                                Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
-                                <TextBlock Grid.Column="2" Text="✓" Foreground="{DynamicResource AccentBlue}"
-                                           FontWeight="Bold" VerticalAlignment="Center"/>
+                                <Border Grid.Column="2" Background="{DynamicResource AccentSuccess}" CornerRadius="4"
+                                        Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock Text="CURRENT" FontSize="9" FontWeight="SemiBold" Foreground="White"/>
+                                </Border>
                             </Grid>
                         </Border>
 
                         <!-- Pinned -->
-                        <TextBlock Text="Pinned" FontSize="10" FontWeight="SemiBold" Margin="8,4,0,2"
+                        <TextBlock Text="PINNED" FontSize="9" FontWeight="SemiBold" Margin="8,4,0,3"
                                    Foreground="{DynamicResource TextTertiary}"
                                    Visibility="{Binding TitleBarVM.HasPinned, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <ItemsControl ItemsSource="{Binding TitleBarVM.PinnedItems}"
@@ -218,7 +454,7 @@
                                    Visibility="{Binding TitleBarVM.HasPinned, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <!-- Recent -->
-                        <TextBlock Text="Recent" FontSize="10" FontWeight="SemiBold" Margin="8,2,0,2"
+                        <TextBlock Text="RECENT" FontSize="9" FontWeight="SemiBold" Margin="8,2,0,3"
                                    Foreground="{DynamicResource TextTertiary}"
                                    Visibility="{Binding TitleBarVM.HasRecentOnly, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <ItemsControl ItemsSource="{Binding TitleBarVM.RecentItems}"
@@ -227,11 +463,21 @@
 
                         <Separator Margin="4,4"/>
                         <Button Style="{StaticResource DropItemButton}" Click="ClosePopup" HorizontalContentAlignment="Stretch"
-                                Command="{Binding BrowseFolderCommand}">
-                            <DockPanel>
-                                <TextBlock DockPanel.Dock="Right" Text="Ctrl+O" Foreground="{DynamicResource TextTertiary}" FontSize="11"/>
-                                <TextBlock Text="📁  Browse repository…" Foreground="{DynamicResource TextPrimary}"/>
-                            </DockPanel>
+                                Padding="0,4" Command="{Binding BrowseFolderCommand}">
+                            <!-- Columns mirror the repo rows so the label lines up with the item names. -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="28"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="📁" FontSize="13"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="Browse repository…" Margin="8,0,0,0"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Grid.Column="2" Text="Ctrl+O" Margin="0,0,8,0" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextTertiary}" FontSize="11"/>
+                            </Grid>
                         </Button>
                     </StackPanel>
                 </Border>
@@ -259,31 +505,31 @@
             <Popup Grid.Column="1" PlacementTarget="{Binding ElementName=BranchToggle}" Placement="Bottom"
                    StaysOpen="False" AllowsTransparency="True"
                    IsOpen="{Binding IsChecked, ElementName=BranchToggle, Mode=TwoWay}">
-                <Border Width="300" MaxHeight="360" Background="{DynamicResource BackgroundPrimary}"
+                <Border Width="320" Background="{DynamicResource BackgroundPrimary}"
                         BorderBrush="{DynamicResource BorderTertiary}" BorderThickness="1"
                         CornerRadius="8" Padding="6">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Opacity="0.22" Color="{DynamicResource OverlayShadowColor}"/>
                     </Border.Effect>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding BranchesVM.LocalBranches}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Style="{StaticResource DropItemButton}" Click="ClosePopup"
-                                            Command="{Binding DataContext.BranchesVM.CheckoutNamedCommand, ElementName=Root}"
-                                            CommandParameter="{Binding Name}">
-                                        <DockPanel>
-                                            <TextBlock DockPanel.Dock="Left" Text="✓" Foreground="{DynamicResource AccentBlue}"
-                                                       FontWeight="Bold" Width="14"
-                                                       Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                            <TextBlock Text="{Binding Name}" FontFamily="{StaticResource FontFamilyMono}"
-                                                       Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                        </DockPanel>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                    <StackPanel>
+                        <!-- Favourites -->
+                        <TextBlock Text="FAVOURITES" FontSize="9" FontWeight="SemiBold" Margin="8,4,0,3"
+                                   Foreground="{DynamicResource TextTertiary}"
+                                   Visibility="{Binding BranchesVM.HasFavoriteBranches, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <ItemsControl ItemsSource="{Binding BranchesVM.FavoriteBranches}"
+                                      ItemTemplate="{StaticResource BranchNodeTemplate}"
+                                      Visibility="{Binding BranchesVM.HasFavoriteBranches, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Separator Margin="4,4"
+                                   Visibility="{Binding BranchesVM.HasFavoriteBranches, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <!-- All branches, "/"-folder tree -->
+                        <TextBlock Text="BRANCHES" FontSize="9" FontWeight="SemiBold" Margin="8,2,0,3"
+                                   Foreground="{DynamicResource TextTertiary}"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="300">
+                            <ItemsControl ItemsSource="{Binding BranchesVM.BranchPickerTree}"
+                                          ItemTemplate="{StaticResource BranchNodeTemplate}"/>
+                        </ScrollViewer>
+                    </StackPanel>
                 </Border>
             </Popup>
 

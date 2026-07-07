@@ -38,16 +38,143 @@
     </Window.InputBindings>
 
     <Window.Resources>
-        <!-- Top-level menu items are white on the accent bar; submenu items keep default dark. -->
+        <!-- ── Menu theming ──────────────────────────────────────────────────
+             Top-level items sit on the accent bar (white text, transparent bg);
+             submenu popups are fully themed so text stays readable in light and
+             dark. NOTE: Foreground is an inherited property, so the white text on
+             the top-level headers would otherwise bleed into the submenu items and
+             render white-on-light-gray — the templates below reset it explicitly. -->
+
+        <!-- Reusable themed submenu popup around an ItemsPresenter. -->
+        <ControlTemplate x:Key="SubmenuItemTemplate" TargetType="MenuItem">
+            <Border x:Name="Bd" Background="Transparent" CornerRadius="3" Padding="0"
+                    SnapsToDevicePixels="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="Check" Grid.Column="0" Text="&#xE73E;"
+                               FontFamily="Segoe MDL2 Assets" FontSize="12"
+                               Foreground="{DynamicResource AccentBlue}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="Collapsed"/>
+                    <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True"
+                                      VerticalAlignment="Center" Margin="2,6,12,6"/>
+                    <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
+                               Foreground="{DynamicResource TextTertiary}"
+                               VerticalAlignment="Center" Margin="0,0,12,0"/>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Submenu header: leaf layout + a nested (Right-placed) themed popup. -->
+        <ControlTemplate x:Key="SubmenuHeaderTemplate" TargetType="MenuItem">
+            <Border x:Name="Bd" Background="Transparent" CornerRadius="3" Padding="0"
+                    SnapsToDevicePixels="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True"
+                                      VerticalAlignment="Center" Margin="2,6,12,6"/>
+                    <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                               Foreground="{DynamicResource TextSecondary}"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
+                           IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                           Placement="Right" HorizontalOffset="-2" VerticalOffset="-3"
+                           PopupAnimation="Fade">
+                        <Border Background="{DynamicResource BackgroundPrimary}"
+                                BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1"
+                                CornerRadius="4" Padding="3" Margin="0,0,8,8" SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.35" Direction="270"/>
+                            </Border.Effect>
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Top-level header on the accent bar: white text + themed dropdown popup. -->
+        <ControlTemplate x:Key="TopLevelHeaderTemplate" TargetType="MenuItem">
+            <Border x:Name="Bd" Background="Transparent" Padding="10,0" SnapsToDevicePixels="True">
+                <Grid>
+                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                      VerticalAlignment="Center" HorizontalAlignment="Center"
+                                      TextElement.Foreground="White"/>
+                    <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
+                           IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                           Placement="Bottom" VerticalOffset="1" PopupAnimation="Fade">
+                        <Border Background="{DynamicResource BackgroundPrimary}"
+                                BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1"
+                                CornerRadius="4" Padding="3" Margin="0,0,8,8" SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.35" Direction="270"/>
+                            </Border.Effect>
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ChromeHoverBrush}"/>
+                </Trigger>
+                <Trigger Property="IsSubmenuOpen" Value="True">
+                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ChromeHoverBrush}"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
         <Style x:Key="ChromeMenuItem" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template" Value="{StaticResource SubmenuItemTemplate}"/>
             <Style.Triggers>
                 <Trigger Property="Role" Value="TopLevelHeader">
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Template" Value="{StaticResource TopLevelHeaderTemplate}"/>
                 </Trigger>
-                <Trigger Property="Role" Value="TopLevelItem">
-                    <Setter Property="Foreground" Value="White"/>
+                <Trigger Property="Role" Value="SubmenuHeader">
+                    <Setter Property="Template" Value="{StaticResource SubmenuHeaderTemplate}"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Themed separator inside the popups. -->
+        <Style x:Key="ChromeMenuSeparator" TargetType="Separator">
+            <Setter Property="Margin" Value="6,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="{DynamicResource WindowBorderBrush}" Opacity="0.6"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="ChromeButton" TargetType="Button">
             <Setter Property="Width" Value="46"/>
@@ -119,11 +246,16 @@
 
                 <Menu Grid.Column="1" Background="Transparent" VerticalAlignment="Center"
                       shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Menu.Resources>
+                        <!-- Submenu children inherit the themed template (top-level items set it explicitly). -->
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource ChromeMenuItem}"/>
+                        <Style TargetType="Separator" BasedOn="{StaticResource ChromeMenuSeparator}"/>
+                    </Menu.Resources>
                     <MenuItem Header="_File" Style="{StaticResource ChromeMenuItem}">
                         <MenuItem Header="Open repository..." Command="{Binding BrowseFolderCommand}" InputGestureText="Ctrl+O"/>
                         <MenuItem Header="Recent" ItemsSource="{Binding RecentRepos}">
                             <MenuItem.ItemContainerStyle>
-                                <Style TargetType="MenuItem">
+                                <Style TargetType="MenuItem" BasedOn="{StaticResource ChromeMenuItem}">
                                     <Setter Property="Header" Value="{Binding DisplayPath}"/>
                                     <Setter Property="ToolTip" Value="{Binding FullPath}"/>
                                     <Setter Property="Command" Value="{Binding DataContext.OpenRepoCommand, RelativeSource={RelativeSource AncestorType=Menu}}"/>
@@ -131,6 +263,8 @@
                                 </Style>
                             </MenuItem.ItemContainerStyle>
                         </MenuItem>
+                        <Separator/>
+                        <MenuItem Header="Options..." Command="{Binding OpenOptionsCommand}"/>
                         <Separator/>
                         <MenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
                     </MenuItem>

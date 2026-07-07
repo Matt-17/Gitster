@@ -162,6 +162,9 @@ public partial class TitleBarViewModel : BaseViewModel
     private void UnpinRepo(string path) => RecentRepos.Unpin(path);
 
     [RelayCommand]
+    private void RemoveRecentRepo(string path) => RecentRepos.Remove(path);
+
+    [RelayCommand]
     private void TogglePinRepo(string path)
     {
         if (RecentRepos.IsPinned(path))

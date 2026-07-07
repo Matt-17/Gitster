@@ -77,6 +77,17 @@ public partial class RecentReposService : ObservableObject
         Save();
     }
 
+    /// <summary>Removes a repo from the recent list entirely (used by the switch-repo dropdown's ✕ marker).</summary>
+    public void Remove(string path)
+    {
+        var existing = Entries.FirstOrDefault(e =>
+            string.Equals(e.FullPath, path, StringComparison.OrdinalIgnoreCase));
+        if (existing == null) return;
+
+        Entries.Remove(existing);
+        Save();
+    }
+
     public void Pin(string path)
     {
         var existing = Entries.FirstOrDefault(e =>
