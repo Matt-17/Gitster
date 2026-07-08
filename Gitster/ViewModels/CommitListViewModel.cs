@@ -44,6 +44,8 @@ public partial class CommitListViewModel : BaseViewModel
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _diffCts;
     private Task? _warmHistoryTask;
+    private HistoryTarget _selectedTarget = HistoryTarget.CurrentBranch;
+    private bool _suppressScopeReload;
 
     public CommitListViewModel(
         IGitBackend git,
@@ -89,13 +91,58 @@ public partial class CommitListViewModel : BaseViewModel
     [ObservableProperty]
     public partial HistoryScope SelectedScope { get; set; } = HistoryScope.CurrentBranch;
 
+    [ObservableProperty]
+    public partial string SelectedRefDisplayName { get; set; } = string.Empty;
+
+    public bool IsNamedRefSelected => _selectedTarget.Scope == HistoryScope.Ref;
+
     [RelayCommand]
     private void FocusSearch() => FocusSearchRequested?.Invoke();
 
     partial void OnSelectedScopeChanged(HistoryScope value)
     {
+        if (_suppressScopeReload)
+            return;
+
+        if (_selectedTarget.Scope == value && value != HistoryScope.Ref)
+            return;
+
+        _selectedTarget = HistoryTarget.ForScope(value);
+        SelectedRefDisplayName = string.Empty;
+        OnPropertyChanged(nameof(IsNamedRefSelected));
+
         if (!string.IsNullOrWhiteSpace(_git.RepositoryPath))
             _ = LoadAsync();
+    }
+
+    public Task ShowScopeAsync(HistoryScope scope)
+    {
+        var normalized = scope == HistoryScope.Ref ? HistoryScope.CurrentBranch : scope;
+        _selectedTarget = HistoryTarget.ForScope(normalized);
+        SelectedRefDisplayName = string.Empty;
+        if (normalized != HistoryScope.CurrentBranch)
+            ShowOutgoingIncomingOnly = false;
+        OnPropertyChanged(nameof(IsNamedRefSelected));
+        _suppressScopeReload = true;
+        try
+        {
+            SelectedScope = normalized;
+        }
+        finally
+        {
+            _suppressScopeReload = false;
+        }
+
+        return string.IsNullOrWhiteSpace(_git.RepositoryPath) ? Task.CompletedTask : LoadAsync();
+    }
+
+    public Task ShowRefAsync(string canonicalName, string displayName)
+    {
+        _selectedTarget = HistoryTarget.ForRef(canonicalName, displayName);
+        SelectedRefDisplayName = displayName;
+        ShowOutgoingIncomingOnly = false;
+        OnPropertyChanged(nameof(IsNamedRefSelected));
+        return string.IsNullOrWhiteSpace(_git.RepositoryPath) ? Task.CompletedTask : LoadAsync();
     }
 
     public Func<DiffFileEntry?, Task>? RemoveChangeFromCommitAsync { get; set; }
@@ -247,8 +294,8 @@ public partial class CommitListViewModel : BaseViewModel
                 return;
             }
 
-            var scope = SelectedScope;
-            await _history.OpenAsync(_git.RepositoryPath, scope, ct, progress);
+            var target = _selectedTarget;
+            await _history.OpenAsync(_git.RepositoryPath, target, ct, progress);
 
             progress?.Report(new RepositoryLoadProgress(
                 "Loading history",
@@ -257,7 +304,7 @@ public partial class CommitListViewModel : BaseViewModel
                 CommitQuery.Parse(null),
                 0,
                 CommitHistoryService.DefaultPageSize,
-                scope,
+                target,
                 ct,
                 progress);
             if (ct.IsCancellationRequested) return;
@@ -269,7 +316,7 @@ public partial class CommitListViewModel : BaseViewModel
                 _allRows = newAllRows;
                 _incomingRows = [];
                 _remoteSets = null;
-                _remoteHistoryState = scope == HistoryScope.CurrentBranch
+                _remoteHistoryState = target.Scope == HistoryScope.CurrentBranch
                     ? RemoteHistoryState.Pending
                     : RemoteHistoryState.Loaded;
                 OnPropertyChanged(nameof(LoadedCommits));
@@ -278,7 +325,7 @@ public partial class CommitListViewModel : BaseViewModel
                 HistoryLoading = false;
             });
 
-            _warmHistoryTask = WarmHistoryAndEnrichAsync(scope, cts, progress);
+            _warmHistoryTask = WarmHistoryAndEnrichAsync(target, cts, progress);
         }
         catch (OperationCanceledException)
         {
@@ -299,6 +346,10 @@ public partial class CommitListViewModel : BaseViewModel
         _incomingRows = [];
         _remoteSets = null;
         _remoteHistoryState = RemoteHistoryState.Loaded;
+        _selectedTarget = HistoryTarget.CurrentBranch;
+        SelectedScope = HistoryScope.CurrentBranch;
+        SelectedRefDisplayName = string.Empty;
+        OnPropertyChanged(nameof(IsNamedRefSelected));
         OnPropertyChanged(nameof(LoadedCommits));
         Items = [];
         GraphColumnWidth = GraphColumnMinWidth;
@@ -529,7 +580,7 @@ public partial class CommitListViewModel : BaseViewModel
                     var rows = await _history.SearchAsync(
                         query,
                         int.MaxValue,
-                        SelectedScope,
+                        _selectedTarget,
                         token,
                         offset: 0,
                         progress: new Progress<RepositoryLoadProgress>(p =>
@@ -590,7 +641,7 @@ public partial class CommitListViewModel : BaseViewModel
 
     private BuiltCommitRows BuildRows(List<CommitItem> incoming, List<CommitItem> local)
     {
-        if (SelectedScope == HistoryScope.AllBranches)
+        if (_selectedTarget.Scope is HistoryScope.AllBranches or HistoryScope.Ref)
         {
             ApplyGraphRows(local);
             return new BuiltCommitRows(local.Cast<object>().ToList(), local.Count, 0);
@@ -600,7 +651,7 @@ public partial class CommitListViewModel : BaseViewModel
         for (int i = 0; i < local.Count; i++)
             if (IsOutgoing(local[i])) outgoingCount++;
 
-        var showRemoteSection = SelectedScope == HistoryScope.CurrentBranch;
+        var showRemoteSection = _selectedTarget.Scope == HistoryScope.CurrentBranch;
         var remotePending = _remoteHistoryState == RemoteHistoryState.Pending;
         var remoteUnavailable = _remoteHistoryState == RemoteHistoryState.Unavailable;
         var hasRemote = _remoteSets?.HasRemote ?? false;
@@ -695,11 +746,21 @@ public partial class CommitListViewModel : BaseViewModel
     private string StatusForRows(int localCount, int incomingCount)
     {
         var count = HasActiveFilters || ShowOutgoingIncomingOnly ? localCount + incomingCount : _allRows.Count;
-        if (SelectedScope == HistoryScope.AllBranches)
+        if (_selectedTarget.Scope == HistoryScope.AllBranches)
         {
             return HasActiveFilters
                 ? $"{count:N0} matching commit{(count == 1 ? "" : "s")}"
                 : $"{count:N0} commit{(count == 1 ? "" : "s")} across branches";
+        }
+
+        if (_selectedTarget.Scope == HistoryScope.Ref)
+        {
+            var name = string.IsNullOrWhiteSpace(_selectedTarget.DisplayName)
+                ? "selected ref"
+                : _selectedTarget.DisplayName;
+            return HasActiveFilters
+                ? $"{count:N0} matching commit{(count == 1 ? "" : "s")}"
+                : $"{count:N0} commit{(count == 1 ? "" : "s")} on {name}";
         }
 
         return HasActiveFilters
@@ -710,7 +771,7 @@ public partial class CommitListViewModel : BaseViewModel
     private sealed record BuiltCommitRows(IReadOnlyList<object> Items, int LocalCount, int IncomingCount);
 
     private async Task WarmHistoryAndEnrichAsync(
-        HistoryScope scope,
+        HistoryTarget target,
         CancellationTokenSource ownerCts,
         IProgress<RepositoryLoadProgress>? progress)
     {
@@ -718,7 +779,7 @@ public partial class CommitListViewModel : BaseViewModel
         try
         {
             await Task.Yield();
-            var wasComplete = await _history.IsCompleteAsync(scope, ct);
+            var wasComplete = await _history.IsCompleteAsync(target, ct);
             if (!wasComplete)
                 await InvokeOnUiAsync(() =>
                 {
@@ -726,7 +787,7 @@ public partial class CommitListViewModel : BaseViewModel
                     HistoryStatusText = "Indexing history...";
                 });
 
-            var rows = await _history.EnsureCompleteAsync(progress, ct, scope);
+            var rows = await _history.EnsureCompleteAsync(progress, ct, target);
             if (ct.IsCancellationRequested || _loadCts != ownerCts)
                 return;
 
@@ -740,7 +801,7 @@ public partial class CommitListViewModel : BaseViewModel
                 HistoryLoading = false;
             });
 
-            await EnrichRemoteAndSigningAsync(scope, ownerCts);
+            await EnrichRemoteAndSigningAsync(target, ownerCts);
         }
         catch (OperationCanceledException)
         {
@@ -758,7 +819,7 @@ public partial class CommitListViewModel : BaseViewModel
     }
 
     private async Task EnrichRemoteAndSigningAsync(
-        HistoryScope scope,
+        HistoryTarget target,
         CancellationTokenSource ownerCts)
     {
         var ct = ownerCts.Token;
@@ -768,7 +829,7 @@ public partial class CommitListViewModel : BaseViewModel
 
             RemoteSets? sets = null;
             var incomingRows = new List<CommitItem>();
-            if (scope == HistoryScope.CurrentBranch)
+            if (target.Scope == HistoryScope.CurrentBranch)
             {
                 sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
                 if (ct.IsCancellationRequested || _loadCts != ownerCts)
@@ -804,7 +865,7 @@ public partial class CommitListViewModel : BaseViewModel
         }
         catch
         {
-            if (_loadCts == ownerCts && scope == HistoryScope.CurrentBranch)
+            if (_loadCts == ownerCts && target.Scope == HistoryScope.CurrentBranch)
                 await InvokeOnUiAsync(() =>
                 {
                     _remoteHistoryState = RemoteHistoryState.Unavailable;
@@ -845,9 +906,9 @@ public partial class CommitListViewModel : BaseViewModel
 
     partial void OnShowOutgoingIncomingOnlyChanged(bool value)
     {
-        if (value && SelectedScope != HistoryScope.CurrentBranch)
+        if (value && _selectedTarget.Scope != HistoryScope.CurrentBranch)
         {
-            SelectedScope = HistoryScope.CurrentBranch;
+            _ = ShowScopeAsync(HistoryScope.CurrentBranch);
             return;
         }
 

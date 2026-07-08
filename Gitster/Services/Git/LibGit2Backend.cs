@@ -132,6 +132,8 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
 
     public Task<Dictionary<string, string>> GetAllRefsAsync() => _history.GetAllRefsAsync();
 
+    public Task<IReadOnlyList<RefCatalogItem>> GetRefCatalogAsync() => _history.GetRefCatalogAsync();
+
     public Task<int> GetStashCountAsync() => _stashes.GetStashCountAsync();
 
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync() => _stashes.GetStashesAsync();

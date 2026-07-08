@@ -401,6 +401,84 @@ internal sealed class LibGit2HistoryReader
         return Task.FromResult(refs);
     }
 
+    public Task<IReadOnlyList<RefCatalogItem>> GetRefCatalogAsync()
+    {
+        using var repo = _context.OpenRepository();
+        var result = new List<RefCatalogItem>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var branch in repo.Branches.Where(b => b.Tip is not null && !IsRemoteHeadAlias(b)))
+        {
+            var tip = branch.Tip!;
+            var tracked = branch.TrackedBranch;
+            var ahead = 0;
+            var behind = 0;
+            if (tracked?.Tip is not null)
+            {
+                var divergence = repo.ObjectDatabase.CalculateHistoryDivergence(tip, tracked.Tip);
+                ahead = divergence.AheadBy ?? 0;
+                behind = divergence.BehindBy ?? 0;
+            }
+
+            result.Add(new RefCatalogItem(
+                branch.FriendlyName,
+                branch.CanonicalName,
+                branch.IsRemote ? RefCatalogKind.RemoteBranch : RefCatalogKind.LocalBranch,
+                tip.Sha,
+                branch.IsCurrentRepositoryHead,
+                branch.IsRemote || tracked?.Tip is not null,
+                ahead,
+                behind));
+            seen.Add(branch.CanonicalName);
+        }
+
+        foreach (var tag in repo.Tags)
+        {
+            if (ResolveTagTargetCommit(tag) is not { } commit)
+                continue;
+
+            var canonical = $"refs/tags/{tag.FriendlyName}";
+            result.Add(new RefCatalogItem(
+                tag.FriendlyName,
+                canonical,
+                RefCatalogKind.Tag,
+                commit.Sha,
+                IsCurrent: false,
+                HasUpstream: true,
+                Ahead: 0,
+                Behind: 0));
+            seen.Add(canonical);
+        }
+
+        foreach (var reference in repo.Refs)
+        {
+            if (seen.Contains(reference.CanonicalName))
+                continue;
+
+            if (!TryClassifyUsefulRef(reference.CanonicalName, out var kind, out var displayName))
+                continue;
+
+            var commit = repo.Lookup<Commit>(reference.TargetIdentifier);
+            if (commit is null)
+                continue;
+
+            result.Add(new RefCatalogItem(
+                displayName,
+                reference.CanonicalName,
+                kind,
+                commit.Sha,
+                IsCurrent: false,
+                HasUpstream: true,
+                Ahead: 0,
+                Behind: 0));
+        }
+
+        return Task.FromResult<IReadOnlyList<RefCatalogItem>>(result
+            .OrderBy(r => RefCatalogSortOrder(r.Kind))
+            .ThenBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList());
+    }
+
     public Task<IReadOnlyList<BranchSummary>> GetBranchesAsync()
     {
         using var repo = _context.OpenRepository();
@@ -453,5 +531,52 @@ internal sealed class LibGit2HistoryReader
     }
 
     private static Commit? ResolveTagTargetCommit(Tag tag) =>
-        tag.PeeledTarget as Commit;
+        tag.PeeledTarget as Commit ?? tag.Target as Commit;
+
+    private static bool IsRemoteHeadAlias(Branch branch) =>
+        branch.IsRemote
+        && (branch.CanonicalName.EndsWith("/HEAD", StringComparison.OrdinalIgnoreCase)
+            || branch.FriendlyName.EndsWith("/HEAD", StringComparison.OrdinalIgnoreCase));
+
+    private static int RefCatalogSortOrder(RefCatalogKind kind) => kind switch
+    {
+        RefCatalogKind.LocalBranch => 0,
+        RefCatalogKind.RemoteBranch => 1,
+        RefCatalogKind.Tag => 2,
+        RefCatalogKind.Stash => 3,
+        RefCatalogKind.Note => 4,
+        RefCatalogKind.Replace => 5,
+        _ => 6,
+    };
+
+    private static bool TryClassifyUsefulRef(
+        string canonicalName,
+        out RefCatalogKind kind,
+        out string displayName)
+    {
+        if (canonicalName.Equals("refs/stash", StringComparison.Ordinal))
+        {
+            kind = RefCatalogKind.Stash;
+            displayName = "stash";
+            return true;
+        }
+
+        if (canonicalName.StartsWith("refs/notes/", StringComparison.Ordinal))
+        {
+            kind = RefCatalogKind.Note;
+            displayName = canonicalName["refs/notes/".Length..];
+            return !string.IsNullOrWhiteSpace(displayName);
+        }
+
+        if (canonicalName.StartsWith("refs/replace/", StringComparison.Ordinal))
+        {
+            kind = RefCatalogKind.Replace;
+            displayName = canonicalName["refs/replace/".Length..];
+            return !string.IsNullOrWhiteSpace(displayName);
+        }
+
+        kind = default;
+        displayName = string.Empty;
+        return false;
+    }
 }

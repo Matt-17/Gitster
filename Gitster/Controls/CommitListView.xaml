@@ -580,6 +580,13 @@
                 </Grid>
 
                 <DockPanel Grid.Row="1" Margin="2,4,0,0">
+                    <TextBlock DockPanel.Dock="Right"
+                               Text="{Binding SelectedRefDisplayName, StringFormat=Ref: {0}}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentBlue}"
+                               Margin="8,0,0,0"
+                               Visibility="{Binding IsNamedRefSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <TextBlock Text="author:Name  message:&quot;fix bug&quot;  sha:abc  after:2026-01-01"
                                FontSize="11"
                                Foreground="{DynamicResource TextTertiary}"

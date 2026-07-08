@@ -25,6 +25,7 @@ public interface IHistoryReader : IRepositoryContext
     Task<IReadOnlyList<CommitInfo>> GetCommitsBetweenAsync(string fromSha, string toSha);
     Task<bool> CommitExistsAsync(string sha);
     Task<Dictionary<string, string>> GetAllRefsAsync();
+    Task<IReadOnlyList<RefCatalogItem>> GetRefCatalogAsync();
     Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200);
 }
 

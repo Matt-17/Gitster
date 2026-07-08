@@ -92,6 +92,7 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
         => RunServerOperationAsync("Push tag", () => _cli.PushTagAsync(tagName, remoteName, ct));
     public Task RevertCommitAsync(string sha)                   => _lib.RevertCommitAsync(sha);
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => _lib.GetAllRefsAsync();
+    public Task<IReadOnlyList<RefCatalogItem>> GetRefCatalogAsync() => _lib.GetRefCatalogAsync();
     public Task<int> GetStashCountAsync()                       => _lib.GetStashCountAsync();
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync()     => _lib.GetStashesAsync();
     public Task<CommitDiff> GetStashDiffAsync(int stashIndex, CancellationToken ct = default) => _lib.GetStashDiffAsync(stashIndex, ct);

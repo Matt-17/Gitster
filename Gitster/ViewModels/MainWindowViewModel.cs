@@ -57,6 +57,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
     public TitleBarViewModel TitleBarVM { get; }
     public CommitListViewModel CommitListVM { get; }
+    public CommitRefNavigatorViewModel CommitRefNavigatorVM { get; }
     public TimestampEditViewModel TimestampEditVM { get; }
     public HistoryRewriteDraftViewModel HistoryRewriteDraftVM { get; }
     public QuickActionsViewModel QuickActionsVM { get; }
@@ -105,6 +106,7 @@ public partial class MainWindowViewModel : BaseViewModel
             childViewModels.StatusBar,
             childViewModels.TitleBar,
             childViewModels.CommitList,
+            childViewModels.CommitRefNavigator,
             childViewModels.TimestampEdit,
             childViewModels.HistoryRewriteDraft,
             childViewModels.QuickActions,
@@ -147,6 +149,7 @@ public partial class MainWindowViewModel : BaseViewModel
         StatusBarViewModel statusBarViewModel,
         TitleBarViewModel titleBarViewModel,
         CommitListViewModel commitListViewModel,
+        CommitRefNavigatorViewModel commitRefNavigatorViewModel,
         TimestampEditViewModel timestampEditViewModel,
         HistoryRewriteDraftViewModel historyRewriteDraftViewModel,
         QuickActionsViewModel quickActionsViewModel,
@@ -203,6 +206,10 @@ public partial class MainWindowViewModel : BaseViewModel
         CommitListVM.PropertyChanged += OnCommitListPropertyChanged;
         CommitListVM.RemoveChangeFromCommitAsync = RemoveChangeFromCommitAsync;
         CommitListVM.FixupDroppedCommitAsync = FixupDroppedCommitAsync;
+        CommitRefNavigatorVM = commitRefNavigatorViewModel;
+        CommitRefNavigatorVM.SelectRefAsync = async item => await CommitListVM.ShowRefAsync(item.CanonicalName, item.DisplayName);
+        CommitRefNavigatorVM.SelectCurrentBranchAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.CurrentBranch);
+        CommitRefNavigatorVM.SelectAllBranchesAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.AllBranches);
         TimestampEditVM = timestampEditViewModel;
         QuickActionsVM = quickActionsViewModel;
         QuickActionsVM.RefreshAfterActionAsync = async () => await UpdateElementsAsync();
@@ -1914,6 +1921,7 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             await BranchesVM.LoadAsync();
             SidebarVM.BranchCount = BranchesVM.LocalCount;
+            await CommitRefNavigatorVM.LoadAsync();
             await WorktreesVM.LoadAsync();
             await RefreshSidebarBadgesAsync();
         }
@@ -1967,6 +1975,9 @@ public partial class MainWindowViewModel : BaseViewModel
 
         progress?.Report(new RepositoryLoadProgress("Loading branches", "Reading local and remote branches."));
         await BranchesVM.LoadAsync();
+        ct.ThrowIfCancellationRequested();
+
+        await CommitRefNavigatorVM.LoadAsync();
         ct.ThrowIfCancellationRequested();
 
         progress?.Report(new RepositoryLoadProgress("Loading worktrees", "Reading linked worktrees."));
@@ -2025,6 +2036,7 @@ public partial class MainWindowViewModel : BaseViewModel
     {
         StashesVM.Clear();
         BranchesVM.Clear();
+        CommitRefNavigatorVM.Clear();
         WorktreesVM.Clear();
         CurrentCommitDetail.Clear();
         SelectedCommitDetail.Clear();

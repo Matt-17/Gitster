@@ -7,7 +7,8 @@ internal sealed record HistoryContext(
     string BranchName,
     string HeadSha,
     string? UpstreamSha,
-    HistoryScope Scope);
+    HistoryScope Scope,
+    string? TargetRefName = null);
 
 internal sealed record BranchState(
     string HeadSha,

@@ -8,6 +8,107 @@
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
+    <UserControl.Resources>
+        <Style x:Key="RefPaneColumnStyle" TargetType="{x:Type ColumnDefinition}">
+            <Setter Property="Width" Value="260"/>
+            <Setter Property="MinWidth" Value="190"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CommitRefNavigatorVM.IsCollapsed}" Value="True">
+                    <Setter Property="Width" Value="0"/>
+                    <Setter Property="MinWidth" Value="0"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RefPaneSplitterColumnStyle" TargetType="{x:Type ColumnDefinition}">
+            <Setter Property="Width" Value="3"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CommitRefNavigatorVM.IsCollapsed}" Value="True">
+                    <Setter Property="Width" Value="0"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <HierarchicalDataTemplate x:Key="CommitRefNodeTemplate"
+                                  DataType="{x:Type vm:CommitRefNode}"
+                                  ItemsSource="{Binding Children}">
+            <Grid MinHeight="22">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Width="14"
+                           Margin="0,0,4,0"
+                           VerticalAlignment="Center"
+                           Text="●"
+                           FontSize="8"
+                           Foreground="{DynamicResource AccentBlue}"
+                           Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <Button Grid.Column="1"
+                        Padding="2,1"
+                        HorizontalContentAlignment="Stretch"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Command="{Binding DataContext.CommitRefNavigatorVM.SelectNodeCommand, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                        CommandParameter="{Binding}"
+                        ToolTip="{Binding DisplayPath}">
+                    <TextBlock Text="{Binding Name}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               FontFamily="{StaticResource FontFamilyMono}"
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                <Setter Property="FontWeight" Value="Normal"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsRemoteBranch}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsTag}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentSuccess}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsOtherRef}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+
+                <TextBlock Grid.Column="2"
+                           Text="{Binding MissingUpstreamText}"
+                           Margin="6,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="10"
+                           Foreground="{DynamicResource AccentWarning}"
+                           Visibility="{Binding MissingUpstream, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <TextBlock Grid.Column="3"
+                           Text="{Binding PinText}"
+                           Margin="6,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentBlue}"
+                           Visibility="{Binding IsPinned, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Grid>
+        </HierarchicalDataTemplate>
+    </UserControl.Resources>
+
     <UserControl.InputBindings>
         <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding CommitListVM.SelectPreviousCommitCommand}"/>
         <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding CommitListVM.SelectNextCommitCommand}"/>
@@ -19,13 +120,108 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="32"/>
+            <ColumnDefinition Style="{StaticResource RefPaneColumnStyle}"/>
+            <ColumnDefinition Style="{StaticResource RefPaneSplitterColumnStyle}"/>
             <ColumnDefinition Width="*" MinWidth="500"/>
             <ColumnDefinition Width="3"/>
             <ColumnDefinition Width="380" MinWidth="320"/>
         </Grid.ColumnDefinitions>
 
+        <Border Grid.Column="0"
+                Background="{DynamicResource BackgroundSecondary}"
+                BorderBrush="{DynamicResource BorderTertiary}"
+                BorderThickness="0,0,1,0">
+            <Button Width="28"
+                    Height="28"
+                    Margin="2,8,2,0"
+                    VerticalAlignment="Top"
+                    Style="{StaticResource GhostButton}"
+                    Command="{Binding CommitRefNavigatorVM.ToggleCollapsedCommand}"
+                    ToolTip="Show or hide refs"
+                    AutomationProperties.Name="Show or hide refs">
+                <Path Width="12"
+                      Height="12"
+                      Stretch="Uniform"
+                      Stroke="{DynamicResource TextSecondary}"
+                      StrokeThickness="1.5"
+                      Fill="Transparent"
+                      Data="M4,4 L10,10 L4,16 M10,4 L16,10 L10,16"/>
+            </Button>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{DynamicResource BackgroundSecondary}"
+                BorderBrush="{DynamicResource BorderTertiary}"
+                BorderThickness="0,0,1,0"
+                Visibility="{Binding CommitRefNavigatorVM.IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid DataContext="{Binding CommitRefNavigatorVM}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="8,8,8,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <controls:SearchBox Grid.Column="0"
+                                        Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                        Placeholder="Filter refs"/>
+                    <Button Grid.Column="1"
+                            Width="28"
+                            Height="28"
+                            Margin="6,0,0,0"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding ToggleCollapsedCommand}"
+                            ToolTip="Collapse refs"
+                            AutomationProperties.Name="Collapse refs">
+                        <Path Width="12"
+                              Height="12"
+                              Stretch="Uniform"
+                              Stroke="{DynamicResource TextSecondary}"
+                              StrokeThickness="1.5"
+                              Fill="Transparent"
+                              Data="M14,4 L8,10 L14,16"/>
+                    </Button>
+                </Grid>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8,0,8,6">
+                    <Button Content="Current"
+                            Padding="8,3"
+                            Margin="0,0,4,0"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding ShowCurrentBranchCommand}"/>
+                    <Button Content="All"
+                            Padding="8,3"
+                            Style="{StaticResource GhostButton}"
+                            Command="{Binding ShowAllBranchesCommand}"/>
+                </StackPanel>
+
+                <TreeView Grid.Row="2"
+                          ItemsSource="{Binding RefTree}"
+                          ItemTemplate="{StaticResource CommitRefNodeTemplate}"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Padding="4,0,6,8"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+            </Grid>
+        </Border>
+
+        <GridSplitter Grid.Column="2"
+                      HorizontalAlignment="Stretch"
+                      Background="{DynamicResource BorderTertiary}"
+                      ResizeBehavior="PreviousAndNext"
+                      Visibility="{Binding CommitRefNavigatorVM.IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      helper:PersistedGridSplitter.Key="CommitsMode.RefPaneWidth"
+                      helper:PersistedGridSplitter.DefinitionKind="Column"
+                      helper:PersistedGridSplitter.TargetIndex="1"/>
+
         <!-- Left: commit list -->
-        <Grid Grid.Column="0">
+        <Grid Grid.Column="3">
             <controls:CommitListView DataContext="{Binding CommitListVM}"
                                      Visibility="{Binding CommitListVM.HasItems, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             <controls:EmptyStateControl Icon="+"
@@ -37,16 +233,16 @@
         </Grid>
 
         <!-- Splitter -->
-        <GridSplitter Grid.Column="1"
+        <GridSplitter Grid.Column="4"
                       HorizontalAlignment="Stretch"
                       Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="CommitsMode.ActionPanelWidth"
                       helper:PersistedGridSplitter.DefinitionKind="Column"
-                      helper:PersistedGridSplitter.TargetIndex="2"/>
+                      helper:PersistedGridSplitter.TargetIndex="5"/>
 
         <!-- Right: action panel -->
-        <ScrollViewer Grid.Column="2"
+        <ScrollViewer Grid.Column="5"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="10,10,12,10">

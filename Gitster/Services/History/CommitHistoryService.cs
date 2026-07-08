@@ -30,9 +30,14 @@ public sealed class CommitHistoryService
 
     public async Task<bool> IsCompleteAsync(
         HistoryScope scope = HistoryScope.CurrentBranch,
+        CancellationToken ct = default) =>
+        await IsCompleteAsync(HistoryTarget.ForScope(scope), ct);
+
+    public async Task<bool> IsCompleteAsync(
+        HistoryTarget target,
         CancellationToken ct = default)
     {
-        await EnsureContextAsync(scope, ct);
+        await EnsureContextAsync(target, ct);
 
         await _gate.WaitAsync(ct);
         try
@@ -82,6 +87,13 @@ public sealed class CommitHistoryService
         string repoPath,
         HistoryScope scope = HistoryScope.CurrentBranch,
         CancellationToken ct = default,
+        IProgress<RepositoryLoadProgress>? progress = null) =>
+        await OpenAsync(repoPath, HistoryTarget.ForScope(scope), ct, progress);
+
+    public async Task OpenAsync(
+        string repoPath,
+        HistoryTarget target,
+        CancellationToken ct = default,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
         progress?.Report(new RepositoryLoadProgress(
@@ -98,7 +110,7 @@ public sealed class CommitHistoryService
                     "Checking cached branch state."));
                 EnsureDatabase();
                 using var repo = OpenRepository(repoPath);
-                var context = BuildContext(repo, scope);
+                var context = BuildContext(repo, target);
                 using var conn = OpenConnection();
 
                 var existing = GetBranchState(conn, context);
@@ -135,12 +147,21 @@ public sealed class CommitHistoryService
         int count,
         HistoryScope scope = HistoryScope.CurrentBranch,
         CancellationToken ct = default,
+        IProgress<RepositoryLoadProgress>? progress = null) =>
+        await GetPageAsync(query, offset, count, HistoryTarget.ForScope(scope), ct, progress);
+
+    public async Task<IReadOnlyList<CommitHistoryRow>> GetPageAsync(
+        CommitQuery query,
+        int offset,
+        int count,
+        HistoryTarget target,
+        CancellationToken ct = default,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
-        await EnsureContextAsync(scope, ct);
+        await EnsureContextAsync(target, ct);
 
         if (!query.IsEmpty)
-            return await SearchAsync(query, count, scope, ct, offset);
+            return await SearchAsync(query, count, target, ct, offset);
 
         await _gate.WaitAsync(ct);
         try
@@ -169,9 +190,18 @@ public sealed class CommitHistoryService
         HistoryScope scope = HistoryScope.CurrentBranch,
         CancellationToken ct = default,
         int offset = 0,
+        IProgress<RepositoryLoadProgress>? progress = null) =>
+        await SearchAsync(query, maxResults, HistoryTarget.ForScope(scope), ct, offset, progress);
+
+    public async Task<IReadOnlyList<CommitHistoryRow>> SearchAsync(
+        CommitQuery query,
+        int maxResults,
+        HistoryTarget target,
+        CancellationToken ct = default,
+        int offset = 0,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
-        await EnsureCompleteAsync(progress, ct, scope);
+        await EnsureCompleteAsync(progress, ct, target);
 
         await _gate.WaitAsync(ct);
         try
@@ -191,9 +221,15 @@ public sealed class CommitHistoryService
     public async Task<IReadOnlyList<CommitHistoryRow>> EnsureCompleteAsync(
         IProgress<RepositoryLoadProgress>? progress,
         CancellationToken ct = default,
-        HistoryScope scope = HistoryScope.CurrentBranch)
+        HistoryScope scope = HistoryScope.CurrentBranch) =>
+        await EnsureCompleteAsync(progress, ct, HistoryTarget.ForScope(scope));
+
+    public async Task<IReadOnlyList<CommitHistoryRow>> EnsureCompleteAsync(
+        IProgress<RepositoryLoadProgress>? progress,
+        CancellationToken ct,
+        HistoryTarget target)
     {
-        await EnsureContextAsync(scope, ct);
+        await EnsureContextAsync(target, ct);
 
         return await Task.Run(() =>
         {
@@ -609,6 +645,18 @@ public sealed class CommitHistoryService
             });
         }
 
+        if (context.Scope == HistoryScope.Ref)
+        {
+            if (string.IsNullOrWhiteSpace(context.TargetRefName))
+                return [];
+
+            return repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = context.TargetRefName,
+            });
+        }
+
         if (repo.Head?.Tip == null)
             return [];
 
@@ -899,24 +947,29 @@ public sealed class CommitHistoryService
         delete.ExecuteNonQuery();
     }
 
-    private async Task EnsureContextAsync(HistoryScope scope, CancellationToken ct)
+    private async Task EnsureContextAsync(HistoryScope scope, CancellationToken ct) =>
+        await EnsureContextAsync(HistoryTarget.ForScope(scope), ct);
+
+    private async Task EnsureContextAsync(HistoryTarget target, CancellationToken ct)
     {
         if (_context != null
-            && _context.Scope == scope
+            && _context.Scope == target.Scope
+            && string.Equals(_context.TargetRefName, target.RefName, StringComparison.Ordinal)
             && string.Equals(_context.RepoPath, _git.RepositoryPath, StringComparison.OrdinalIgnoreCase))
             return;
 
         if (string.IsNullOrWhiteSpace(_git.RepositoryPath))
             throw new InvalidOperationException("No repository is open.");
 
-        await OpenAsync(_git.RepositoryPath, scope, ct);
+        await OpenAsync(_git.RepositoryPath, target, ct);
     }
 
     private HistoryContext RequireContext() =>
         _context ?? throw new InvalidOperationException("No repository is open.");
 
-    private static HistoryContext BuildContext(Repository repo, HistoryScope scope)
+    private static HistoryContext BuildContext(Repository repo, HistoryTarget target)
     {
+        var scope = target.Scope;
         var workDir = repo.Info.WorkingDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var gitDir = repo.Info.Path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var repoKey = Sha256($"{gitDir.ToLowerInvariant()}|{workDir.ToLowerInvariant()}");
@@ -933,12 +986,45 @@ public sealed class CommitHistoryService
                 scope);
         }
 
+        if (scope == HistoryScope.Ref)
+        {
+            var refName = target.RefName
+                ?? throw new InvalidOperationException("Ref history target requires a ref name.");
+            var commit = ResolveCommit(repo, refName)
+                ?? throw new InvalidOperationException($"Cannot resolve ref: {refName}");
+            var cacheName = $"ref:{refName}";
+            return new HistoryContext(
+                repoKey,
+                workDir,
+                gitDir,
+                cacheName,
+                commit.Sha,
+                null,
+                scope,
+                refName);
+        }
+
         var headSha = repo.Head.Tip?.Sha ?? string.Empty;
         var branchName = repo.Info.IsHeadDetached
             ? $"detached:{Short(headSha)}"
             : repo.Head.FriendlyName;
         var upstreamSha = repo.Head.TrackedBranch?.Tip?.Sha;
         return new HistoryContext(repoKey, workDir, gitDir, branchName, headSha, upstreamSha, scope);
+    }
+
+    private static Commit? ResolveCommit(Repository repo, string refName)
+    {
+        var obj = repo.Lookup(refName);
+        if (obj is Commit commit)
+            return commit;
+
+        if (obj is TagAnnotation annotation)
+            return annotation.Target as Commit;
+
+        if (repo.Tags[refName] is { } tag)
+            return tag.PeeledTarget as Commit ?? tag.Target as Commit;
+
+        return null;
     }
 
     private static string BuildAllBranchesFingerprint(Repository repo)

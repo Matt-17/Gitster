@@ -691,6 +691,7 @@ public sealed class GitCliBackend : IGitBackend
 
     public Task RevertCommitAsync(string sha)                   => NSVoid();
     public Task<Dictionary<string, string>> GetAllRefsAsync()   => NS<Dictionary<string, string>>();
+    public Task<IReadOnlyList<RefCatalogItem>> GetRefCatalogAsync() => NS<IReadOnlyList<RefCatalogItem>>();
     public Task<int> GetStashCountAsync()                       => NS<int>();
     public Task<IReadOnlyList<StashInfo>> GetStashesAsync()     => NS<IReadOnlyList<StashInfo>>();
     public Task<CommitDiff> GetStashDiffAsync(int stashIndex, CancellationToken ct = default) => NS<CommitDiff>();

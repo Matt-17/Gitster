@@ -4,4 +4,5 @@ public enum HistoryScope
 {
     CurrentBranch,
     AllBranches,
+    Ref,
 }

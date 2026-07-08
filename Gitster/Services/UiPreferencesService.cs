@@ -42,6 +42,7 @@ public partial class UiPreferencesService : ObservableObject
         public bool UseRelativeDates { get; set; }
         public bool GravatarEnabled { get; set; }
         public bool BranchTreeView { get; set; }
+        public bool CommitRefPaneCollapsed { get; set; }
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
         public ThemePreference ThemePreference { get; set; } = ThemePreference.System;
@@ -56,6 +57,9 @@ public partial class UiPreferencesService : ObservableObject
 
     [ObservableProperty]
     public partial bool BranchTreeView { get; set; }
+
+    [ObservableProperty]
+    public partial bool CommitRefPaneCollapsed { get; set; }
 
     [ObservableProperty]
     public partial bool UpdateChecksEnabled { get; set; }
@@ -73,6 +77,7 @@ public partial class UiPreferencesService : ObservableObject
     partial void OnUseRelativeDatesChanged(bool value) => Save();
     partial void OnGravatarEnabledChanged(bool value) => Save();
     partial void OnBranchTreeViewChanged(bool value) => Save();
+    partial void OnCommitRefPaneCollapsedChanged(bool value) => Save();
     partial void OnUpdateChecksEnabledChanged(bool value) => Save();
     partial void OnPersistentLoggingEnabledChanged(bool value) => Save();
     partial void OnThemePreferenceChanged(ThemePreference value)
@@ -136,6 +141,7 @@ public partial class UiPreferencesService : ObservableObject
                     UseRelativeDates = UseRelativeDates,
                     GravatarEnabled = GravatarEnabled,
                     BranchTreeView = BranchTreeView,
+                    CommitRefPaneCollapsed = CommitRefPaneCollapsed,
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
                     ThemePreference = ThemePreference,
@@ -154,6 +160,7 @@ public partial class UiPreferencesService : ObservableObject
                     UseRelativeDates = UseRelativeDates,
                     GravatarEnabled = GravatarEnabled,
                     BranchTreeView = BranchTreeView,
+                    CommitRefPaneCollapsed = CommitRefPaneCollapsed,
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
                     ThemePreference = ThemePreference,
@@ -176,6 +183,7 @@ public partial class UiPreferencesService : ObservableObject
         UseRelativeDates = settings.UseRelativeDates;
         GravatarEnabled = settings.GravatarEnabled;
         BranchTreeView = settings.BranchTreeView;
+        CommitRefPaneCollapsed = settings.CommitRefPaneCollapsed;
         UpdateChecksEnabled = settings.UpdateChecksEnabled;
         PersistentLoggingEnabled = settings.PersistentLoggingEnabled;
         ThemePreference = settings.ThemePreference;
@@ -187,6 +195,7 @@ public partial class UiPreferencesService : ObservableObject
         UseRelativeDates = p.UseRelativeDates;
         GravatarEnabled = p.GravatarEnabled;
         BranchTreeView = p.BranchTreeView;
+        CommitRefPaneCollapsed = p.CommitRefPaneCollapsed;
         UpdateChecksEnabled = p.UpdateChecksEnabled;
         PersistentLoggingEnabled = p.PersistentLoggingEnabled;
         ThemePreference = p.ThemePreference;

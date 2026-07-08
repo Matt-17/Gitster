@@ -44,6 +44,20 @@ public sealed class AppSettingsServiceTests
     }
 
     [TestMethod]
+    public void UiPreferencesService_WithAppSettingsService_PersistsCommitRefPaneCollapsed()
+    {
+        var path = SettingsPath();
+        _ = new UiPreferencesService(new AppSettingsService(path))
+        {
+            CommitRefPaneCollapsed = true,
+        };
+
+        var reloaded = new UiPreferencesService(new AppSettingsService(path));
+
+        Assert.IsTrue(reloaded.CommitRefPaneCollapsed);
+    }
+
+    [TestMethod]
     public void UiPreferencesService_WithAppSettingsService_DefaultsPersistentLoggingDisabled()
     {
         var path = SettingsPath();
