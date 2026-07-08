@@ -9,6 +9,43 @@ namespace Gitster.Tests;
 public sealed class LibGit2BackendTests
 {
     [TestMethod]
+    public async Task GetRefCatalog_ListsBranchesTagsAndUsefulRefs()
+    {
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "1");
+        string featureSha;
+        using (var r = new Repository(repo.Path))
+        {
+            r.CreateBranch("feature/work", r.Head.Tip);
+            Commands.Checkout(r, r.Branches["feature/work"]);
+        }
+
+        featureSha = repo.Commit("feature", "feature.txt", "1");
+        using (var r = new Repository(repo.Path))
+        {
+            Commands.Checkout(r, r.Branches["master"]);
+            r.Tags.Add("v-base", r.Lookup<Commit>(baseSha)!);
+            r.Refs.Add("refs/remotes/origin/master", baseSha, allowOverwrite: true);
+            r.Refs.Add("refs/remotes/origin/HEAD", baseSha, allowOverwrite: true);
+            r.Refs.Add("refs/notes/commits", featureSha, allowOverwrite: true);
+            r.Refs.Add("refs/bisect/good-test", featureSha, allowOverwrite: true);
+        }
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var refs = await backend.GetRefCatalogAsync();
+
+        Assert.IsTrue(refs.Any(r => r.Kind == RefCatalogKind.LocalBranch && r.DisplayName == "master" && r.IsCurrent));
+        Assert.IsTrue(refs.Any(r => r.Kind == RefCatalogKind.LocalBranch && r.DisplayName == "feature/work" && !r.HasUpstream));
+        Assert.IsTrue(refs.Any(r => r.Kind == RefCatalogKind.RemoteBranch && r.DisplayName == "origin/master"));
+        Assert.IsTrue(refs.Any(r => r.Kind == RefCatalogKind.Tag && r.DisplayName == "v-base"));
+        Assert.IsTrue(refs.Any(r => r.Kind == RefCatalogKind.Note && r.DisplayName == "commits"));
+        Assert.IsFalse(refs.Any(r => r.DisplayName.EndsWith("/HEAD", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(refs.Any(r => r.CanonicalName.StartsWith("refs/bisect/", StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
     public async Task AreCommitsContiguous_TrueForAdjacentRange()
     {
         using var repo = new GitTestRepo();

@@ -83,6 +83,7 @@ public partial class App : Application
 					services.AddSingleton<StatusBarViewModel>();
 					services.AddSingleton<TitleBarViewModel>();
 					services.AddSingleton<CommitListViewModel>();
+					services.AddSingleton<CommitRefNavigatorViewModel>();
 					services.AddSingleton<TimestampEditViewModel>();
 					services.AddSingleton<HistoryRewriteDraftViewModel>();
 					services.AddSingleton<QuickActionsViewModel>();
@@ -185,4 +186,3 @@ public partial class App : Application
 			"Gitster",
 			"logs");
 }
-

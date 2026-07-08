@@ -43,6 +43,7 @@ public sealed class AppSettingsService
         public bool UseRelativeDates { get; set; }
         public bool GravatarEnabled { get; set; }
         public bool BranchTreeView { get; set; }
+        public bool CommitRefPaneCollapsed { get; set; }
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
         public ThemePreference ThemePreference { get; set; } = ThemePreference.System;

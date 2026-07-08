@@ -319,6 +319,60 @@ public sealed class CommitHistoryServiceTests
     }
 
     [TestMethod]
+    public async Task EnsureCompleteAsync_RefTarget_LoadsSelectedBranchWithoutCheckout()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "1");
+        string main;
+        using (var r = new Repository(repo.Path))
+        {
+            main = r.Head.FriendlyName;
+            r.CreateBranch("feature/work", r.Head.Tip);
+            Commands.Checkout(r, r.Branches["feature/work"]);
+        }
+
+        repo.Commit("feature only", "feature.txt", "1");
+        Checkout(repo.Path, main);
+        repo.Commit("main only", "main.txt", "1");
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+
+        await history.OpenAsync(repo.Path, HistoryTarget.ForRef("refs/heads/feature/work", "feature/work"));
+        var rows = await history.EnsureCompleteAsync(
+            progress: null,
+            target: HistoryTarget.ForRef("refs/heads/feature/work", "feature/work"),
+            ct: CancellationToken.None);
+
+        Assert.IsTrue(rows.Any(r => r.Message == "feature only"));
+        Assert.IsFalse(rows.Any(r => r.Message == "main only"));
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(main, check.Head.FriendlyName);
+    }
+
+    [TestMethod]
+    public async Task EnsureCompleteAsync_RefTarget_LoadsTagHistory()
+    {
+        using var repo = new GitTestRepo();
+        var tagged = repo.Commit("tagged", "a.txt", "1");
+        repo.Commit("later", "a.txt", "2");
+        using (var r = new Repository(repo.Path))
+            r.Tags.Add("v-tagged", r.Lookup<Commit>(tagged)!);
+
+        using var cache = new TempCacheDir();
+        var backend = new LibGit2Backend();
+        var history = new CommitHistoryService(backend, cache.Path);
+        var target = HistoryTarget.ForRef("refs/tags/v-tagged", "v-tagged");
+
+        await history.OpenAsync(repo.Path, target);
+        var rows = await history.EnsureCompleteAsync(progress: null, ct: CancellationToken.None, target: target);
+
+        Assert.AreEqual("tagged", rows[0].Message);
+        Assert.IsFalse(rows.Any(r => r.Message == "later"));
+    }
+
+    [TestMethod]
     public async Task OpenAsync_WhenCacheDatabaseIsCorrupt_RebuildsSilently()
     {
         using var repo = new GitTestRepo();

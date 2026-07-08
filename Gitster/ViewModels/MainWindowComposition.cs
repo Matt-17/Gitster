@@ -39,6 +39,7 @@ public sealed record MainWindowChildViewModels(
     StatusBarViewModel StatusBar,
     TitleBarViewModel TitleBar,
     CommitListViewModel CommitList,
+    CommitRefNavigatorViewModel CommitRefNavigator,
     TimestampEditViewModel TimestampEdit,
     HistoryRewriteDraftViewModel HistoryRewriteDraft,
     QuickActionsViewModel QuickActions,
