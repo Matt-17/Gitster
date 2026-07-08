@@ -4,6 +4,7 @@ public sealed class HeadRefreshCoordinator : IDisposable
 {
     private readonly TimeSpan _debounceDelay;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _sync = new();
 
     private Func<CancellationToken, Task>? _refreshAsync;
     private int _requestVersion;
@@ -37,10 +38,19 @@ public sealed class HeadRefreshCoordinator : IDisposable
         if (IsSuspended)
             return;
 
-        _requested = true;
-        _requestVersion++;
+        bool startWorker;
+        lock (_sync)
+        {
+            _requested = true;
+            _requestVersion++;
 
-        if (!_workerRunning)
+            // Claim the worker slot atomically so two callers can never start two workers.
+            startWorker = !_workerRunning;
+            if (startWorker)
+                _workerRunning = true;
+        }
+
+        if (startWorker)
             _ = RunQueuedRefreshAsync();
     }
 
@@ -48,8 +58,11 @@ public sealed class HeadRefreshCoordinator : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _requested = false;
-        _requestVersion++;
+        lock (_sync)
+        {
+            _requested = false;
+            _requestVersion++;
+        }
     }
 
     public async Task RunExclusiveAsync(
@@ -79,27 +92,32 @@ public sealed class HeadRefreshCoordinator : IDisposable
 
     private async Task RunQueuedRefreshAsync()
     {
-        if (_workerRunning)
-            return;
-
-        _workerRunning = true;
+        // The worker slot (_workerRunning) was claimed by the caller under _sync.
         try
         {
             while (!IsSuspended)
             {
-                if (!_requested)
-                    return;
+                int version;
+                lock (_sync)
+                {
+                    if (!_requested)
+                        return;
+                    version = _requestVersion;
+                }
 
-                var version = _requestVersion;
                 await Task.Delay(_debounceDelay);
 
-                if (IsSuspended || !_requested)
-                    return;
+                lock (_sync)
+                {
+                    if (IsSuspended || !_requested)
+                        return;
 
-                if (version != _requestVersion)
-                    continue;
+                    if (version != _requestVersion)
+                        continue;
 
-                _requested = false;
+                    _requested = false;
+                }
+
                 var refresh = _refreshAsync
                     ?? throw new InvalidOperationException("Head refresh coordinator has not been configured.");
                 await RunExclusiveAsync(refresh);
@@ -110,9 +128,16 @@ public sealed class HeadRefreshCoordinator : IDisposable
         }
         finally
         {
-            _workerRunning = false;
+            bool restart;
+            lock (_sync)
+            {
+                _workerRunning = false;
+                restart = _requested && !IsSuspended && !_disposed;
+                if (restart)
+                    _workerRunning = true;
+            }
 
-            if (_requested && !IsSuspended && !_disposed)
+            if (restart)
                 _ = RunQueuedRefreshAsync();
         }
     }
@@ -123,7 +148,10 @@ public sealed class HeadRefreshCoordinator : IDisposable
             return;
 
         _disposed = true;
-        _requested = false;
+        lock (_sync)
+        {
+            _requested = false;
+        }
         _gate.Dispose();
     }
 

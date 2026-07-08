@@ -22,13 +22,15 @@ public partial class OperationsLogService : ObservableObject
     public OperationRecord? MostRecentActive
         => Records.FirstOrDefault(r => r.Status == OperationStatus.Active);
 
-    public Task DetachAsync()
+    public async Task DetachAsync()
     {
-        Records.Clear();
-        _storagePath = null;
-        OnPropertyChanged(nameof(MostRecentActive));
-        Changed?.Invoke(this, EventArgs.Empty);
-        return Task.CompletedTask;
+        await RunOnUiThreadAsync(() =>
+        {
+            Records.Clear();
+            _storagePath = null;
+            OnPropertyChanged(nameof(MostRecentActive));
+            Changed?.Invoke(this, EventArgs.Empty);
+        });
     }
 
     public async Task AttachAsync(string repoPath)
@@ -41,42 +43,81 @@ public partial class OperationsLogService : ObservableObject
 
     public async Task RecordAsync(OperationRecord record)
     {
-        // Mark the immediate predecessor on the same branch as Replaced
-        var previousActive = Records.FirstOrDefault(r =>
-            r.Status == OperationStatus.Active
-            && r.BranchName == record.BranchName
-            && r.AfterSha == record.BeforeSha);
-
-        if (previousActive != null)
+        await RunOnUiThreadAsync(() =>
         {
-            var idx = Records.IndexOf(previousActive);
-            Records[idx] = previousActive with { Status = OperationStatus.Replaced };
-        }
+            // Mark the immediate predecessor on the same branch as Replaced.
+            // Prefix-tolerant: records persisted by older versions stored short SHAs.
+            var previousActive = Records.FirstOrDefault(r =>
+                r.Status == OperationStatus.Active
+                && r.BranchName == record.BranchName
+                && GitSha.Matches(r.AfterSha, record.BeforeSha));
 
-        Records.Insert(0, record);
+            if (previousActive != null)
+            {
+                var idx = Records.IndexOf(previousActive);
+                Records[idx] = previousActive with { Status = OperationStatus.Replaced };
+            }
+
+            Records.Insert(0, record);
+            OnPropertyChanged(nameof(MostRecentActive));
+            Changed?.Invoke(this, EventArgs.Empty);
+        });
         await SaveAsync();
-        OnPropertyChanged(nameof(MostRecentActive));
-        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public async Task MarkUndoneAsync(string recordId)
     {
-        var record = Records.FirstOrDefault(r => r.Id == recordId);
-        if (record is null) return;
-        var idx = Records.IndexOf(record);
-        Records[idx] = record with { Status = OperationStatus.Undone };
-        await SaveAsync();
-        OnPropertyChanged(nameof(MostRecentActive));
-        Changed?.Invoke(this, EventArgs.Empty);
+        var changed = await RunOnUiThreadAsync(() =>
+        {
+            var record = Records.FirstOrDefault(r => r.Id == recordId);
+            if (record is null) return false;
+            var idx = Records.IndexOf(record);
+            Records[idx] = record with { Status = OperationStatus.Undone };
+            OnPropertyChanged(nameof(MostRecentActive));
+            Changed?.Invoke(this, EventArgs.Empty);
+            return true;
+        });
+        if (changed)
+            await SaveAsync();
     }
 
     public async Task MarkExpiredAsync(string recordId)
     {
-        var record = Records.FirstOrDefault(r => r.Id == recordId);
-        if (record is null) return;
-        var idx = Records.IndexOf(record);
-        Records[idx] = record with { Status = OperationStatus.Expired };
-        await SaveAsync();
+        var changed = await RunOnUiThreadAsync(() =>
+        {
+            var record = Records.FirstOrDefault(r => r.Id == recordId);
+            if (record is null) return false;
+            var idx = Records.IndexOf(record);
+            Records[idx] = record with { Status = OperationStatus.Expired };
+            return true;
+        });
+        if (changed)
+            await SaveAsync();
+    }
+
+    /// <summary>
+    /// Records is bound to the UI; every mutation must happen on the dispatcher.
+    /// Falls back to inline execution in unit tests (no Application).
+    /// </summary>
+    private static Task RunOnUiThreadAsync(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.InvokeAsync(action).Task;
+    }
+
+    private static async Task<T> RunOnUiThreadAsync<T>(Func<T> func)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            return func();
+
+        return await dispatcher.InvokeAsync(func).Task;
     }
 
     public async Task<UndoPlan> PrepareUndoAsync(
@@ -109,7 +150,8 @@ public partial class OperationsLogService : ObservableObject
             "Checking commits that would be affected.",
             28));
         var commitsBetween = await Task.Run(() => git.GetCommitsBetweenAsync(targetSha, currentHead));
-        var wouldBeDiscarded = commitsBetween.Where(c => c.Sha != record.AfterSha).ToList();
+        // Prefix-tolerant: records from older Gitster versions stored 7-char SHAs.
+        var wouldBeDiscarded = commitsBetween.Where(c => !GitSha.Matches(c.Sha, record.AfterSha)).ToList();
 
         progress?.Report(new OperationProgress(
             "Preparing undo",
@@ -174,8 +216,9 @@ public partial class OperationsLogService : ObservableObject
                     "Replay conflicted. Restoring the repository state before the undo attempt.",
                     75));
                 await Task.Run(() => git.ResetHardAsync(plan.Record.AfterSha));
-                throw new InvalidOperationException(
-                    "Replay produced conflicts. Repository restored to state before undo attempt.");
+                throw new GitConflictException(
+                    "Replay produced conflicts. Repository restored to state before undo attempt.",
+                    repositoryHalted: false);
             }
         }
 
@@ -233,7 +276,7 @@ public partial class OperationsLogService : ObservableObject
                 Converters = { new JsonStringEnumConverter() }
             };
             var list = JsonSerializer.Deserialize<List<OperationRecord>>(json, options) ?? [];
-            Records = new ObservableCollection<OperationRecord>(list);
+            await RunOnUiThreadAsync(() => Records = new ObservableCollection<OperationRecord>(list));
         }
         catch (Exception ex)
         {
@@ -270,4 +313,7 @@ public abstract record UndoPlan
 
     public sealed record NotAvailable(string Reason) : UndoPlan;
     public sealed record Expired(string Reason) : UndoPlan;
+
+    /// <summary>The user declined the undo confirmation — no message needed.</summary>
+    public sealed record Canceled : UndoPlan;
 }

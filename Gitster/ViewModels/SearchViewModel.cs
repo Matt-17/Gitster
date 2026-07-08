@@ -336,7 +336,7 @@ public partial class SearchViewModel : BaseViewModel
         if (SelectedReflogEntry is not { } entry)
             return;
 
-        var shortSha = entry.Sha.Length >= 7 ? entry.Sha[..7] : entry.Sha;
+        var shortSha = GitSha.Short(entry.Sha);
         var dialog = new TextInputDialog
         {
             Title = "Create branch from reflog",

@@ -319,14 +319,13 @@ public partial class StashesViewModel : BaseViewModel
             await _feedbackService.RunAsync("Pop stash",
                 () => _git.PopStashAsync(stash.Info.Index));
 
-            var shortSha = stash.CommitSha.Length >= 7 ? stash.CommitSha[..7] : stash.CommitSha;
             await _opsLogService.RecordAsync(new OperationRecord(
                 Id:              Guid.NewGuid().ToString(),
                 Timestamp:       DateTimeOffset.Now,
                 Kind:            OperationKind.StashPop,
                 Description:     $"Pop {stash.Ref}: {stash.DisplayName}",
                 BranchName:      stash.BranchName,
-                BeforeSha:       shortSha,
+                BeforeSha:       stash.CommitSha,
                 AfterSha:        string.Empty,
                 ReflogSelector:  null,
                 Status:          OperationStatus.Active));
@@ -365,14 +364,13 @@ public partial class StashesViewModel : BaseViewModel
 
             await _nameService.RemoveAsync(stash.CommitSha);
 
-            var shortSha = stash.CommitSha.Length >= 7 ? stash.CommitSha[..7] : stash.CommitSha;
             await _opsLogService.RecordAsync(new OperationRecord(
                 Id:              Guid.NewGuid().ToString(),
                 Timestamp:       DateTimeOffset.Now,
                 Kind:            OperationKind.StashDrop,
                 Description:     $"Drop {stash.Ref}: {stash.DisplayName}",
                 BranchName:      stash.BranchName,
-                BeforeSha:       shortSha,
+                BeforeSha:       stash.CommitSha,
                 AfterSha:        string.Empty,
                 ReflogSelector:  null,
                 Status:          OperationStatus.Active));
@@ -430,14 +428,13 @@ public partial class StashesViewModel : BaseViewModel
             await _feedbackService.RunAsync("Convert to branch",
                 () => _git.ConvertStashToBranchAsync(stash.Info.Index, branchName));
 
-            var shortSha = stash.CommitSha.Length >= 7 ? stash.CommitSha[..7] : stash.CommitSha;
             await _opsLogService.RecordAsync(new OperationRecord(
                 Id:              Guid.NewGuid().ToString(),
                 Timestamp:       DateTimeOffset.Now,
                 Kind:            OperationKind.StashConvert,
                 Description:     $"Convert {stash.Ref} → branch '{branchName}'",
                 BranchName:      branchName,
-                BeforeSha:       shortSha,
+                BeforeSha:       stash.CommitSha,
                 AfterSha:        string.Empty,
                 ReflogSelector:  null,
                 Status:          OperationStatus.Active));

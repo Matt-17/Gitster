@@ -16,6 +16,8 @@
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <converters:InverseBoolVisibilityConverter x:Key="InverseBoolVisibilityConverter"/>
             <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
+            <converters:RelativeDateConverter x:Key="RelativeDateConverter"/>
+            <converters:RelativeTimeConverter x:Key="RelativeTimeConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

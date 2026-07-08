@@ -331,6 +331,14 @@ public partial class CommitListViewModel : BaseViewModel
         {
             // Superseded by a newer load.
         }
+        catch (Exception ex)
+        {
+            // Several callers fire-and-forget this method (scope/ref changes); an
+            // escaping exception would only surface as an UnobservedTaskException.
+            System.Diagnostics.Debug.WriteLine($"History load failed: {ex}");
+            if (_loadCts == cts)
+                HistoryStatusText = $"Could not load history: {ex.Message}";
+        }
         finally
         {
             if (_loadCts == cts)

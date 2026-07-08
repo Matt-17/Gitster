@@ -322,7 +322,8 @@
                               Padding="2,1"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
-                              ScrollViewer.CanContentScroll="False">
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
                         <TreeView.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Remove change from commit"

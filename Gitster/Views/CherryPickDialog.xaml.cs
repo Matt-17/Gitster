@@ -41,7 +41,7 @@ public partial class CherryPickDialog : Window
             var commits = await _git.GetCommitsForRefAsync(branchName, maxCount: 150);
             CommitList.ItemsSource = commits
                 .Select(c => new CherryPickCommitRow(
-                    c.Sha.Length >= 7 ? c.Sha[..7] : c.Sha,
+                    c.ShortSha,
                     c.Message,
                     c.AuthorName,
                     c.FullSha))

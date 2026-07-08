@@ -151,8 +151,9 @@ internal sealed class LibGit2BranchOperations
         }
 
         if (result.Status == MergeStatus.Conflicts)
-            throw new InvalidOperationException(
-                $"Merge of '{branchName}' produced conflicts. Resolve them in the working tree, then commit or abort the merge.");
+            throw new GitConflictException(
+                $"Merge of '{branchName}' produced conflicts. Resolve them in the working tree, then commit or abort the merge.",
+                repositoryHalted: true);
 
         if (strategy == BranchMergeStrategy.FastForwardOnly && result.Status == MergeStatus.NonFastForward)
             throw new InvalidOperationException(

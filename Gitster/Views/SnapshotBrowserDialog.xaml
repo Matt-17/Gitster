@@ -28,20 +28,19 @@
         </ListView>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Close"
+            <Button Content="Cl_ose"
                     IsCancel="True"
-                    MinWidth="86"
                     Margin="0,0,8,0"
-                    Style="{StaticResource GhostButton}"/>
-            <Button Content="Restore current branch"
+                    Style="{StaticResource DialogButton}"/>
+            <Button Content="Restore current _branch"
                     MinWidth="140"
                     Margin="0,0,8,0"
                     Click="RestoreBranch_Click"
-                    Style="{StaticResource GhostButton}"/>
-            <Button Content="Restore all refs"
+                    Style="{StaticResource DialogButton}"/>
+            <Button Content="_Restore all refs"
                     MinWidth="120"
                     Click="RestoreAll_Click"
-                    Style="{StaticResource PrimaryButton}"/>
+                    Style="{StaticResource DialogPrimaryButton}"/>
         </StackPanel>
     </Grid>
 </Window>

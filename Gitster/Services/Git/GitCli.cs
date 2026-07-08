@@ -178,7 +178,13 @@ public static class GitCli
     public static string WriteTempBat(string content, string label = "script")
     {
         var tmp = Path.Combine(Path.GetTempPath(), $"gitster-{label}-{Guid.NewGuid():N}.cmd");
-        File.WriteAllText(tmp, content);
+        // cmd.exe parses .cmd files in the console's OEM code page; switch that
+        // console to UTF-8 first so non-ASCII content (e.g. temp paths under a
+        // non-ASCII user profile) survives. BOM-less, or cmd chokes on line 1.
+        File.WriteAllText(
+            tmp,
+            "@chcp 65001 >nul\r\n" + content,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return tmp;
     }
 
@@ -188,7 +194,8 @@ public static class GitCli
     public static string WriteTempMsg(string content)
     {
         var tmp = Path.Combine(Path.GetTempPath(), $"gitster-msg-{Guid.NewGuid():N}.txt");
-        File.WriteAllText(tmp, content);
+        // Git reads commit-message files as UTF-8; a BOM would leak into the subject line.
+        File.WriteAllText(tmp, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return tmp;
     }
 

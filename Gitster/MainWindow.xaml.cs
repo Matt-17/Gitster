@@ -30,13 +30,29 @@ public partial class MainWindow : Window
 
     private async void Window_ContentRendered(object? sender, EventArgs e)
     {
-        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        await _viewModel.InitializeAsync();
+        // async void event handler: never let an exception escape to the dispatcher.
+        try
+        {
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            await _viewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Could not load the repository:\n{ex.Message}", "Gitster");
+        }
     }
 
     private async void Window_Activated(object sender, EventArgs e)
     {
-        await _viewModel.OnWindowActivatedAsync();
+        try
+        {
+            await _viewModel.OnWindowActivatedAsync();
+        }
+        catch (Exception ex)
+        {
+            // Activation refreshes fire on every focus change — log, don't dialog-spam.
+            System.Diagnostics.Debug.WriteLine($"Activation refresh failed: {ex}");
+        }
     }
 
     protected override void OnStateChanged(EventArgs e)
@@ -119,7 +135,17 @@ public partial class MainWindow : Window
             Header   = tool.Name,
             ToolTip  = tool.Command,
         };
-        item.Click += async (_, _) => await _viewModel.RunCustomToolAsync(tool);
+        item.Click += async (_, _) =>
+        {
+            try
+            {
+                await _viewModel.RunCustomToolAsync(tool);
+            }
+            catch (Exception ex)
+            {
+                _windowService.Error($"Tool '{tool.Name}' failed:\n{ex.Message}", "Gitster");
+            }
+        };
         return item;
     }
 

@@ -10,12 +10,6 @@
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
-    <UserControl.Resources>
-        <converters:RelativeDateConverter x:Key="RelativeDate"/>
-        <BooleanToVisibilityConverter x:Key="BoolVis"/>
-        <converters:InverseBoolVisibilityConverter x:Key="InverseBoolVis"/>
-    </UserControl.Resources>
-
     <!-- Root grid inherits MainWindowViewModel; swap DataContext for everything inside -->
     <Grid DataContext="{Binding StashesVM}"
           d:DataContext="{d:DesignInstance Type=vm:StashesViewModel}">
@@ -62,7 +56,7 @@
                                         Message="Save your current working tree changes as a named stash, then return to them later."
                                         ActionText="New stash"
                                         ActionCommand="{Binding NewStashCommand}"
-                                        Visibility="{Binding HasStashes, Converter={StaticResource InverseBoolVis}}"/>
+                                        Visibility="{Binding HasStashes, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
 
             <!-- Stash list -->
             <ListView Grid.Row="1"
@@ -70,7 +64,7 @@
                       SelectedItem="{Binding SelectedStash}"
                       Background="Transparent"
                       BorderThickness="0"
-                      Visibility="{Binding HasStashes, Converter={StaticResource BoolVis}}"
+                      Visibility="{Binding HasStashes, Converter={StaticResource BooleanToVisibilityConverter}}"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListView.View>
                     <GridView>
@@ -115,7 +109,7 @@
                         <GridViewColumn Header="Age" Width="80">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding CreatedAt, Converter={StaticResource RelativeDate}}"
+                                    <TextBlock Text="{Binding CreatedAt, Converter={StaticResource RelativeDateConverter}}"
                                                FontSize="11"
                                                Foreground="{DynamicResource TextSecondary}"/>
                                 </DataTemplate>
@@ -147,10 +141,10 @@
                            Foreground="{DynamicResource TextTertiary}"
                            HorizontalAlignment="Center"
                            Margin="0,40,0,0"
-                           Visibility="{Binding HasSelectedStash, Converter={StaticResource InverseBoolVis}}"/>
+                           Visibility="{Binding HasSelectedStash, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
 
                 <!-- Detail panel (visible when stash is selected) -->
-                <StackPanel Visibility="{Binding HasSelectedStash, Converter={StaticResource BoolVis}}">
+                <StackPanel Visibility="{Binding HasSelectedStash, Converter={StaticResource BooleanToVisibilityConverter}}">
 
                     <!-- Header card: display name + meta line -->
                     <Border Style="{StaticResource PanelCard}" Margin="0,0,0,8">

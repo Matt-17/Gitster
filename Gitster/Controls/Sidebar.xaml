@@ -10,8 +10,6 @@
              Width="44">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-
         <Style x:Key="SidebarButton" TargetType="Button">
             <Setter Property="Background"     Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -54,7 +52,7 @@
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                Fill="{DynamicResource AccentBlue}"
-                               Visibility="{Binding IsCommitsActive, Converter={StaticResource BoolToVis}}"/>
+                               Visibility="{Binding IsCommitsActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <Path Data="{StaticResource IconCommitsGeometry}">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
@@ -79,7 +77,7 @@
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                Fill="{DynamicResource AccentBlue}"
-                               Visibility="{Binding IsStashesActive, Converter={StaticResource BoolToVis}}"/>
+                               Visibility="{Binding IsStashesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <Path Data="{StaticResource IconStashesGeometry}">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
@@ -97,7 +95,7 @@
                             Background="{DynamicResource AccentBlue}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,9,9,0"
-                            Visibility="{Binding HasStashBadge, Converter={StaticResource BoolToVis}}"/>
+                            Visibility="{Binding HasStashBadge, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
             </Button>
 
@@ -110,7 +108,7 @@
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                Fill="{DynamicResource AccentBlue}"
-                               Visibility="{Binding IsBranchesActive, Converter={StaticResource BoolToVis}}"/>
+                               Visibility="{Binding IsBranchesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <Path Data="{StaticResource IconBranchesGeometry}">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
@@ -128,7 +126,7 @@
                             Background="{DynamicResource AccentBlue}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,9,9,0"
-                            Visibility="{Binding HasBranchBadge, Converter={StaticResource BoolToVis}}"/>
+                            Visibility="{Binding HasBranchBadge, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
             </Button>
 
@@ -141,7 +139,7 @@
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                Fill="{DynamicResource AccentBlue}"
-                               Visibility="{Binding IsWorktreesActive, Converter={StaticResource BoolToVis}}"/>
+                               Visibility="{Binding IsWorktreesActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <Path Data="{StaticResource IconWorktreesGeometry}">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
@@ -166,7 +164,7 @@
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                Fill="{DynamicResource AccentBlue}"
-                               Visibility="{Binding IsSearchActive, Converter={StaticResource BoolToVis}}"/>
+                               Visibility="{Binding IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <Path Data="{StaticResource IconSearchGeometry}">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
@@ -191,7 +189,7 @@
                 <Grid Width="44" Height="44">
                     <Rectangle Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
                                Fill="{DynamicResource AccentBlue}"
-                               Visibility="{Binding IsOperationsLogActive, Converter={StaticResource BoolToVis}}"/>
+                               Visibility="{Binding IsOperationsLogActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <Path Data="{StaticResource IconOperationsLogGeometry}">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StrokeIcon16}">
@@ -209,7 +207,7 @@
                             Background="{DynamicResource AccentBlue}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
                             Margin="0,9,9,0"
-                            Visibility="{Binding HasOpsLogBadge, Converter={StaticResource BoolToVis}}"/>
+                            Visibility="{Binding HasOpsLogBadge, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
             </Button>
 

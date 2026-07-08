@@ -41,15 +41,13 @@
         <StackPanel Grid.Row="4"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
-            <Button Content="Cancel"
-                    Style="{DynamicResource GhostButton}"
-                    Width="80"
+            <Button Content="_Cancel"
+                    Style="{DynamicResource DialogButton}"
                     Margin="0,0,8,0"
                     IsCancel="True"
                     Click="CancelButton_Click"/>
-            <Button Content="OK"
-                    Style="{DynamicResource PrimaryButton}"
-                    Width="80"
+            <Button Content="_OK"
+                    Style="{DynamicResource DialogPrimaryButton}"
                     IsDefault="True"
                     Click="OkButton_Click"/>
         </StackPanel>

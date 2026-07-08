@@ -155,10 +155,5 @@ public partial class AuthorPanelViewModel : BaseViewModel
         string.IsNullOrEmpty(email) ? name : $"{name} <{email}>";
 
     private static (string name, string email) ParseAuthor(string s)
-    {
-        var m = Regex.Match(s, @"^(.+?)\s*<([^>]*)>\s*$");
-        return m.Success
-            ? (m.Groups[1].Value.Trim(), m.Groups[2].Value.Trim())
-            : (s.Trim(), string.Empty);
-    }
+        => GitIdentityFormat.Parse(s);
 }

@@ -22,7 +22,7 @@ public sealed class WorktreeRow
     public string Path        => Info.Path;
     public string FolderName  => System.IO.Path.GetFileName(Info.Path.TrimEnd(System.IO.Path.DirectorySeparatorChar));
     public string BranchName  => Info.BranchName;
-    public string ShortSha    => Info.HeadSha.Length >= 7 ? Info.HeadSha[..7] : Info.HeadSha;
+    public string ShortSha    => GitSha.Short(Info.HeadSha);
     public bool   IsMain      => Info.IsMain;
     public bool   IsLocked    => Info.IsLocked;
     public bool   IsPrunable  => Info.IsPrunable;

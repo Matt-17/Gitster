@@ -158,7 +158,15 @@ public partial class CommitListView : UserControl
             return;
 
         item.ClearValue(ToolTipProperty);
-        await _vm.DropCommitForFixupAsync(source, target);
+        try
+        {
+            await _vm.DropCommitForFixupAsync(source, target);
+        }
+        catch (Exception ex)
+        {
+            // async void drop handler — an escaping exception would hit the dispatcher.
+            System.Diagnostics.Debug.WriteLine($"Fixup drop failed: {ex}");
+        }
     }
 }
 

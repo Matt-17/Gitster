@@ -141,8 +141,7 @@ public sealed class SourceArchiveService
     private static string NormalizeDirectoryPath(string path) =>
         Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-    private static string ShortSha(string value) =>
-        value.Length >= 7 ? value[..7] : value;
+    private static string ShortSha(string value) => Git.GitSha.Short(value);
 
     private static string FormatSize(long bytes)
     {

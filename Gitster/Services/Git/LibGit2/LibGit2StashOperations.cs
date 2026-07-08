@@ -114,8 +114,9 @@ internal sealed class LibGit2StashOperations
         var status = repo.Stashes.Apply(stashIndex, opts);
         return status switch
         {
-            StashApplyStatus.Conflicts => throw new InvalidOperationException(
-                "Applying the stash produced conflicts. Resolve them manually."),
+            StashApplyStatus.Conflicts => throw new GitConflictException(
+                "Applying the stash produced conflicts. Resolve them manually.",
+                repositoryHalted: true),
             StashApplyStatus.NotFound => throw new InvalidOperationException(
                 $"stash@{{{stashIndex}}} was not found."),
             _ => Task.CompletedTask,
@@ -131,8 +132,9 @@ internal sealed class LibGit2StashOperations
 
         var status = repo.Stashes.Pop(stashIndex, opts);
         if (status == StashApplyStatus.Conflicts)
-            throw new InvalidOperationException(
-                "Popping the stash produced conflicts. Resolve them manually.");
+            throw new GitConflictException(
+                "Popping the stash produced conflicts. Resolve them manually.",
+                repositoryHalted: true);
         if (status == StashApplyStatus.NotFound)
             throw new InvalidOperationException($"stash@{{{stashIndex}}} was not found.");
 
@@ -193,9 +195,10 @@ internal sealed class LibGit2StashOperations
         if (status == StashApplyStatus.Conflicts)
         {
             _context.RaiseHeadChanged();
-            throw new InvalidOperationException(
+            throw new GitConflictException(
                 $"Branch '{branchName}' was created from the stash, but applying produced conflicts. " +
-                "Both the branch and the stash are intact - resolve conflicts manually.");
+                "Both the branch and the stash are intact - resolve conflicts manually.",
+                repositoryHalted: true);
         }
 
         throw new InvalidOperationException(

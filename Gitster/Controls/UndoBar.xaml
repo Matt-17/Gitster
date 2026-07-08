@@ -7,10 +7,6 @@
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:UndoBarViewModel}">
 
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-    </UserControl.Resources>
-
     <!-- A7 — always present. Tinted accent when an undoable op exists, neutral otherwise. -->
     <Border Padding="10,0" Height="32">
         <Border.Style>
@@ -33,7 +29,7 @@
                         Height="24"
                         Padding="10,1"
                         Margin="0,0,4,0"
-                        Visibility="{Binding HasUndoableOperation, Converter={StaticResource BoolToVis}}"/>
+                        Visibility="{Binding HasUndoableOperation, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 <Button Content="Log"
                         Command="{Binding OpenLogCommand}"
                         Style="{StaticResource GhostButton}"

@@ -34,7 +34,7 @@
                  BorderBrush="{DynamicResource BorderTertiary}"/>
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Close" Style="{DynamicResource PrimaryButton}" Width="90"
+            <Button Content="Cl_ose" Style="{DynamicResource DialogPrimaryButton}"
                     IsDefault="True" IsCancel="True" Click="Close_Click"/>
         </StackPanel>
     </Grid>

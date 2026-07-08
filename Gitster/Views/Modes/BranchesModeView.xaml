@@ -10,12 +10,6 @@
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
-    <UserControl.Resources>
-        <converters:RelativeDateConverter x:Key="RelativeDate"/>
-        <BooleanToVisibilityConverter x:Key="BoolVis"/>
-        <converters:InverseBoolVisibilityConverter x:Key="InverseBoolVis"/>
-    </UserControl.Resources>
-
     <Grid DataContext="{Binding BranchesVM}"
           d:DataContext="{d:DesignInstance Type=vm:BranchesViewModel}">
         <Grid.ColumnDefinitions>
@@ -108,7 +102,7 @@
                                         Message="Clear the filter or refresh the repository to reload local and remote branches."
                                         ActionText="Clear filter"
                                         ActionCommand="{Binding ClearFilterCommand}"
-                                        Visibility="{Binding HasBranches, Converter={StaticResource InverseBoolVis}}"/>
+                                        Visibility="{Binding HasBranches, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
 
             <!-- Branch tree (A13) -->
             <TreeView Grid.Row="1"
@@ -116,7 +110,7 @@
                       ItemsSource="{Binding BranchTree}"
                       Background="Transparent" BorderThickness="0"
                       MouseDoubleClick="BranchTree_MouseDoubleClick"
-                      Visibility="{Binding ShowTree, Converter={StaticResource BoolVis}}"
+                      Visibility="{Binding ShowTree, Converter={StaticResource BooleanToVisibilityConverter}}"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <TreeView.Resources>
                     <Style x:Key="BranchTreeExpanderToggle" TargetType="{x:Type ToggleButton}">
@@ -218,10 +212,10 @@
                     <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📁 " FontSize="11" VerticalAlignment="Center"
-                                       Visibility="{Binding IsBranch, Converter={StaticResource InverseBoolVis}}"/>
+                                       Visibility="{Binding IsBranch, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
                             <Ellipse Width="6" Height="6" Margin="0,0,5,0" VerticalAlignment="Center"
                                      Fill="{DynamicResource AccentBlue}"
-                                     Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
+                                     Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -249,7 +243,7 @@
                       ItemsSource="{Binding GroupedBranches}"
                       SelectedItem="{Binding SelectedBranch}"
                       Background="Transparent" BorderThickness="0"
-                      Visibility="{Binding ShowFlat, Converter={StaticResource BoolVis}}"
+                      Visibility="{Binding ShowFlat, Converter={StaticResource BooleanToVisibilityConverter}}"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListView.GroupStyle>
                     <GroupStyle>
@@ -283,7 +277,7 @@
                             <Ellipse Grid.Column="0" Width="6" Height="6" Margin="0,0,6,0"
                                      VerticalAlignment="Center"
                                      Fill="{DynamicResource AccentBlue}"
-                                     Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
+                                     Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                             <!-- Name + tip message -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -313,16 +307,16 @@
                                            FontFamily="{StaticResource FontFamilyMono}"
                                            Foreground="{DynamicResource AccentSuccess}"
                                            Margin="0,0,4,0"
-                                           Visibility="{Binding ShowAhead, Converter={StaticResource BoolVis}}"/>
+                                           Visibility="{Binding ShowAhead, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                 <TextBlock Text="{Binding BehindText}" FontSize="11"
                                            FontFamily="{StaticResource FontFamilyMono}"
                                            Foreground="{DynamicResource AccentWarning}"
-                                           Visibility="{Binding ShowBehind, Converter={StaticResource BoolVis}}"/>
+                                           Visibility="{Binding ShowBehind, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                             </StackPanel>
 
                             <!-- Last activity -->
                             <TextBlock Grid.Column="3"
-                                       Text="{Binding LastActivityLocal, Converter={StaticResource RelativeDate}}"
+                                       Text="{Binding LastActivityLocal, Converter={StaticResource RelativeDateConverter}}"
                                        FontSize="11" Foreground="{DynamicResource TextSecondary}"
                                        VerticalAlignment="Center" Margin="6,0,0,0"/>
                         </Grid>
@@ -345,9 +339,9 @@
                 <TextBlock Text="Select a branch to manage it"
                            FontSize="13" Foreground="{DynamicResource TextTertiary}"
                            HorizontalAlignment="Center" Margin="0,40,0,0"
-                           Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVis}}"/>
+                           Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
 
-                <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolVis}}">
+                <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!-- Selected-branch card -->
                     <Border Style="{StaticResource PanelCard}" Margin="0,0,0,8">
                         <StackPanel>

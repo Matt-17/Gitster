@@ -272,18 +272,17 @@ public partial class CommitPanelViewModel : BaseViewModel
             var newSha = await _feedback.RunAsync("Commit",
                 () => _git.CommitAsync(new CommitRequest(
                     Message.Trim(), amend, authorName, authorEmail, committerName, committerEmail)),
-                sha => sha.Length > 7 ? sha[..7] : sha);
+                GitSha.Short);
 
-            var shortBefore = beforeSha is { Length: >= 7 } ? beforeSha[..7] : beforeSha ?? string.Empty;
-            var shortAfter = newSha.Length >= 7 ? newSha[..7] : newSha;
+            var shortAfter = GitSha.Short(newSha);
             await _opsLog.RecordAsync(new OperationRecord(
                 Id: Guid.NewGuid().ToString(),
                 Timestamp: DateTimeOffset.Now,
                 Kind: amend ? OperationKind.Amend : OperationKind.Commit,
                 Description: amend ? $"Amend {shortAfter}" : $"Commit {shortAfter}: {Message.Trim()}",
                 BranchName: branch,
-                BeforeSha: shortBefore,
-                AfterSha: shortAfter,
+                BeforeSha: beforeSha ?? string.Empty,
+                AfterSha: newSha,
                 ReflogSelector: null,
                 Status: OperationStatus.Active));
 
@@ -365,9 +364,7 @@ public partial class CommitPanelViewModel : BaseViewModel
     private static (string? name, string? email) ParseIdentity(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return (null, null);
-        var m = Regex.Match(text, @"^(.+?)\s*<([^>]*)>\s*$");
-        return m.Success
-            ? (m.Groups[1].Value.Trim(), m.Groups[2].Value.Trim())
-            : (text.Trim(), null);
+        var (name, email) = GitIdentityFormat.Parse(text);
+        return (name, email.Length == 0 ? null : email);
     }
 }

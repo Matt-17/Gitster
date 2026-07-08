@@ -51,7 +51,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" Margin="0,2">
-                                <TextBlock Text="{Binding Sha}"
+                                <TextBlock Text="{Binding ShortSha}"
                                            FontFamily="{DynamicResource FontFamilyMono}"
                                            FontSize="11"
                                            Foreground="{DynamicResource TextSecondary}"
@@ -70,21 +70,20 @@
         <!-- Buttons -->
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="CancelButton"
-                    Content="Cancel"
+                    Content="_Cancel"
                     IsDefault="False" IsCancel="True"
-                    Style="{StaticResource GhostButton}"
-                    Padding="16,6" Margin="0,0,8,0"
+                    Style="{StaticResource DialogButton}"
+                    Margin="0,0,8,0"
                     Click="CancelButton_Click"/>
             <Button x:Name="ReplayButton"
-                    Content="Replay on top"
-                    Style="{StaticResource GhostButton}"
-                    Padding="16,6" Margin="0,0,8,0"
+                    Content="_Replay on top"
+                    Style="{StaticResource DialogButton}"
+                    Margin="0,0,8,0"
                     Click="ReplayButton_Click"/>
             <Button x:Name="DiscardButton"
-                    Content="Discard commits"
+                    Content="_Discard commits"
                     IsDefault="True"
-                    Style="{StaticResource PrimaryButton}"
-                    Padding="16,6"
+                    Style="{StaticResource DialogPrimaryButton}"
                     Click="DiscardButton_Click"/>
         </StackPanel>
     </Grid>

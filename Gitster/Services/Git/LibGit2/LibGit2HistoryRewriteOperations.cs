@@ -227,9 +227,10 @@ internal sealed class LibGit2HistoryRewriteOperations
             if (originalHead != null)
                 repo.Reset(ResetMode.Hard, originalHead);
             CleanupSequencerState(repo);
-            throw new InvalidOperationException(
-                $"Cherry-pick of {sha[..Math.Min(7, sha.Length)]} produced conflicts and was aborted - " +
-                "history and working tree are unchanged.");
+            throw new GitConflictException(
+                $"Cherry-pick of {GitSha.Short(sha)} produced conflicts and was aborted - " +
+                "history and working tree are unchanged.",
+                repositoryHalted: false);
         }
 
         _context.RaiseHeadChanged();
@@ -267,9 +268,10 @@ internal sealed class LibGit2HistoryRewriteOperations
             if (originalHead != null)
                 repo.Reset(ResetMode.Hard, originalHead);
             CleanupSequencerState(repo);
-            throw new InvalidOperationException(
-                $"Revert of {sha[..Math.Min(7, sha.Length)]} produced conflicts and was aborted - " +
-                "history and working tree are unchanged.");
+            throw new GitConflictException(
+                $"Revert of {GitSha.Short(sha)} produced conflicts and was aborted - " +
+                "history and working tree are unchanged.",
+                repositoryHalted: false);
         }
 
         if (result.Status == RevertStatus.NothingToRevert)
@@ -851,6 +853,5 @@ internal sealed class LibGit2HistoryRewriteOperations
     private static string NormalizeRepoPath(string path) =>
         path.Replace('\\', '/').Trim('/');
 
-    private static string ShortSha(string sha) =>
-        sha.Length >= 7 ? sha[..7] : sha;
+    private static string ShortSha(string sha) => GitSha.Short(sha);
 }
