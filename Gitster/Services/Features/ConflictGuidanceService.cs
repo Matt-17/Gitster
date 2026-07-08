@@ -21,8 +21,9 @@ public sealed record ConflictGuidance(
 public static class ConflictGuidanceService
 {
     public static bool LooksLikeConflict(Exception ex) =>
-        ex.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase)
-        || ex.Message.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase);
+        ex is GitConflictException
+        // Message heuristic remains as fallback for CLI-origin errors (raw git output).
+        || ex.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase);
 
     public static async Task<ConflictGuidance> BuildAsync(
         IGitBackend git,
@@ -30,7 +31,9 @@ public static class ConflictGuidanceService
         Exception ex)
     {
         var files = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        var repositoryHalted = !MessageSaysRestored(ex.Message);
+        var repositoryHalted = ex is GitConflictException typed
+            ? typed.RepositoryHalted
+            : !MessageSaysRestored(ex.Message);
 
         try
         {

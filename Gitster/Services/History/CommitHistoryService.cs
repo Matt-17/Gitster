@@ -201,7 +201,9 @@ public sealed class CommitHistoryService
         int offset = 0,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
-        await EnsureCompleteAsync(progress, ct, target);
+        // Ensure-only: the search itself filters in SQL, so don't materialize
+        // the full cached table here just to discard it.
+        await EnsureCompleteCoreAsync(progress, ct, target, materialize: false);
 
         await _gate.WaitAsync(ct);
         try
@@ -228,10 +230,17 @@ public sealed class CommitHistoryService
         IProgress<RepositoryLoadProgress>? progress,
         CancellationToken ct,
         HistoryTarget target)
+        => (await EnsureCompleteCoreAsync(progress, ct, target, materialize: true))!;
+
+    private async Task<IReadOnlyList<CommitHistoryRow>?> EnsureCompleteCoreAsync(
+        IProgress<RepositoryLoadProgress>? progress,
+        CancellationToken ct,
+        HistoryTarget target,
+        bool materialize)
     {
         await EnsureContextAsync(target, ct);
 
-        return await Task.Run(() =>
+        return await Task.Run<IReadOnlyList<CommitHistoryRow>?>(() =>
         {
             _gate.Wait(ct);
             try
@@ -241,6 +250,14 @@ public sealed class CommitHistoryService
                 var state = GetBranchState(conn, context);
                 if (state?.IsComplete == true)
                 {
+                    if (!materialize)
+                    {
+                        progress?.Report(new RepositoryLoadProgress(
+                            "Loading history",
+                            "History cache is ready."));
+                        return null;
+                    }
+
                     var cachedRows = ReadRows(conn, context, 0, int.MaxValue);
                     progress?.Report(new RepositoryLoadProgress(
                         "Loading history",
@@ -673,7 +690,7 @@ public sealed class CommitHistoryService
         IReadOnlyDictionary<string, IReadOnlyList<CommitRefLabel>> refLabels) => new(
         sequence,
         commit.Id.Sha,
-        commit.Id.Sha.Length >= 7 ? commit.Id.Sha[..7] : commit.Id.Sha,
+        GitSha.Short(commit.Id.Sha),
         commit.MessageShort,
         commit.Author.When.DateTime,
         commit.Author.Name ?? string.Empty,
@@ -1087,8 +1104,7 @@ public sealed class CommitHistoryService
         _ => 3,
     };
 
-    private static string Short(string sha) =>
-        sha.Length >= 7 ? sha[..7] : sha;
+    private static string Short(string sha) => GitSha.Short(sha);
 
     private void EnsureDatabase()
     {

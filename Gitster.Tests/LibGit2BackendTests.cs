@@ -214,7 +214,7 @@ public sealed class LibGit2BackendTests
         var backend = new LibGit2Backend();
         await backend.OpenAsync(repo.Path);
 
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+        await Assert.ThrowsExceptionAsync<GitConflictException>(
             () => backend.CherryPickAsync(sideSha));
 
         Assert.AreEqual(headBefore, repo.Head(), "HEAD must be unchanged after an aborted cherry-pick");
@@ -306,7 +306,7 @@ public sealed class LibGit2BackendTests
         var backend = new LibGit2Backend();
         await backend.OpenAsync(repo.Path);
 
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+        await Assert.ThrowsExceptionAsync<GitConflictException>(
             () => backend.RevertCommitAsync(second));
 
         Assert.AreEqual(headBefore, repo.Head());

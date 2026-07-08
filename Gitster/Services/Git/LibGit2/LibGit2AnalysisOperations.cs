@@ -94,7 +94,7 @@ internal sealed class LibGit2AnalysisOperations
         return Task.FromResult(new CompareResult(commits, diff, explanation));
 
         static CommitInfo ToInfo(Commit c) => new(
-            c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha,
+            GitSha.Short(c.Id.Sha),
             c.MessageShort,
             c.Author.When.DateTime,
             c.Author.Name ?? string.Empty,

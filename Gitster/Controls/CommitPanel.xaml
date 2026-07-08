@@ -178,10 +178,10 @@
                     <Button Grid.Column="0" Style="{StaticResource PrimaryButton}" MinWidth="120"
                             Content="Commit" Command="{Binding CommitCommand}"/>
                     <ToggleButton x:Name="CommitMore" Grid.Column="1" Margin="3,0,0,0" Width="26"
-                                  Background="{DynamicResource AccentBlue}" Foreground="White" BorderThickness="0"
+                                  Background="{DynamicResource AccentBlue}" Foreground="{DynamicResource TextOnAccent}" BorderThickness="0"
                                   ToolTip="More commit actions"
                                   AutomationProperties.Name="More commit actions">
-                        <Path Width="8" Height="5" Data="M0,0 L4,4 L8,0" Stroke="White" StrokeThickness="1.5"
+                        <Path Width="8" Height="5" Data="M0,0 L4,4 L8,0" Stroke="{DynamicResource TextOnAccent}" StrokeThickness="1.5"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Fill="Transparent"/>
                     </ToggleButton>
                     <Popup IsOpen="{Binding IsChecked, ElementName=CommitMore}" PlacementTarget="{Binding ElementName=CommitMore}"

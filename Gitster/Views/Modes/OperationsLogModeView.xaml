@@ -9,12 +9,6 @@
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
-    <UserControl.Resources>
-        <conv:RelativeTimeConverter x:Key="RelativeTime"/>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <conv:InverseBoolVisibilityConverter x:Key="InverseBoolToVis"/>
-    </UserControl.Resources>
-
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -62,7 +56,7 @@
                     <GridViewColumn Header="When" Width="100">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelativeTime}}"
+                                <TextBlock Text="{Binding Timestamp, Converter={StaticResource RelativeTimeConverter}}"
                                            FontSize="12"
                                            Foreground="{DynamicResource TextPrimary}"
                                            ToolTip="{Binding Timestamp}"/>
@@ -108,9 +102,9 @@
                             <DataTemplate>
                                 <TextBlock FontSize="11" FontFamily="{DynamicResource FontFamilyMono}"
                                            Foreground="{DynamicResource TextSecondary}">
-                                    <Run Text="{Binding BeforeSha, Mode=OneWay}"/>
+                                    <Run Text="{Binding BeforeShaShort, Mode=OneWay}"/>
                                     <Run Text=" → "/>
-                                    <Run Text="{Binding AfterSha, Mode=OneWay}"/>
+                                    <Run Text="{Binding AfterShaShort, Mode=OneWay}"/>
                                 </TextBlock>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -147,7 +141,7 @@
             <controls:EmptyStateControl Icon="U"
                                         Title="No operations yet"
                                         Message="Undoable history operations will appear here after you amend, rewrite, stash, merge, or restore."
-                                        Visibility="{Binding HasItems, ElementName=RecordList, Converter={StaticResource InverseBoolToVis}}"/>
+                                        Visibility="{Binding HasItems, ElementName=RecordList, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>

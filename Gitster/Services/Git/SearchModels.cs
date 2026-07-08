@@ -10,7 +10,7 @@ public sealed record BlameLine(
     DateTimeOffset Date,
     string Content)
 {
-    public string ShortSha => Sha.Length >= 7 ? Sha[..7] : Sha;
+    public string ShortSha => GitSha.Short(Sha);
     public string DateText => Date.ToLocalTime().ToString("dd.MM.yyyy");
 }
 

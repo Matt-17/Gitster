@@ -91,8 +91,11 @@ public sealed class BranchesViewModelTests
         Assert.AreEqual(OperationKind.Merge, record.Kind);
         Assert.AreEqual("Stitch history from old/history", record.Description);
         Assert.AreEqual("main", record.BranchName);
-        Assert.AreEqual("1111111", record.BeforeSha);
-        Assert.AreEqual("3333333", record.AfterSha);
+        // Records store full SHAs; truncation is display-only (BeforeShaShort/AfterShaShort).
+        Assert.AreEqual(beforeSha, record.BeforeSha);
+        Assert.AreEqual(mergeSha, record.AfterSha);
+        Assert.AreEqual("1111111", record.BeforeShaShort);
+        Assert.AreEqual("3333333", record.AfterShaShort);
     }
 
     private static BranchListItem Branch(string name, string sha, bool isCurrent) =>

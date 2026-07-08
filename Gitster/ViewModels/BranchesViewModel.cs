@@ -31,7 +31,7 @@ public sealed class BranchRow
     public string  TipMessage  => Info.TipMessage;
     public DateTimeOffset LastActivity => Info.LastActivity;
     public DateTime LastActivityLocal => Info.LastActivity.LocalDateTime;
-    public string  ShortSha    => Info.TipSha.Length >= 7 ? Info.TipSha[..7] : Info.TipSha;
+    public string  ShortSha    => GitSha.Short(Info.TipSha);
     public string? UpstreamName => Info.UpstreamName;
 
     public string  GroupLabel  => Info.IsRemote ? "Remote" : "Local";
@@ -555,17 +555,14 @@ public partial class BranchesViewModel : BaseViewModel
 
             if (result.Outcome != BranchMergeOutcome.UpToDate)
             {
-                var before7 = ShortSha(beforeSha);
-                var after7 = ShortSha(result.HeadSha);
-
                 await _opsLog.RecordAsync(new OperationRecord(
                     Id:             Guid.NewGuid().ToString(),
                     Timestamp:      DateTimeOffset.Now,
                     Kind:           OperationKind.Merge,
                     Description:    $"Merge {row.Name} ({DescribeStrategy(dialog.SelectedStrategy)})",
                     BranchName:     result.TargetBranch,
-                    BeforeSha:      before7,
-                    AfterSha:       after7,
+                    BeforeSha:      beforeSha,
+                    AfterSha:       result.HeadSha,
                     ReflogSelector: null,
                     Status:         OperationStatus.Active));
             }
@@ -578,15 +575,13 @@ public partial class BranchesViewModel : BaseViewModel
                 "You have uncommitted changes that would be overwritten by this merge.",
                 "Merge failed");
         }
+        catch (GitConflictException ex)
+        {
+            await AfterChangeAsync();
+            await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Merge", ex);
+        }
         catch (Exception ex)
         {
-            if (ex.Message.Contains("produced conflicts", StringComparison.OrdinalIgnoreCase))
-            {
-                await AfterChangeAsync();
-                await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Merge", ex);
-                return;
-            }
-
             _windowService.Warning(ex.Message, "Merge failed");
         }
     }
@@ -630,8 +625,8 @@ public partial class BranchesViewModel : BaseViewModel
                 Kind:           OperationKind.Merge,
                 Description:    $"Stitch history from {result.SourceRef}",
                 BranchName:     result.TargetBranch,
-                BeforeSha:      ShortSha(beforeSha),
-                AfterSha:       ShortSha(result.MergeCommitSha),
+                BeforeSha:      beforeSha,
+                AfterSha:       result.MergeCommitSha,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -751,8 +746,7 @@ public partial class BranchesViewModel : BaseViewModel
         await _onChanged();
     }
 
-    private static string ShortSha(string sha) =>
-        sha.Length >= 7 ? sha[..7] : sha;
+    private static string ShortSha(string sha) => GitSha.Short(sha);
 
     private static string DescribeStrategy(BranchMergeStrategy strategy) => strategy switch
     {

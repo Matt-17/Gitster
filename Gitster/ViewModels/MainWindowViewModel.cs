@@ -522,7 +522,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private bool CanArchiveHead() => IsGoButtonEnabled;
 
     [RelayCommand]
-    private void SwitchBranch() { }
+    private void SwitchBranch() => SidebarVM.CurrentMode = AppMode.Branches;
 
     [RelayCommand]
     private void SetTheme(ThemePreference preference)
@@ -667,8 +667,6 @@ public partial class MainWindowViewModel : BaseViewModel
                 var afterSha = await _gitBackend.GetHeadShaAsync();
                 var branchName = TitleBarVM.CurrentBranch;
                 var n = vm.Preview.Count;
-                var shortBefore = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-                var shortAfter  = afterSha.Length  >= 7 ? afterSha[..7]  : afterSha;
 
                 await _opsLogService.RecordAsync(new OperationRecord(
                     Id: Guid.NewGuid().ToString(),
@@ -676,8 +674,8 @@ public partial class MainWindowViewModel : BaseViewModel
                     Kind: OperationKind.RangeRewrite,
                     Description: $"Rewrite timestamps ({n} commit{(n == 1 ? "" : "s")})",
                     BranchName: branchName,
-                    BeforeSha: shortBefore,
-                    AfterSha: shortAfter,
+                    BeforeSha: beforeSha,
+                    AfterSha: afterSha,
                     ReflogSelector: null,
                     Status: OperationStatus.Active));
 
@@ -715,9 +713,6 @@ public partial class MainWindowViewModel : BaseViewModel
         if (outcome == CustomToolRunOutcome.RepositoryMayHaveChanged)
             await UpdateElementsAsync();
     }
-
-    [RelayCommand]
-    private void OpenDocs() { }
 
     [RelayCommand]
     private void OpenShortcuts()
@@ -761,7 +756,14 @@ public partial class MainWindowViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void OpenAbout() { }
+    private void OpenAbout()
+    {
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        var versionText = version is null ? "unknown version" : $"Version {version.ToString(3)}";
+        _windowService.Info(
+            $"Gitster — surgical Git history and metadata operations.\n\n{versionText}",
+            "About Gitster");
+    }
 
     [RelayCommand]
     private async Task CheckForUpdates()
@@ -893,7 +895,7 @@ public partial class MainWindowViewModel : BaseViewModel
                             CommitterEmail: committerEmail)));
                     }
 
-                    var rewriteDate = BuildRewriteDate(editDate.Value, selected.Date);
+                    var rewriteDate = RewriteDate.Build(editDate.Value, selected.Date);
                     var rewrite = new CommitRewrite(
                         selected.FullSha,
                         NewAuthorName: authorName,
@@ -906,23 +908,20 @@ public partial class MainWindowViewModel : BaseViewModel
                     await Task.Run(() => _gitBackend.RewriteCommitsAsync([rewrite], branchName));
                     return await _gitBackend.GetHeadShaAsync();
                 },
-                sha => sha.Length > 7 ? sha[..7] : sha);
+                GitSha.Short);
 
             var reflogSelector = await _gitBackend.GetReflogSelectorForHeadAsync();
-
-            var shortBefore = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-            var shortAfter = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
 
             await _opsLogService.RecordAsync(new OperationRecord(
                 Id: Guid.NewGuid().ToString(),
                 Timestamp: DateTimeOffset.Now,
                 Kind: OperationKind.Amend,
                 Description: isHead
-                    ? $"Amend {shortAfter}"
-                    : $"Amend selected {(selected.CommitId.Length > 0 ? selected.CommitId : selected.FullSha[..Math.Min(7, selected.FullSha.Length)])}",
+                    ? $"Amend {GitSha.Short(afterSha)}"
+                    : $"Amend selected {(selected.CommitId.Length > 0 ? selected.CommitId : GitSha.Short(selected.FullSha))}",
                 BranchName: branchName,
-                BeforeSha: shortBefore,
-                AfterSha: shortAfter,
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
 
@@ -937,18 +936,6 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
-    private static DateTimeOffset BuildRewriteDate(DateTime newDate, DateTime originalDate)
-    {
-        var offset = DateTimeOffset.Now.Offset;
-        return new DateTimeOffset(
-            newDate.Year,
-            newDate.Month,
-            newDate.Day,
-            newDate.Hour,
-            newDate.Minute,
-            originalDate.Second,
-            offset);
-    }
 
     private async Task RemoveChangeFromCommitAsync(DiffFileEntry? file)
     {
@@ -1010,8 +997,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 Kind: OperationKind.HistoryEdit,
                 Description: $"Remove {file.Path} from {commitSha}",
                 BranchName: branchName,
-                BeforeSha: ShortSha(beforeSha),
-                AfterSha: ShortSha(afterSha),
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
 
@@ -1067,8 +1054,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 Kind: OperationKind.Fixup,
                 Description: $"Fixup {sourceShort} into {targetShort}",
                 BranchName: branch,
-                BeforeSha: ShortSha(beforeSha),
-                AfterSha: ShortSha(afterSha),
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: null,
                 Status: OperationStatus.Active));
 
@@ -1375,8 +1362,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 Kind: OperationKind.Revert,
                 Description: $"Revert {shortSha}",
                 BranchName: branchName,
-                BeforeSha: ShortSha(beforeSha),
-                AfterSha: ShortSha(afterSha),
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
 
@@ -1414,8 +1401,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 Kind: OperationKind.CherryPick,
                 Description: $"Cherry-pick {shortSha}",
                 BranchName: branchName,
-                BeforeSha: ShortSha(beforeSha),
-                AfterSha: ShortSha(afterSha),
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: null,
                 Status: OperationStatus.Active));
 
@@ -1514,8 +1501,8 @@ public partial class MainWindowViewModel : BaseViewModel
                 Kind: OperationKind.Reset,
                 Description: $"Reset {mode} to {shortTarget}",
                 BranchName: branchName,
-                BeforeSha: ShortSha(beforeSha),
-                AfterSha: ShortSha(afterSha),
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
 
@@ -1540,8 +1527,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
     }
 
-    private static string ShortSha(string sha) =>
-        sha.Length >= 7 ? sha[..7] : sha;
+    private static string ShortSha(string sha) => GitSha.Short(sha);
 
     [RelayCommand]
     private void ReadSelectedCommitTime()
@@ -1822,9 +1808,7 @@ public partial class MainWindowViewModel : BaseViewModel
         CancellationToken ct,
         IProgress<RepositoryLoadProgress> progress)
     {
-        await _headRefresh.RunExclusiveAsync(
-            token => UpdateElementsAsync(token, progress),
-            ct);
+        await UpdateElementsAsync(ct, progress);
     }
 
     private async Task RefreshStateAfterActivationWithDialogAsync()
@@ -1857,8 +1841,18 @@ public partial class MainWindowViewModel : BaseViewModel
             await refreshTask;
     }
 
+    /// <summary>
+    /// Full reload, serialized with queued HEAD refreshes through the coordinator gate
+    /// so a manual/remote-op reload can never interleave with a HEAD-change refresh.
+    /// </summary>
     public async Task UpdateElementsAsync(
         CancellationToken ct = default,
+        IProgress<RepositoryLoadProgress>? progress = null)
+        => await _headRefresh.RunExclusiveAsync(token => UpdateElementsUngatedAsync(token, progress), ct);
+
+    /// <summary>Reload body for callers that already hold the coordinator gate.</summary>
+    private async Task UpdateElementsUngatedAsync(
+        CancellationToken ct,
         IProgress<RepositoryLoadProgress>? progress = null)
     {
         try
@@ -1911,7 +1905,8 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch
         {
-            await UpdateElementsAsync(ct);
+            // Already running under the coordinator gate — must not re-acquire it.
+            await UpdateElementsUngatedAsync(ct);
         }
     }
 

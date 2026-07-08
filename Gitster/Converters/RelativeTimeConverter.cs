@@ -15,7 +15,8 @@ public class RelativeTimeConverter : IValueConverter
         if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes}m ago";
         if (elapsed.TotalHours < 24) return $"{(int)elapsed.TotalHours}h ago";
         if (elapsed.TotalDays < 7) return $"{(int)elapsed.TotalDays}d ago";
-        return dt.ToString("dd.MM.yyyy", culture);
+        // Same absolute format as RelativeDateConverter.Absolute, minus the time part.
+        return dt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

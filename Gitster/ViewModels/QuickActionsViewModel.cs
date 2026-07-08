@@ -111,17 +111,15 @@ public partial class QuickActionsViewModel : BaseViewModel
 
             var afterSha = await _git.GetHeadShaAsync();
             var branch   = (await _git.GetCurrentBranchAsync()).Name;
-            var short7b  = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-            var short7a  = afterSha.Length  >= 7 ? afterSha[..7]  : afterSha;
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
                 Timestamp:      DateTimeOffset.Now,
                 Kind:           OperationKind.Reword,
-                Description:    $"Reword {short7b}",
+                Description:    $"Reword {GitSha.Short(beforeSha)}",
                 BranchName:     branch,
-                BeforeSha:      short7b,
-                AfterSha:       short7a,
+                BeforeSha:      beforeSha,
+                AfterSha:       afterSha,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -165,9 +163,7 @@ public partial class QuickActionsViewModel : BaseViewModel
 
             var afterSha = await _git.GetHeadShaAsync();
             var branch   = (await _git.GetCurrentBranchAsync()).Name;
-            var target7  = commit.FullSha.Length >= 7 ? commit.FullSha[..7] : commit.FullSha;
-            var short7b  = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-            var short7a  = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
+            var target7  = GitSha.Short(commit.FullSha);
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
@@ -175,8 +171,8 @@ public partial class QuickActionsViewModel : BaseViewModel
                 Kind:           OperationKind.Fixup,
                 Description:    $"Fixup into {target7}",
                 BranchName:     branch,
-                BeforeSha:      short7b,
-                AfterSha:       short7a,
+                BeforeSha:      beforeSha,
+                AfterSha:       afterSha,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -240,8 +236,6 @@ public partial class QuickActionsViewModel : BaseViewModel
 
             var afterSha  = await _git.GetHeadShaAsync();
             var branch    = (await _git.GetCurrentBranchAsync()).Name;
-            var short7b   = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-            var short7a   = afterSha.Length  >= 7 ? afterSha[..7]  : afterSha;
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
@@ -249,8 +243,8 @@ public partial class QuickActionsViewModel : BaseViewModel
                 Kind:           OperationKind.Squash,
                 Description:    $"Squash {commits.Count} commits",
                 BranchName:     branch,
-                BeforeSha:      short7b,
-                AfterSha:       short7a,
+                BeforeSha:      beforeSha,
+                AfterSha:       afterSha,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -307,10 +301,8 @@ public partial class QuickActionsViewModel : BaseViewModel
 
             var afterSha = await _git.GetHeadShaAsync();
             var branch   = (await _git.GetCurrentBranchAsync()).Name;
-            var source7  = dlg.SelectedSha.Length >= 7 ? dlg.SelectedSha[..7] : dlg.SelectedSha;
             // BeforeSha is the pre-op HEAD (undo target), not the cherry-picked source.
-            var short7b  = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-            var short7a  = afterSha.Length >= 7 ? afterSha[..7] : afterSha;
+            var source7  = GitSha.Short(dlg.SelectedSha);
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
@@ -318,8 +310,8 @@ public partial class QuickActionsViewModel : BaseViewModel
                 Kind:           dlg.OverrideDate.HasValue ? OperationKind.CherryPickTimestamp : OperationKind.CherryPick,
                 Description:    $"Cherry-pick {source7}",
                 BranchName:     branch,
-                BeforeSha:      short7b,
-                AfterSha:       short7a,
+                BeforeSha:      beforeSha,
+                AfterSha:       afterSha,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -377,14 +369,12 @@ public partial class QuickActionsViewModel : BaseViewModel
                 () => _git.CommitToBranchAsync(new CommitToBranchRequest(
                     dlg.TargetBranch, dlg.Message, dlg.AuthorName, dlg.AuthorEmail,
                     dlg.IncludeUnstaged, dlg.RemoveFromCurrent)),
-                sha => sha.Length > 7 ? sha[..7] : sha);
+                GitSha.Short);
 
             // The current branch HEAD does not move; record for the audit log with the
             // current HEAD as before/after (the snapshot above is the recovery net).
             var afterHead = await _git.GetHeadShaAsync();
-            var short7b   = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
-            var short7a   = afterHead.Length >= 7 ? afterHead[..7] : afterHead;
-            var target7   = newSha.Length >= 7 ? newSha[..7] : newSha;
+            var target7   = GitSha.Short(newSha);
 
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
@@ -392,8 +382,8 @@ public partial class QuickActionsViewModel : BaseViewModel
                 Kind:           OperationKind.CommitOnBranch,
                 Description:    $"Commit {target7} to {dlg.TargetBranch}",
                 BranchName:     current,
-                BeforeSha:      short7b,
-                AfterSha:       short7a,
+                BeforeSha:      beforeSha,
+                AfterSha:       afterHead,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -422,15 +412,14 @@ public partial class QuickActionsViewModel : BaseViewModel
                 () => _git.CreateSnapshotBranchAsync(dlg.BranchName, dlg.IncludeUncommitted),
                 name => name);
 
-            var short7 = beforeSha.Length >= 7 ? beforeSha[..7] : beforeSha;
             await _opsLog.RecordAsync(new OperationRecord(
                 Id:             Guid.NewGuid().ToString(),
                 Timestamp:      DateTimeOffset.Now,
                 Kind:           OperationKind.Snapshot,
                 Description:    $"Snapshot → branch '{created}'",
                 BranchName:     (await _git.GetCurrentBranchAsync()).Name,
-                BeforeSha:      short7,
-                AfterSha:       short7,
+                BeforeSha:      beforeSha,
+                AfterSha:       beforeSha,
                 ReflogSelector: null,
                 Status:         OperationStatus.Active));
 
@@ -464,12 +453,6 @@ public partial class QuickActionsViewModel : BaseViewModel
         SquashSelectedCommand.NotifyCanExecuteChanged();
         ArchiveSelectedCommitCommand.NotifyCanExecuteChanged();
     }
-
-    // ── Change Author ─────────────────────────────────────────────────────
-
-    [RelayCommand(CanExecute = nameof(CanChangeAuthor))]
-    private void ChangeAuthor() { }
-    private static bool CanChangeAuthor() => false;
 
     // ── Helpers ────────────────────────────────────────────────────────────
 

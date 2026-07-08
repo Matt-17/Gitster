@@ -277,7 +277,6 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             var rewritePlan = BuildRewritePlan();
             var selectedOriginalSha = SelectedCommit?.FullSha;
             var beforeSha = await _git.GetHeadShaAsync();
-            var shortBefore = ShortSha(beforeSha);
             var branchName = _getBranchName?.Invoke() ?? string.Empty;
             var directCount = DirectEditCount;
             var transitiveCount = TransitiveRewriteCount;
@@ -318,8 +317,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                     ? $"Batch history edit ({directCount} edit{Plural(directCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)}, force-with-lease required)"
                     : $"Batch history edit ({directCount} edit{Plural(directCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)})",
                 BranchName: branchName,
-                BeforeSha: shortBefore,
-                AfterSha: ShortSha(afterSha),
+                BeforeSha: beforeSha,
+                AfterSha: afterSha,
                 ReflogSelector: reflogSelector,
                 Status: OperationStatus.Active));
 
@@ -812,21 +811,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         && left.Value.Hour == right.Hour
         && left.Value.Minute == right.Minute;
 
-    private static DateTimeOffset BuildRewriteDate(DateTime newDate, DateTime originalDate)
-    {
-        var offset = DateTimeOffset.Now.Offset;
-        return new DateTimeOffset(
-            newDate.Year,
-            newDate.Month,
-            newDate.Day,
-            newDate.Hour,
-            newDate.Minute,
-            originalDate.Second,
-            offset);
-    }
-
-    private static string ShortSha(string sha)
-        => sha.Length >= 7 ? sha[..7] : sha;
+    private static string ShortSha(string sha) => GitSha.Short(sha);
 
     private static string Plural(int count)
         => count == 1 ? string.Empty : "s";
@@ -919,7 +904,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             DateTimeOffset? newCommitterDate = null;
             if (HasTimeChange && NewAuthorDate.HasValue)
             {
-                newAuthorDate = BuildRewriteDate(NewAuthorDate.Value, OriginalAuthorDate);
+                newAuthorDate = RewriteDate.Build(NewAuthorDate.Value, OriginalAuthorDate);
                 if (UpdateCommitterTimestamp)
                     newCommitterDate = newAuthorDate;
             }

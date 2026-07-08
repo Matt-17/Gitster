@@ -1,7 +1,7 @@
 <Window x:Class="Gitster.Views.CommitDetailsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Commit Details"
+        Title="Commit details"
         SizeToContent="WidthAndHeight"
         MinWidth="520"
         WindowStartupLocation="CenterOwner"
@@ -46,8 +46,8 @@
                  VerticalScrollBarVisibility="Auto"/>
 
         <Button Grid.Row="8" Grid.Column="1"
-                Content="Close"
-                Width="88"
+                Content="Cl_ose"
+                Style="{StaticResource DialogButton}"
                 HorizontalAlignment="Right"
                 IsDefault="True"
                 IsCancel="True"

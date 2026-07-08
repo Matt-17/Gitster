@@ -10,17 +10,12 @@
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
 
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolVis"/>
-        <converters:InverseBoolVisibilityConverter x:Key="InverseBoolVis"/>
-    </UserControl.Resources>
-
     <Grid DataContext="{Binding WorktreesVM}"
           d:DataContext="{d:DesignInstance Type=vm:WorktreesViewModel}">
 
         <!-- "Requires Git CLI" state -->
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7"
-                    Visibility="{Binding IsCliAvailable, Converter={StaticResource InverseBoolVis}}">
+                    Visibility="{Binding IsCliAvailable, Converter={StaticResource InverseBoolVisibilityConverter}}">
             <TextBlock Text="Worktrees require the Git command-line tool"
                        FontSize="15" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center"/>
             <TextBlock Text="Install Git for Windows and restart Gitster to use worktrees."
@@ -29,7 +24,7 @@
         </StackPanel>
 
         <!-- Main layout (CLI available) -->
-        <Grid Visibility="{Binding IsCliAvailable, Converter={StaticResource BoolVis}}">
+        <Grid Visibility="{Binding IsCliAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="380"/>
                 <ColumnDefinition Width="4"/>
@@ -65,13 +60,13 @@
                                             Message="Create another checkout of this repository for parallel branch work."
                                             ActionText="Add worktree"
                                             ActionCommand="{Binding AddCommand}"
-                                            Visibility="{Binding HasWorktrees, Converter={StaticResource InverseBoolVis}}"/>
+                                            Visibility="{Binding HasWorktrees, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
 
                 <ListView Grid.Row="1"
                           ItemsSource="{Binding Worktrees}"
                           SelectedItem="{Binding SelectedWorktree}"
                           Background="Transparent" BorderThickness="0"
-                          Visibility="{Binding HasWorktrees, Converter={StaticResource BoolVis}}"
+                          Visibility="{Binding HasWorktrees, Converter={StaticResource BooleanToVisibilityConverter}}"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
@@ -91,7 +86,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="6" Height="6" Margin="0,0,6,0" VerticalAlignment="Center"
                                                  Fill="{DynamicResource AccentBlue}"
-                                                 Visibility="{Binding IsCurrent, Converter={StaticResource BoolVis}}"/>
+                                                 Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                         <TextBlock Text="{Binding BranchName}" FontSize="13"
                                                    Foreground="{DynamicResource TextPrimary}"
                                                    TextTrimming="CharacterEllipsis"/>
@@ -105,17 +100,17 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border CornerRadius="3" Padding="5,1" Margin="3,0,0,0"
                                             Background="{DynamicResource AccentInfoBackground}"
-                                            Visibility="{Binding IsMain, Converter={StaticResource BoolVis}}">
+                                            Visibility="{Binding IsMain, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <TextBlock Text="main" FontSize="10" Foreground="{DynamicResource AccentBlue}"/>
                                     </Border>
                                     <Border CornerRadius="3" Padding="5,1" Margin="3,0,0,0"
                                             Background="{DynamicResource AccentWarningBackground}"
-                                            Visibility="{Binding IsLocked, Converter={StaticResource BoolVis}}">
+                                            Visibility="{Binding IsLocked, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <TextBlock Text="locked" FontSize="10" Foreground="{DynamicResource AccentWarning}"/>
                                     </Border>
                                     <Border CornerRadius="3" Padding="5,1" Margin="3,0,0,0"
                                             Background="{DynamicResource AccentDangerBackground}"
-                                            Visibility="{Binding IsPrunable, Converter={StaticResource BoolVis}}">
+                                            Visibility="{Binding IsPrunable, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <TextBlock Text="missing" FontSize="10" Foreground="{DynamicResource AccentDanger}"/>
                                     </Border>
                                 </StackPanel>
@@ -138,9 +133,9 @@
                     <TextBlock Text="Select a worktree"
                                FontSize="13" Foreground="{DynamicResource TextTertiary}"
                                HorizontalAlignment="Center" Margin="0,40,0,0"
-                               Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVis}}"/>
+                               Visibility="{Binding HasSelection, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
 
-                    <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolVis}}">
+                    <StackPanel Visibility="{Binding HasSelection, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Border Style="{StaticResource PanelCard}" Margin="0,0,0,8">
                             <StackPanel>
                                 <TextBlock Text="{Binding SelectedWorktree.BranchName}"

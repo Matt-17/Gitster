@@ -174,16 +174,14 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Cancel"
-                    Style="{DynamicResource GhostButton}"
-                    Width="90"
+            <Button Content="_Cancel"
+                    Style="{DynamicResource DialogButton}"
                     Margin="0,0,8,0"
                     IsCancel="True"
                     Click="Cancel_Click"/>
             <Button x:Name="StitchButton"
-                    Content="Stitch history"
-                    Style="{DynamicResource PrimaryButton}"
-                    Width="120"
+                    Content="_Stitch history"
+                    Style="{DynamicResource DialogPrimaryButton}"
                     IsDefault="True"
                     Click="Ok_Click"/>
         </StackPanel>

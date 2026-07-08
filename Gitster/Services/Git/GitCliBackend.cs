@@ -43,7 +43,7 @@ public sealed class GitCliBackend : IGitBackend
         EnsureCli();
         await EnsureNotShallowRepositoryAsync("fix up commits");
 
-        var sha7 = targetSha.Length >= 7 ? targetSha[..7] : targetSha;
+        var sha7 = GitSha.Short(targetSha);
 
         // Capture the real pre-operation HEAD so we can always get back to it.
         var originalHead = await GetHeadAsync();
@@ -153,7 +153,7 @@ public sealed class GitCliBackend : IGitBackend
         EnsureCli();
         await EnsureNotShallowRepositoryAsync("reword commits");
 
-        var sha7 = sha.Length >= 7 ? sha[..7] : sha;
+        var sha7 = GitSha.Short(sha);
 
         var originalHead = await GetHeadAsync();
 
@@ -238,7 +238,7 @@ public sealed class GitCliBackend : IGitBackend
             var replaces = new System.Text.StringBuilder();
             for (int i = 1; i < orderedOldestFirst.Count; i++)
             {
-                var s7 = orderedOldestFirst[i].Length >= 7 ? orderedOldestFirst[i][..7] : orderedOldestFirst[i];
+                var s7 = GitSha.Short(orderedOldestFirst[i]);
                 replaces.Append($"$c = $c -replace 'pick {s7}', 'squash {s7}'; ");
             }
             var seqScript =
@@ -298,8 +298,13 @@ public sealed class GitCliBackend : IGitBackend
     public async Task<IReadOnlyList<CommitInfo>> PickaxeSearchAsync(string term, string? path, CancellationToken ct = default)
     {
         EnsurePath(); EnsureCli();
-        var pathArg = string.IsNullOrWhiteSpace(path) ? string.Empty : $" -- {QuoteArg(path)}";
-        var r = await GitCli.RunAsync(RepositoryPath, $"log -S{QuoteArg(term)} --pretty=format:{LogFormat}{pathArg}", null, ct);
+        var args = new List<string> { "log", $"-S{term}", $"--pretty=format:{LogFormat}" };
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            args.Add("--");
+            args.Add(path);
+        }
+        var r = await GitCli.RunAsync(RepositoryPath, args, null, ct);
         if (!r.Success && string.IsNullOrEmpty(r.Stdout))
             throw new InvalidOperationException($"Pickaxe search failed:\n{r.Output}");
         return ParseLog(r.Stdout);
@@ -308,8 +313,13 @@ public sealed class GitCliBackend : IGitBackend
     public async Task<IReadOnlyList<CommitInfo>> DiffRegexSearchAsync(string pattern, string? path, CancellationToken ct = default)
     {
         EnsurePath(); EnsureCli();
-        var pathArg = string.IsNullOrWhiteSpace(path) ? string.Empty : $" -- {QuoteArg(path)}";
-        var r = await GitCli.RunAsync(RepositoryPath, $"log -G{QuoteArg(pattern)} --pretty=format:{LogFormat}{pathArg}", null, ct);
+        var args = new List<string> { "log", $"-G{pattern}", $"--pretty=format:{LogFormat}" };
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            args.Add("--");
+            args.Add(path);
+        }
+        var r = await GitCli.RunAsync(RepositoryPath, args, null, ct);
         if (!r.Success && string.IsNullOrEmpty(r.Stdout))
             throw new InvalidOperationException($"Diff-regex search failed:\n{r.Output}");
         return ParseLog(r.Stdout);
@@ -318,9 +328,14 @@ public sealed class GitCliBackend : IGitBackend
     public async Task<IReadOnlyList<BlameLine>> BlameAsync(string filePath, bool ignoreWhitespace, bool followMoves, CancellationToken ct = default)
     {
         EnsurePath(); EnsureCli();
-        var ws = ignoreWhitespace ? "-w " : string.Empty;
-        var moves = followMoves ? "-C -C -C " : string.Empty;
-        var r = await GitCli.RunAsync(RepositoryPath, $"blame {ws}{moves}--line-porcelain {QuoteArg(filePath)}", null, ct);
+        var args = new List<string> { "blame" };
+        if (ignoreWhitespace)
+            args.Add("-w");
+        if (followMoves)
+            args.AddRange(["-C", "-C", "-C"]);
+        args.Add("--line-porcelain");
+        args.Add(filePath);
+        var r = await GitCli.RunAsync(RepositoryPath, args, null, ct);
         if (!r.Success)
             throw new InvalidOperationException($"Blame failed:\n{r.Output}");
         return ParseBlamePorcelain(r.Stdout);
@@ -354,7 +369,7 @@ public sealed class GitCliBackend : IGitBackend
             if (p.Length < 5) continue;
             var date = DateTimeOffset.TryParse(p[3], out var dt) ? dt.LocalDateTime : DateTime.MinValue;
             var sha = p[0];
-            result.Add(new CommitInfo(sha.Length >= 7 ? sha[..7] : sha, p[4], date, p[1], p[2], CommitRemoteState.LocalOnly, sha));
+            result.Add(new CommitInfo(GitSha.Short(sha), p[4], date, p[1], p[2], CommitRemoteState.LocalOnly, sha));
         }
         return result;
     }
@@ -425,8 +440,6 @@ public sealed class GitCliBackend : IGitBackend
 
     private static string? NullIfDashes(string s) =>
         s.All(c => c == '-') ? null : s;
-
-    private static string QuoteArg(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
 
     // ── Unsupported pass-through stubs ────────────────────────────────────
     // These are here only to satisfy the interface; HybridGitBackend never
@@ -896,10 +909,9 @@ public sealed class GitCliBackend : IGitBackend
         EnsurePath();
         EnsureCli();
 
-        var quotedPath = Quote(path);
         var args = createBranch
-            ? $"worktree add -b {branchName} {quotedPath}"
-            : $"worktree add {quotedPath} {branchName}";
+            ? new[] { "worktree", "add", "-b", branchName, path }
+            : new[] { "worktree", "add", path, branchName };
 
         var r = await GitCli.RunAsync(RepositoryPath, args);
         if (!r.Success)
@@ -914,8 +926,11 @@ public sealed class GitCliBackend : IGitBackend
         EnsurePath();
         EnsureCli();
 
-        var forceFlag = force ? "--force " : string.Empty;
-        var r = await GitCli.RunAsync(RepositoryPath, $"worktree remove {forceFlag}{Quote(path)}");
+        var args = new List<string> { "worktree", "remove" };
+        if (force)
+            args.Add("--force");
+        args.Add(path);
+        var r = await GitCli.RunAsync(RepositoryPath, args);
         if (!r.Success)
             throw new InvalidOperationException($"Could not remove worktree:\n{r.Output}");
 
@@ -931,8 +946,6 @@ public sealed class GitCliBackend : IGitBackend
         if (!r.Success)
             throw new InvalidOperationException($"Could not prune worktrees:\n{r.Output}");
     }
-
-    private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
 
     // ── Rebase safety helpers ───────────────────────────────────────────────
 
@@ -1051,8 +1064,7 @@ public sealed class GitCliBackend : IGitBackend
             : name;
     }
 
-    private static string ShortSha(string sha) =>
-        sha.Length >= 7 ? sha[..7] : sha;
+    private static string ShortSha(string sha) => GitSha.Short(sha);
 
     private void EnsurePath()
     {

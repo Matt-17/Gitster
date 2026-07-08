@@ -31,16 +31,14 @@
                  Text="{Binding PreviewText}"/>
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Cancel"
-                    MinWidth="86"
+            <Button Content="_Cancel"
                     Margin="0,0,8,0"
                     IsCancel="True"
-                    Style="{StaticResource GhostButton}"/>
-            <Button Content="Append"
-                    MinWidth="86"
+                    Style="{StaticResource DialogButton}"/>
+            <Button Content="_Append"
                     IsDefault="True"
                     Click="Append_Click"
-                    Style="{StaticResource PrimaryButton}"/>
+                    Style="{StaticResource DialogPrimaryButton}"/>
         </StackPanel>
     </Grid>
 </Window>

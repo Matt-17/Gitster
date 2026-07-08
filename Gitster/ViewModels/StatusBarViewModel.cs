@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Models;
 using Gitster.Services;
 using Gitster.Services.Features;
+using Gitster.Services.Git;
 
 namespace Gitster.ViewModels;
 
@@ -218,8 +219,7 @@ public partial class StatusBarViewModel : BaseViewModel
         return path;
     }
 
-    private static string ShortSha(string sha)
-        => string.IsNullOrEmpty(sha) ? string.Empty : sha[..Math.Min(7, sha.Length)];
+    private static string ShortSha(string sha) => GitSha.Short(sha);
 
     private async Task RefreshSubmoduleStatusAsync(string? repoPath)
     {

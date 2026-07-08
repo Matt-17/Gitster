@@ -39,20 +39,27 @@ public partial class CommitPanel : UserControl
     }
 
     private async void Staged_Drop(object sender, DragEventArgs e)
-    {
-        if (DataContext is CommitPanelViewModel vm
-            && e.Data.GetData(typeof(CommitFileViewModel)) is CommitFileViewModel file)
-        {
-            await vm.SetFileStagedAsync(file.Path, staged: true);
-        }
-    }
+        => await DropFileAsync(e, staged: true);
 
     private async void Changes_Drop(object sender, DragEventArgs e)
+        => await DropFileAsync(e, staged: false);
+
+    private async Task DropFileAsync(DragEventArgs e, bool staged)
     {
-        if (DataContext is CommitPanelViewModel vm
-            && e.Data.GetData(typeof(CommitFileViewModel)) is CommitFileViewModel file)
+        if (DataContext is not CommitPanelViewModel vm
+            || e.Data.GetData(typeof(CommitFileViewModel)) is not CommitFileViewModel file)
         {
-            await vm.SetFileStagedAsync(file.Path, staged: false);
+            return;
+        }
+
+        try
+        {
+            await vm.SetFileStagedAsync(file.Path, staged);
+        }
+        catch (Exception ex)
+        {
+            // async void drop handler — an escaping exception would hit the dispatcher.
+            System.Diagnostics.Debug.WriteLine($"Stage/unstage drop failed: {ex}");
         }
     }
 

@@ -177,7 +177,7 @@
                     <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextOnAccent}"/>
                     <Setter Property="FontWeight" Value="SemiBold"/>
                 </DataTrigger>
             </Style.Triggers>

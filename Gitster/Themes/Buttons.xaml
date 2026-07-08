@@ -2,10 +2,10 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ── PrimaryButton ─────────────────────────────────────────── -->
-    <!-- Accent background, white text. Used for "Amend ausführen".  -->
+    <!-- Accent background, theme-aware on-accent text. Used for the primary action. -->
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="Background"  Value="{DynamicResource AccentBlue}"/>
-        <Setter Property="Foreground"  Value="White"/>
+        <Setter Property="Foreground"  Value="{DynamicResource TextOnAccent}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding"     Value="12,6"/>
@@ -22,7 +22,8 @@
                             CornerRadius="{StaticResource CornerRadiusMd}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -42,6 +43,14 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- ── Dialog action buttons ─────────────────────────────────── -->
+    <!-- Standard footer buttons; every dialog's Cancel/primary row uses these
+         so sizes stay uniform across the app. -->
+    <Style x:Key="DialogPrimaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="MinWidth" Value="86"/>
+        <Setter Property="Height"   Value="30"/>
     </Style>
 
     <!-- ── GhostButton ───────────────────────────────────────────── -->
@@ -65,7 +74,8 @@
                             CornerRadius="{StaticResource CornerRadiusMd}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -87,6 +97,12 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Ghost-style dialog footer button (Cancel, secondary actions). -->
+    <Style x:Key="DialogButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="MinWidth" Value="86"/>
+        <Setter Property="Height"   Value="30"/>
     </Style>
 
     <!-- ── IconButton ────────────────────────────────────────────── -->

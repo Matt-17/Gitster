@@ -126,7 +126,7 @@
                 <Grid>
                     <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
                                       VerticalAlignment="Center" HorizontalAlignment="Center"
-                                      TextElement.Foreground="White"/>
+                                      TextElement.Foreground="{DynamicResource TextOnAccent}"/>
                     <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
                            IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
                            Placement="Bottom" VerticalOffset="1" PopupAnimation="Fade">
@@ -181,7 +181,7 @@
             <Setter Property="Height" Value="38"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccent}"/>
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
@@ -337,7 +337,6 @@
                     </MenuItem>
 
                     <MenuItem Header="_Help" Style="{StaticResource ChromeMenuItem}">
-                        <MenuItem Header="Documentation"       Command="{Binding OpenDocsCommand}"/>
                         <MenuItem Header="Keyboard shortcuts"  Command="{Binding OpenShortcutsCommand}"/>
                         <MenuItem Header="Command palette"     Command="{Binding OpenCommandPaletteCommand}" InputGestureText="Ctrl+Shift+P"/>
                         <Separator/>

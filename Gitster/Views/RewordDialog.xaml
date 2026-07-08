@@ -44,17 +44,15 @@
         <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
-            <Button Content="Cancel"
-                    Style="{StaticResource GhostButton}"
+            <Button Content="_Cancel"
+                    Style="{StaticResource DialogButton}"
                     Click="Cancel_Click"
                     IsCancel="True"
-                    Width="80"
                     Margin="0,0,8,0" />
-            <Button Content="Reword"
-                    Style="{StaticResource PrimaryButton}"
+            <Button Content="_Reword"
+                    Style="{StaticResource DialogPrimaryButton}"
                     Click="OK_Click"
-                    IsDefault="True"
-                    Width="80" />
+                    IsDefault="True" />
         </StackPanel>
     </Grid>
 </Window>

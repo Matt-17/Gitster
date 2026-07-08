@@ -52,7 +52,7 @@ public partial class HistoryStitchDialog : Window
     }
 
     private static string ShortSha(string sha) =>
-        string.IsNullOrEmpty(sha) ? "-" : sha[..Math.Min(7, sha.Length)];
+        string.IsNullOrEmpty(sha) ? "-" : GitSha.Short(sha);
 
     private static string QuoteForDisplay(string value) =>
         value.Any(char.IsWhiteSpace)

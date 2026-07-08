@@ -113,7 +113,7 @@ public partial class UndoBarViewModel : BaseViewModel
                     });
 
                     if (!confirm.Accepted)
-                        return new UndoPlan.NotAvailable("Undo canceled.");
+                        return new UndoPlan.Canceled();
 
                     replayOnTop = confirm.Replay;
                 }
@@ -145,7 +145,7 @@ public partial class UndoBarViewModel : BaseViewModel
                 return ready;
             });
 
-            if (plan is UndoPlan.NotAvailable na && na.Reason != "Undo canceled.")
+            if (plan is UndoPlan.NotAvailable na)
                 _windowService.Info(na.Reason, "Cannot undo");
             else if (plan is UndoPlan.Expired exp)
                 _windowService.Info(exp.Reason, "Undo expired");

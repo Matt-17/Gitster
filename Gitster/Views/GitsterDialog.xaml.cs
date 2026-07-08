@@ -70,12 +70,11 @@ public partial class GitsterDialog : Window
         var button = new Button
         {
             Content = text,
-            MinWidth = 82,
             Margin = new Thickness(6, 0, 0, 0),
             IsDefault = isDefault,
             IsCancel = isCancel,
         };
-        button.SetResourceReference(StyleProperty, isDefault ? "PrimaryButton" : "GhostButton");
+        button.SetResourceReference(StyleProperty, isDefault ? "DialogPrimaryButton" : "DialogButton");
         button.Click += (_, _) =>
         {
             _result = result;

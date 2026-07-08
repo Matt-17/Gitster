@@ -356,10 +356,12 @@ internal sealed class LibGit2HistoryReader
         };
         var result = repo.Commits.QueryBy(filter)
             .Select(c => new CommitInfo(
-                c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha,
+                c.Id.Sha,
                 c.MessageShort,
                 c.Author.When.DateTime,
                 c.Author.Name ?? string.Empty,
+                c.Author.Email ?? string.Empty,
+                FullSha: c.Id.Sha,
                 ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()))
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
@@ -506,7 +508,7 @@ internal sealed class LibGit2HistoryReader
         var result = repo.Commits.QueryBy(filter)
             .Take(maxCount)
             .Select(c => new CommitInfo(
-                c.Id.Sha.Length >= 7 ? c.Id.Sha[..7] : c.Id.Sha,
+                GitSha.Short(c.Id.Sha),
                 c.MessageShort,
                 c.Author.When.DateTime,
                 c.Author.Name ?? string.Empty,
