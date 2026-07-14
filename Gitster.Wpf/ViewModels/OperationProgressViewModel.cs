@@ -2,7 +2,7 @@ using System.Windows.Threading;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 namespace Gitster.ViewModels;
 

@@ -5,8 +5,8 @@ using System.Text.Json.Serialization;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Models;
-using Gitster.Services.Git;
+using Gitster.Core.Models;
+using Gitster.Core.Git;
 
 namespace Gitster.Services.OperationsLog;
 

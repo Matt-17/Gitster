@@ -1,4 +1,4 @@
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using LibGit2Sharp;
 
 namespace Gitster.Tests;

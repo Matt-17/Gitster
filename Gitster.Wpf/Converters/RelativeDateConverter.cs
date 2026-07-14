@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-using Gitster.Helpers;
+using Gitster.Core.Common;
 
 namespace Gitster.Converters;
 

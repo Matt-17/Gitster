@@ -35,7 +35,7 @@ public sealed class FeatureServicesTests
             new DateTime(2026, 1, 1),
             "abc1234",
             "Tester",
-            remoteState: Gitster.Services.Git.CommitRemoteState.OnRemote,
+            remoteState: Gitster.Core.Git.CommitRemoteState.OnRemote,
             fullSha: "abc1234-full");
 
         item.SigningStatus = CommitSigningStatus.NoSignature;

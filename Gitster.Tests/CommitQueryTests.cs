@@ -1,4 +1,4 @@
-using Gitster.Services.Search;
+using Gitster.Core.Search;
 
 namespace Gitster.Tests;
 

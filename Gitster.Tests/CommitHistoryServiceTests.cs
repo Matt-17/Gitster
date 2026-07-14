@@ -1,9 +1,9 @@
 using System.IO;
 
-using Gitster.Models;
-using Gitster.Services.Git;
-using Gitster.Services.History;
-using Gitster.Services.Search;
+using Gitster.Core.Models;
+using Gitster.Core.Git;
+using Gitster.Core.History;
+using Gitster.Core.Search;
 using LibGit2Sharp;
 using Microsoft.Data.Sqlite;
 

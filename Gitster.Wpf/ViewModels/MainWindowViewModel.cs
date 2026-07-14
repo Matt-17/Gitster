@@ -10,13 +10,13 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
 using Gitster.Services.Capabilities;
 using Gitster.Services.Features;
-using Gitster.Services.Git;
-using Gitster.Services.History;
+using Gitster.Core.Git;
+using Gitster.Core.History;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
 using Gitster.Views.Helper;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 using LibGit2Sharp;
 
@@ -324,12 +324,12 @@ public partial class MainWindowViewModel : BaseViewModel
     public ObservableCollection<string> Remotes { get; } = [];
 
     /// <summary>True when the selected commit is already on the remote — amending it requires a force-push.</summary>
-    public bool IsAmendUnsafe => SelectedCommit?.RemoteState == Gitster.Services.Git.CommitRemoteState.OnRemote;
+    public bool IsAmendUnsafe => SelectedCommit?.RemoteState == Gitster.Core.Git.CommitRemoteState.OnRemote;
 
     public bool CanAmendSelectedCommit =>
         IsGoButtonEnabled
         && SelectedCommit is not null
-        && SelectedCommit.RemoteState != Gitster.Services.Git.CommitRemoteState.Incoming;
+        && SelectedCommit.RemoteState != Gitster.Core.Git.CommitRemoteState.Incoming;
 
     partial void OnIsGoButtonEnabledChanged(bool value)
     {
@@ -695,7 +695,7 @@ public partial class MainWindowViewModel : BaseViewModel
     // ── Custom tools (Phase 3, Step E) ────────────────────────────────────
 
     /// <summary>All custom tools (repo-scoped first, then global) for the Tools menu.</summary>
-    public IReadOnlyList<Gitster.Models.CustomTool> GetCustomTools()
+    public IReadOnlyList<Gitster.Core.Models.CustomTool> GetCustomTools()
         => _customToolRunner.GetTools();
 
     [RelayCommand]
@@ -706,7 +706,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _windowService.ShowDialog(window);
     }
 
-    public async Task RunCustomToolAsync(Gitster.Models.CustomTool tool)
+    public async Task RunCustomToolAsync(Gitster.Core.Models.CustomTool tool)
     {
         var outcome = await _customToolRunner.RunAsync(
             tool,
@@ -863,7 +863,7 @@ public partial class MainWindowViewModel : BaseViewModel
                 return;
             }
 
-            if (selected.RemoteState == Gitster.Services.Git.CommitRemoteState.Incoming)
+            if (selected.RemoteState == Gitster.Core.Git.CommitRemoteState.Incoming)
             {
                 _windowService.Warning("Incoming commits are not on the local branch yet. Pull or cherry-pick the commit before amending it.", "Gitster");
                 return;

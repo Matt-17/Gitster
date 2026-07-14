@@ -1,5 +1,5 @@
-using Gitster.Services.Git;
-using Gitster.Services.History;
+using Gitster.Core.Git;
+using Gitster.Core.History;
 using System.Diagnostics;
 
 namespace Gitster.Tests;

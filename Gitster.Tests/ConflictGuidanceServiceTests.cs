@@ -1,5 +1,5 @@
 using Gitster.Services.Features;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using NSubstitute;
 
 namespace Gitster.Tests;

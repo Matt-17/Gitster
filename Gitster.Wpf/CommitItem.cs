@@ -1,8 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using Gitster.Services.Features;
-using Gitster.Services.History;
+using Gitster.Core.History;
 
 namespace Gitster;
 

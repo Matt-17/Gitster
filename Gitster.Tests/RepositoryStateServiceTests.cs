@@ -1,8 +1,8 @@
 using System.IO;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 using NSubstitute;
 

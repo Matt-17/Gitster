@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 using Microsoft.Win32;
 

@@ -1,6 +1,6 @@
 using System.IO;
 
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 namespace Gitster.Services.Features;
 

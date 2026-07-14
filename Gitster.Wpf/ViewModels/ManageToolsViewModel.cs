@@ -4,7 +4,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
 
 namespace Gitster.ViewModels;

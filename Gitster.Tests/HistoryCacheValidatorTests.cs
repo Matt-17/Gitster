@@ -1,4 +1,4 @@
-using Gitster.Services.History;
+using Gitster.Core.History;
 
 namespace Gitster.Tests;
 

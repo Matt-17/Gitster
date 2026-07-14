@@ -1,8 +1,8 @@
 using System.Windows;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using Gitster.Views;
 
 using Microsoft.Win32;

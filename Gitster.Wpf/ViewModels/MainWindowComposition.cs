@@ -1,8 +1,8 @@
 using Gitster.Services;
 using Gitster.Services.Capabilities;
 using Gitster.Services.Features;
-using Gitster.Services.Git;
-using Gitster.Services.History;
+using Gitster.Core.Git;
+using Gitster.Core.History;
 using Gitster.Services.OperationsLog;
 
 namespace Gitster.ViewModels;

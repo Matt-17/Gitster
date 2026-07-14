@@ -1,5 +1,5 @@
-using Gitster.Models;
-using Gitster.Services.Git;
+using Gitster.Core.Models;
+using Gitster.Core.Git;
 using LibGit2Sharp;
 
 namespace Gitster.Tests;

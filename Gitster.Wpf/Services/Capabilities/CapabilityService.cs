@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 namespace Gitster.Services.Capabilities;
 

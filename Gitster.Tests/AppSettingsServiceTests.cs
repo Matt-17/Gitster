@@ -2,7 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
 
 namespace Gitster.Tests;

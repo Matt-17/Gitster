@@ -1,8 +1,8 @@
 using System.IO;
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services.Features;
-using Gitster.Services.Git;
-using Gitster.Services.History;
+using Gitster.Core.Git;
+using Gitster.Core.History;
 using LibGit2Sharp;
 
 namespace Gitster.Tests;

@@ -4,7 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:Gitster.Controls"
-             xmlns:models="clr-namespace:Gitster.Models"
+             xmlns:models="clr-namespace:Gitster.Core.Models;assembly=Gitster.Core"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
              x:Name="Root"

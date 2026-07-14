@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:Gitster.Controls"
              xmlns:vm="clr-namespace:Gitster.ViewModels"
              xmlns:converters="clr-namespace:Gitster.Converters"
-             xmlns:git="clr-namespace:Gitster.Services.Git"
+             xmlns:git="clr-namespace:Gitster.Core.Git;assembly=Gitster.Core"
              xmlns:helper="clr-namespace:Gitster.Views.Helper"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:CommitListViewModel}">

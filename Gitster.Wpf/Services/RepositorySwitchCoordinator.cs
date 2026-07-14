@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.ViewModels;
 using Gitster.Views;
 

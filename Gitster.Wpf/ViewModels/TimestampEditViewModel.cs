@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
 using Gitster.Services.Features;
 

@@ -1,8 +1,8 @@
 using System.IO;
 using System.Text.Json;
 
-using Gitster.Models;
-using Gitster.Services.Git;
+using Gitster.Core.Models;
+using Gitster.Core.Git;
 
 namespace Gitster.Services;
 

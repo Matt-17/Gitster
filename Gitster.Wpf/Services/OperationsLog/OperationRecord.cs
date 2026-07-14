@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 namespace Gitster.Services.OperationsLog;
 
