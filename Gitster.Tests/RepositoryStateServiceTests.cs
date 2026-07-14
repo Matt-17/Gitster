@@ -2,7 +2,7 @@ using System.IO;
 
 using Gitster.Core.Models;
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 using Gitster.Core.Git;
 
 using NSubstitute;

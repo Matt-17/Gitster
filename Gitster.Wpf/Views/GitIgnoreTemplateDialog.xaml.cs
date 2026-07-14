@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 
 using Gitster.Services.Features;
-using Gitster.ApplicationLayer.Features;
+using Gitster.Core.Features;
 
 namespace Gitster.Views;
 

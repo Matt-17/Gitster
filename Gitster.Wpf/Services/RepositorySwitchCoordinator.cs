@@ -5,7 +5,7 @@ using Gitster.Core.Models;
 using Gitster.ViewModels;
 using Gitster.Views;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 

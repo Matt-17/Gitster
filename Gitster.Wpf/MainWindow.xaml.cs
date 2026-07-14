@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using Gitster.Core.Models;
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 using Gitster.ViewModels;
 
 namespace Gitster;

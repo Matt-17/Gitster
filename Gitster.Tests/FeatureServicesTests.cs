@@ -1,7 +1,7 @@
 using System.IO;
 
 using Gitster.Services.Features;
-using Gitster.ApplicationLayer.Features;
+using Gitster.Core.Features;
 
 namespace Gitster.Tests;
 

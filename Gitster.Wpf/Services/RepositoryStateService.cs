@@ -5,7 +5,7 @@ using Gitster.Core.Models;
 using Gitster.Core.Git;
 using Timer = System.Timers.Timer;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 

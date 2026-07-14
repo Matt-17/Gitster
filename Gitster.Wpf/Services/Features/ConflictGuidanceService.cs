@@ -1,7 +1,7 @@
 using Gitster.Core.Git;
 using Gitster.Views;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services.Features;
 

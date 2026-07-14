@@ -4,7 +4,7 @@ using System.Text;
 
 using Microsoft.Extensions.Logging;
 
-namespace Gitster.ApplicationLayer.Logging;
+namespace Gitster.Core.Logging;
 
 public sealed class RollingFileLoggerProvider : ILoggerProvider
 {

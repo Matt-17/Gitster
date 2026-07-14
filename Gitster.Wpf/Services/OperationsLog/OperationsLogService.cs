@@ -8,7 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Gitster.Core.Models;
 using Gitster.Core.Git;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services.OperationsLog;
 

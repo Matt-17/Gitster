@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 using Gitster.Core.Models;
 
-namespace Gitster.ApplicationLayer;
+namespace Gitster.Core;
 
 /// <summary>
 /// Persists app-wide settings in %AppData%/Gitster/settings.json. Recent repositories

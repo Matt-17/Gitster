@@ -1,6 +1,6 @@
 using Gitster.Core.Models;
 
-namespace Gitster.ApplicationLayer;
+namespace Gitster.Core;
 
 public interface ICustomToolsService
 {

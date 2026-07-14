@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Documents;
 
-using Gitster.ApplicationLayer.Capabilities;
+using Gitster.Core.Capabilities;
 
 namespace Gitster.Views.Helper;
 

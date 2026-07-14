@@ -7,7 +7,7 @@ using Gitster.Core.Models;
 
 using Microsoft.Win32;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 

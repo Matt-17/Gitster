@@ -1,7 +1,7 @@
 using System.Windows;
 using Microsoft.Win32;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 
