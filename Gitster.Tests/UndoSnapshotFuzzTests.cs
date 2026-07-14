@@ -2,7 +2,7 @@ using System.IO;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 using LibGit2Sharp;
 
 namespace Gitster.Tests;

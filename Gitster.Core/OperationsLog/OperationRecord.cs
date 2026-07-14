@@ -4,7 +4,7 @@ using Gitster.Core.Git;
 
 using Gitster.Core;
 
-namespace Gitster.Services.OperationsLog;
+namespace Gitster.Core.OperationsLog;
 
 public enum OperationKind { Amend, Reword, Reset, Rebase, CherryPick, CommitOnBranch, AuthorRepair, AuthorAmend, RangeRewrite, StashDrop, StashPop, StashConvert, Fixup, Squash, CherryPickTimestamp, Snapshot, Commit, HistoryEdit, Merge, Revert }
 public enum OperationStatus { Active, Undone, Replaced, Expired }

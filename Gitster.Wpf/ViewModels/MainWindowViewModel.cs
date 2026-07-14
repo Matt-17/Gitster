@@ -14,7 +14,7 @@ using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.History;
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 using Gitster.Views;
 using Gitster.Views.Helper;
 

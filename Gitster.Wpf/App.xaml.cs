@@ -8,7 +8,7 @@ using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.History;
 using Gitster.Core.Logging;
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 using Gitster.Views;
 using Gitster.ViewModels;
 using Microsoft.Extensions.DependencyInjection;

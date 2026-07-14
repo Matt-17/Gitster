@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 
 namespace Gitster.Views;
 

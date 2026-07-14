@@ -1,9 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Core;
 using Gitster.Core.Ui;
 
-namespace Gitster.Services;
+namespace Gitster.Core;
 
 public abstract record OperationFeedback
 {

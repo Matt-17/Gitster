@@ -4,7 +4,7 @@ using System.Windows;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 using Gitster.ViewModels;
 using Gitster.Views;
 
