@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 
 using Gitster.Services;
 using Gitster.Core;
@@ -77,6 +78,7 @@ public static class PersistedGridSplitter
 
         splitter.SetValue(IsAttachedProperty, true);
         splitter.Loaded += OnLoaded;
+        splitter.IsVisibleChanged += OnIsVisibleChanged;
         splitter.DragCompleted += OnDragCompleted;
         Track(splitter);
     }
@@ -109,6 +111,18 @@ public static class PersistedGridSplitter
             ApplySavedLength(splitter);
     }
 
+    /// <summary>Re-applies the saved length when a collapsed pane is expanded again.</summary>
+    private static void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not GridSplitter splitter || e.NewValue is not true)
+            return;
+
+        // Deferred: the style triggers that release the collapsed MaxWidth react to the same
+        // property change, and the order is not guaranteed. Re-apply once layout has settled,
+        // otherwise the saved length would be clamped against a MaxWidth that is still 0.
+        splitter.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => ApplySavedLength(splitter));
+    }
+
     private static void OnDragCompleted(object sender, DragCompletedEventArgs e)
     {
         if (sender is GridSplitter splitter)
@@ -117,6 +131,12 @@ public static class PersistedGridSplitter
 
     private static void ApplySavedLength(GridSplitter splitter)
     {
+        // A hidden splitter means its pane is collapsed. Its target definition is pinned to
+        // zero (via MaxWidth), so restoring now would clamp the saved length to 0 and lose it.
+        // The length is re-applied when the pane — and with it the splitter — becomes visible.
+        if (splitter.Visibility != Visibility.Visible)
+            return;
+
         var length = _preferences?.GetSplitterLength(GetKey(splitter));
         if (length is not { } value)
             return;
