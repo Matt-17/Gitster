@@ -51,6 +51,9 @@
                         <MenuItem Header="Push through this commit"
                                   Command="{Binding Tag.PushThroughCommitCommand}"
                                   CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="Rewind remote to this commit"
+                                  Command="{Binding Tag.ForceRemoteToCommitCommand}"
+                                  CommandParameter="{Binding DataContext}"/>
                         <MenuItem Header="Push Tag"
                                   Command="{Binding Tag.PushTagCommand}"
                                   CommandParameter="{Binding DataContext}"/>

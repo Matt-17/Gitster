@@ -381,6 +381,7 @@ public partial class MainWindowViewModel : BaseViewModel
         PushTagCommand.NotifyCanExecuteChanged();
         RevertCommitCommand.NotifyCanExecuteChanged();
         CherryPickCommitCommand.NotifyCanExecuteChanged();
+        ForceRemoteToCommitCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -516,7 +517,10 @@ public partial class MainWindowViewModel : BaseViewModel
     private void OnCapabilityServicePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CapabilityService.IsGitCliAvailable))
+        {
             PushThroughCommitCommand.NotifyCanExecuteChanged();
+            ForceRemoteToCommitCommand.NotifyCanExecuteChanged();
+        }
     }
 
     private bool CanArchiveHead() => IsGoButtonEnabled;
@@ -1633,6 +1637,47 @@ public partial class MainWindowViewModel : BaseViewModel
         IsGoButtonEnabled
         && _capabilityService.IsGitCliAvailable
         && commit?.RemoteState == CommitRemoteState.LocalOnly;
+
+    [RelayCommand(CanExecute = nameof(CanForceRemoteToCommit))]
+    private async Task ForceRemoteToCommit(CommitItem? commit)
+    {
+        if (!CanForceRemoteToCommit(commit))
+        {
+            var message = !_capabilityService.IsGitCliAvailable
+                ? "Rewinding the remote requires the Git command-line tool. Install Git for Windows and restart Gitster."
+                : "Pick a commit that is already on the remote to rewind the remote branch back to it.";
+            _windowService.Warning(message, "Gitster");
+            return;
+        }
+
+        var shortSha = ShortSha(commit!.FullSha);
+        var confirmed = _windowService.Confirm(
+            $"This force-pushes the remote branch back to {shortSha}, discarding every remote commit after it. " +
+            "Anyone who has already pulled those commits will be affected.\n\n" +
+            "It uses --force-with-lease, so it aborts if the remote received commits you haven't fetched.\n\n" +
+            "Rewind the remote to this commit?",
+            "Dangerous: rewind remote");
+        if (!confirmed)
+            return;
+
+        try
+        {
+            var remote = ActiveRemote(null);
+            await RunRemoteOperationAsync(
+                $"Rewind remote to {shortSha}",
+                ct => _gitBackend.ForceRemoteToCommitAsync(commit.FullSha, remote, ct));
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Error rewinding remote: {ex.Message}", "Gitster");
+        }
+    }
+
+    private bool CanForceRemoteToCommit(CommitItem? commit) =>
+        IsGoButtonEnabled
+        && _capabilityService.IsGitCliAvailable
+        && commit?.RemoteState == CommitRemoteState.OnRemote;
 
     [RelayCommand]
     private Task PushForceWithLease(string? remoteName) => PushWithModeAsync(remoteName, PushMode.ForceWithLease);
