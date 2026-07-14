@@ -33,7 +33,8 @@
         </ListBox>
 
         <!-- Right: settings panel (Branches) -->
-        <Grid Grid.Column="1" Margin="16">
+        <Grid Grid.Column="1" Margin="16"
+              Visibility="{Binding IsBranchesCategory, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -89,6 +90,41 @@
             <Button Grid.Row="4" Content="Remove" HorizontalAlignment="Left" Margin="0,8,0,0"
                     Padding="16,5" Style="{StaticResource GhostButton}"
                     Command="{Binding RemoveFavoriteCommand}"/>
+        </Grid>
+
+        <!-- Right: settings panel (Appearance) -->
+        <Grid Grid.Column="1" Margin="16"
+              Visibility="{Binding IsAppearanceCategory, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Branch list font"
+                       FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Grid.Row="1" Margin="0,4,0,12" TextWrapping="Wrap"
+                       Text="Font family used for branch and ref names in the commits sidebar. Type any installed font family, or pick a suggestion. Leave blank to restore the default."
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+
+            <ComboBox Grid.Row="2" IsEditable="True"
+                      ItemsSource="{Binding FontSuggestions}"
+                      Text="{Binding BranchFontFamily, UpdateSourceTrigger=LostFocus}"
+                      FontSize="12" Padding="8,5"/>
+
+            <!-- Live preview -->
+            <Border Grid.Row="3" Margin="0,12,0,0" Padding="12,8"
+                    Background="{DynamicResource BackgroundSecondary}"
+                    BorderBrush="{DynamicResource BorderTertiary}" BorderThickness="1"
+                    CornerRadius="4">
+                <TextBlock Text="feature/preview-branch-name"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextPrimary}"
+                           FontFamily="{Binding BranchFontFamily}"/>
+            </Border>
         </Grid>
     </Grid>
 </Window>

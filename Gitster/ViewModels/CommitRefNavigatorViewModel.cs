@@ -53,10 +53,23 @@ public sealed class CommitRefNode : ObservableObject
 
 public partial class CommitRefNavigatorViewModel : BaseViewModel
 {
+    /// <summary>
+    /// Local-branch count below which the "Branches" group (and its sub-folders) auto-expands.
+    /// Above it we leave the tree collapsed so a large branch set stays manageable.
+    /// </summary>
+    private const int AutoExpandBranchLimit = 30;
+
     private readonly IGitBackend _git;
     private readonly UiPreferencesService _ui;
     private readonly BranchFavoritesService _favorites;
     private List<RefCatalogItem> _allRefs = [];
+
+    // Remembers each folder node's expanded/collapsed state (keyed by its path) so that a
+    // refresh — e.g. while committing — rebuilds the tree without losing what the user opened.
+    private readonly Dictionary<string, bool> _expansionState = new(StringComparer.Ordinal);
+
+    // A filtered tree is force-expanded, so its state must not be snapshotted back as user intent.
+    private bool _treeFiltered;
 
     public CommitRefNavigatorViewModel(
         IGitBackend git,
@@ -119,6 +132,8 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
     {
         _allRefs = [];
         RefTree.Clear();
+        _expansionState.Clear();
+        _treeFiltered = false;
         SelectedNode = null;
         HasRefs = false;
     }
@@ -154,37 +169,62 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
 
     private void Rebuild()
     {
+        // Preserve any expander state the user changed before we throw the old tree away.
+        // Skip a force-expanded filtered tree so it can't overwrite the user's real intent.
+        if (!_treeFiltered)
+            SnapshotExpansion();
+
         var query = FilterText.Trim();
+        var hasFilter = !string.IsNullOrWhiteSpace(query);
         var refs = _allRefs.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(query))
+        if (hasFilter)
             refs = refs.Where(r => r.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
                 || r.CanonicalName.Contains(query, StringComparison.OrdinalIgnoreCase));
 
+        var localBranchCount = _allRefs.Count(r => r.Kind == RefCatalogKind.LocalBranch);
+        // A filter should surface every match, so expand everything while one is active.
+        var expandBranches = hasFilter || localBranchCount < AutoExpandBranchLimit;
+
         var roots = new List<CommitRefNode>
         {
-            BuildGroup("Branches", refs.Where(r => r.Kind == RefCatalogKind.LocalBranch), stripPrefix: null),
-            BuildGroup("Remotes", refs.Where(r => r.Kind == RefCatalogKind.RemoteBranch), stripPrefix: null),
-            BuildGroup("Tags", refs.Where(r => r.Kind == RefCatalogKind.Tag), stripPrefix: null),
-            BuildGroup("Other refs", refs.Where(r => r.Kind is RefCatalogKind.Stash or RefCatalogKind.Note or RefCatalogKind.Replace), stripPrefix: null),
+            BuildGroup("Branches", refs.Where(r => r.Kind == RefCatalogKind.LocalBranch), defaultExpanded: expandBranches),
+            BuildGroup("Remotes", refs.Where(r => r.Kind == RefCatalogKind.RemoteBranch), defaultExpanded: hasFilter),
+            BuildGroup("Tags", refs.Where(r => r.Kind == RefCatalogKind.Tag), defaultExpanded: hasFilter),
+            BuildGroup("Other refs", refs.Where(r => r.Kind is RefCatalogKind.Stash or RefCatalogKind.Note or RefCatalogKind.Replace), defaultExpanded: hasFilter),
         }.Where(n => n.Children.Count > 0).ToList();
 
         RefTree.Clear();
         foreach (var root in roots)
             RefTree.Add(root);
 
+        _treeFiltered = hasFilter;
         HasRefs = RefTree.Count > 0;
     }
 
-    private CommitRefNode BuildGroup(string name, IEnumerable<RefCatalogItem> refs, string? stripPrefix)
+    private void SnapshotExpansion()
     {
-        var root = new CommitRefNode(name, null, name) { IsExpanded = true };
+        foreach (var root in RefTree)
+            SnapshotExpansion(root);
+    }
+
+    private void SnapshotExpansion(CommitRefNode node)
+    {
+        if (node.IsFolder)
+        {
+            _expansionState[node.FolderPath] = node.IsExpanded;
+            foreach (var child in node.Children)
+                SnapshotExpansion(child);
+        }
+    }
+
+    private CommitRefNode BuildGroup(string name, IEnumerable<RefCatalogItem> refs, bool defaultExpanded)
+    {
+        var root = new CommitRefNode(name, null, name) { IsExpanded = ResolveExpanded(name, defaultExpanded) };
         var folders = new Dictionary<string, CommitRefNode>(StringComparer.Ordinal);
 
         foreach (var item in refs.OrderBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase))
         {
-            var display = stripPrefix is not null && item.DisplayName.StartsWith(stripPrefix, StringComparison.Ordinal)
-                ? item.DisplayName[stripPrefix.Length..]
-                : item.DisplayName;
+            var display = item.DisplayName;
             var segments = display.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (segments.Length == 0)
                 segments = [display];
@@ -215,7 +255,10 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
                 }
                 else
                 {
-                    folder = new CommitRefNode(segments[i], null, path);
+                    folder = new CommitRefNode(segments[i], null, path)
+                    {
+                        IsExpanded = ResolveExpanded(path, defaultExpanded),
+                    };
                     folders[path] = folder;
                     level.Add(folder);
                     level = folder.Children;
@@ -226,6 +269,11 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
         SortLevel(root.Children);
         return root;
     }
+
+    // A folder the user has already touched keeps its remembered state; a brand-new one
+    // follows the group default (auto-expanded local branches / filtered results).
+    private bool ResolveExpanded(string path, bool defaultExpanded) =>
+        _expansionState.TryGetValue(path, out var remembered) ? remembered : defaultExpanded;
 
     private static void SortLevel(ObservableCollection<CommitRefNode> level)
     {

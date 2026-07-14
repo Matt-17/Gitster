@@ -20,29 +20,22 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="RefPaneSplitterColumnStyle" TargetType="{x:Type ColumnDefinition}">
-            <Setter Property="Width" Value="3"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding CommitRefNavigatorVM.IsCollapsed}" Value="True">
-                    <Setter Property="Width" Value="0"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
         <HierarchicalDataTemplate x:Key="CommitRefNodeTemplate"
                                   DataType="{x:Type vm:CommitRefNode}"
                                   ItemsSource="{Binding Children}">
             <Grid MinHeight="22">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
+                    <!-- Fixed gutter so the current-branch dot sits to the left and every
+                         branch name in a level stays left-aligned, dot or not. -->
+                    <ColumnDefinition Width="12"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0"
-                           Width="14"
-                           Margin="0,0,4,0"
+                           HorizontalAlignment="Left"
                            VerticalAlignment="Center"
                            Text="●"
                            FontSize="8"
@@ -60,7 +53,7 @@
                     <TextBlock Text="{Binding Name}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
-                               FontFamily="{StaticResource FontFamilyMono}"
+                               FontFamily="{Binding DataContext.Ui.BranchFontFamily, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                                FontSize="12">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -90,6 +83,13 @@
                 </Button>
 
                 <TextBlock Grid.Column="2"
+                           Text="{Binding AheadBehindText}"
+                           Margin="6,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="10"
+                           Foreground="{DynamicResource TextTertiary}"/>
+
+                <TextBlock Grid.Column="3"
                            Text="{Binding MissingUpstreamText}"
                            Margin="6,0,0,0"
                            VerticalAlignment="Center"
@@ -97,7 +97,7 @@
                            Foreground="{DynamicResource AccentWarning}"
                            Visibility="{Binding MissingUpstream, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                <TextBlock Grid.Column="3"
+                <TextBlock Grid.Column="4"
                            Text="{Binding PinText}"
                            Margin="6,0,0,0"
                            VerticalAlignment="Center"
@@ -122,7 +122,6 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="32"/>
             <ColumnDefinition Style="{StaticResource RefPaneColumnStyle}"/>
-            <ColumnDefinition Style="{StaticResource RefPaneSplitterColumnStyle}"/>
             <ColumnDefinition Width="*" MinWidth="500"/>
             <ColumnDefinition Width="3"/>
             <ColumnDefinition Width="380" MinWidth="320"/>
@@ -207,21 +206,18 @@
                           Background="Transparent"
                           BorderThickness="0"
                           Padding="4,0,6,8"
-                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="TreeViewItem">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                </TreeView>
             </Grid>
         </Border>
 
-        <GridSplitter Grid.Column="2"
-                      HorizontalAlignment="Stretch"
-                      Background="{DynamicResource BorderTertiary}"
-                      ResizeBehavior="PreviousAndNext"
-                      Visibility="{Binding CommitRefNavigatorVM.IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"
-                      helper:PersistedGridSplitter.Key="CommitsMode.RefPaneWidth"
-                      helper:PersistedGridSplitter.DefinitionKind="Column"
-                      helper:PersistedGridSplitter.TargetIndex="1"/>
-
         <!-- Left: commit list -->
-        <Grid Grid.Column="3">
+        <Grid Grid.Column="2">
             <controls:CommitListView DataContext="{Binding CommitListVM}"
                                      Visibility="{Binding CommitListVM.HasItems, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             <controls:EmptyStateControl Icon="+"
@@ -233,16 +229,16 @@
         </Grid>
 
         <!-- Splitter -->
-        <GridSplitter Grid.Column="4"
+        <GridSplitter Grid.Column="3"
                       HorizontalAlignment="Stretch"
                       Background="{DynamicResource BorderTertiary}"
                       ResizeBehavior="PreviousAndNext"
                       helper:PersistedGridSplitter.Key="CommitsMode.ActionPanelWidth"
                       helper:PersistedGridSplitter.DefinitionKind="Column"
-                      helper:PersistedGridSplitter.TargetIndex="5"/>
+                      helper:PersistedGridSplitter.TargetIndex="4"/>
 
         <!-- Right: action panel -->
-        <ScrollViewer Grid.Column="5"
+        <ScrollViewer Grid.Column="4"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="10,10,12,10">

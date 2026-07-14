@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Gitster.Tests/Gitster.Tests.csproj" />
+  <Project Path="Gitster/Gitster.csproj" />
+</Solution>

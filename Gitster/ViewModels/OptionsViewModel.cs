@@ -14,18 +14,52 @@ namespace Gitster.ViewModels;
 public partial class OptionsViewModel : BaseViewModel
 {
     private readonly BranchFavoritesService _favorites;
+    private readonly UiPreferencesService _ui;
 
-    public OptionsViewModel(BranchFavoritesService favorites)
+    public OptionsViewModel(BranchFavoritesService favorites, UiPreferencesService ui)
     {
         _favorites = favorites;
-        Categories = ["Branches"];
+        _ui = ui;
+        Categories = ["Branches", "Appearance"];
         SelectedCategory = Categories[0];
     }
 
     public ObservableCollection<string> Categories { get; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBranchesCategory))]
+    [NotifyPropertyChangedFor(nameof(IsAppearanceCategory))]
     public partial string SelectedCategory { get; set; }
+
+    public bool IsBranchesCategory => SelectedCategory == "Branches";
+    public bool IsAppearanceCategory => SelectedCategory == "Appearance";
+
+    // ── Appearance category ──────────────────────────────────────────────
+
+    /// <summary>Font family used to render branch/ref names in the commits sidebar.</summary>
+    public string BranchFontFamily
+    {
+        get => _ui.BranchFontFamily;
+        set
+        {
+            if (_ui.BranchFontFamily == value)
+                return;
+            _ui.BranchFontFamily = string.IsNullOrWhiteSpace(value)
+                ? UiPreferencesService.DefaultBranchFontFamily
+                : value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>A few sensible font suggestions; the field stays free-text/editable.</summary>
+    public ObservableCollection<string> FontSuggestions { get; } =
+    [
+        UiPreferencesService.DefaultBranchFontFamily,
+        "Segoe UI",
+        "Cascadia Mono, Consolas",
+        "Consolas",
+        "Verdana",
+    ];
 
     // ── Branches category ────────────────────────────────────────────────
 
