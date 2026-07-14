@@ -9,13 +9,28 @@
              d:DataContext="{d:DesignInstance Type=vm:MainWindowViewModel}"
              mc:Ignorable="d">
     <UserControl.Resources>
+        <!-- The 32px rail only exists while the pane is collapsed; when expanded the pane
+             carries its own collapse button, so the rail would just be a stray "»". -->
+        <Style x:Key="RefRailColumnStyle" TargetType="{x:Type ColumnDefinition}">
+            <Setter Property="Width" Value="0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CommitRefNavigatorVM.IsCollapsed}" Value="True">
+                    <Setter Property="Width" Value="32"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="RefPaneColumnStyle" TargetType="{x:Type ColumnDefinition}">
             <Setter Property="Width" Value="260"/>
             <Setter Property="MinWidth" Value="190"/>
             <Style.Triggers>
+                <!-- Collapse via MaxWidth, never Width: the GridSplitter (and the persisted
+                     width restore) assign a *local* Width, which outranks a style trigger's
+                     Width setter and would leave the pane stuck open. MaxWidth is untouched
+                     by both, so it always wins and the commit list reclaims the space. -->
                 <DataTrigger Binding="{Binding CommitRefNavigatorVM.IsCollapsed}" Value="True">
-                    <Setter Property="Width" Value="0"/>
                     <Setter Property="MinWidth" Value="0"/>
+                    <Setter Property="MaxWidth" Value="0"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -129,7 +144,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="32"/>
+            <ColumnDefinition Style="{StaticResource RefRailColumnStyle}"/>
             <ColumnDefinition Style="{StaticResource RefPaneColumnStyle}"/>
             <ColumnDefinition Style="{StaticResource RefPaneSplitterColumnStyle}"/>
             <ColumnDefinition Width="*" MinWidth="500"/>
@@ -139,15 +154,16 @@
         <Border Grid.Column="0"
                 Background="{DynamicResource BackgroundSecondary}"
                 BorderBrush="{DynamicResource BorderTertiary}"
-                BorderThickness="0,0,1,0">
+                BorderThickness="0,0,1,0"
+                Visibility="{Binding CommitRefNavigatorVM.IsCollapsed, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Button Width="28"
                     Height="28"
                     Margin="2,8,2,0"
                     VerticalAlignment="Top"
                     Style="{StaticResource GhostButton}"
                     Command="{Binding CommitRefNavigatorVM.ToggleCollapsedCommand}"
-                    ToolTip="Show or hide refs"
-                    AutomationProperties.Name="Show or hide refs">
+                    ToolTip="Show refs"
+                    AutomationProperties.Name="Show refs">
                 <Path Width="12"
                       Height="12"
                       Stretch="Uniform"
