@@ -36,7 +36,7 @@
                 </Button.Template>
                 <StackPanel Orientation="Horizontal">
                     <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                             Fill="{Binding StateIndicatorBrush}"/>
+                             Fill="{Binding StateIndicatorColor, Converter={StaticResource StatusColorToBrushConverter}}"/>
                     <TextBlock Text="{Binding StateText}" Margin="6,0,0,0"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -51,12 +51,12 @@
                                           Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <TextBlock Text="{Binding FeedbackIcon}"
                                FontSize="11"
-                               Foreground="{Binding FeedbackBrush}"
+                               Foreground="{Binding FeedbackColor, Converter={StaticResource StatusColorToBrushConverter}}"
                                VerticalAlignment="Center"
                                Visibility="{Binding IsRunning, Converter={StaticResource InverseBoolVisibilityConverter}}"/>
                     <TextBlock Text="{Binding FeedbackText}" Margin="6,0,0,0"
                                FontSize="12"
-                               Foreground="{Binding FeedbackBrush}"
+                               Foreground="{Binding FeedbackColor, Converter={StaticResource StatusColorToBrushConverter}}"
                                VerticalAlignment="Center"/>
                     <Button Margin="6,0,0,0" Padding="2"
                             Background="Transparent" BorderThickness="0"
