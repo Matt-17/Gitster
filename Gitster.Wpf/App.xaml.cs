@@ -57,6 +57,7 @@ public partial class App : Application
 					services.AddSingleton<WindowService>();
 					services.AddSingleton<IWindowService>(sp => sp.GetRequiredService<WindowService>());
 					services.AddSingleton<IUserInteraction>(sp => sp.GetRequiredService<WindowService>());
+					services.AddSingleton<IDialogService, WpfDialogService>();
 					services.AddSingleton<IDispatcher, WpfDispatcher>();
 					services.AddSingleton<IClipboard, WpfClipboard>();
 					services.AddSingleton<IAppLifetime, WpfAppLifetime>();
