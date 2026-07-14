@@ -5,6 +5,7 @@ using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.History;
 using Gitster.Core.OperationsLog;
+using Gitster.Core.Ui;
 using Gitster.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -57,6 +58,10 @@ public sealed class ViewModelDiTests
     private static void RegisterViewModelGraph(ServiceCollection services)
     {
         services.AddSingleton<IWindowService, WindowService>();
+        services.AddSingleton<IUserInteraction>(sp => sp.GetRequiredService<IWindowService>());
+        services.AddSingleton<IDialogService, WpfDialogService>();
+        services.AddSingleton<IClipboard, WpfClipboard>();
+        services.AddSingleton<IDispatcher, WpfDispatcher>();
         services.AddSingleton<IGitBackend, HybridGitBackend>();
         services.AddSingleton<RepositoryStateService>();
         services.AddSingleton<OperationFeedbackService>();

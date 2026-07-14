@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -35,8 +34,8 @@ public partial class WorktreesViewModel : BaseViewModel
     private readonly IGitBackend              _git;
     private readonly OperationFeedbackService _feedback;
     private readonly SnapshotService          _snapshots;
-    private readonly IWindowService           _windowService;
-    private IDialogService Dialogs => new WpfDialogService(_windowService);
+    private readonly IUserInteraction         _windowService;
+    private readonly IDialogService           _dialogs;
     private readonly Func<string>             _getCurrentPath;
     private readonly Action<string>           _openInGitster;
 
@@ -68,15 +67,17 @@ public partial class WorktreesViewModel : BaseViewModel
         IGitBackend              git,
         OperationFeedbackService feedback,
         SnapshotService          snapshots,
-        IWindowService?          windowService,
-        RepositoryCommandContext commandContext)
+        IUserInteraction?        windowService,
+        RepositoryCommandContext commandContext,
+        IDialogService           dialogs)
         : this(
             git,
             feedback,
             snapshots,
             windowService,
             () => commandContext.CurrentPath,
-            commandContext.OpenRepositoryPath)
+            commandContext.OpenRepositoryPath,
+            dialogs)
     {
     }
 
@@ -84,14 +85,16 @@ public partial class WorktreesViewModel : BaseViewModel
         IGitBackend              git,
         OperationFeedbackService feedback,
         SnapshotService          snapshots,
-        IWindowService?          windowService,
+        IUserInteraction?        windowService,
         Func<string>             getCurrentPath,
-        Action<string>           openInGitster)
+        Action<string>           openInGitster,
+        IDialogService?          dialogs = null)
     {
         _git            = git;
         _feedback       = feedback;
         _snapshots      = snapshots;
-        _windowService  = windowService ?? new WindowService();
+        _windowService  = windowService ?? NullUserInteraction.Instance;
+        _dialogs        = dialogs ?? NullDialogService.Instance;
         _getCurrentPath = getCurrentPath;
         _openInGitster  = openInGitster;
     }
@@ -139,7 +142,7 @@ public partial class WorktreesViewModel : BaseViewModel
     [RelayCommand]
     private async Task Add()
     {
-        var dialog = Dialogs.AddWorktree(_getCurrentPath());
+        var dialog = _dialogs.AddWorktree(_getCurrentPath());
         if (dialog is null) return;
 
         try
@@ -185,11 +188,11 @@ public partial class WorktreesViewModel : BaseViewModel
     {
         if (SelectedWorktree is not { } w) return;
 
-        var confirm = _windowService.ShowMessage(
+        var confirm = _windowService.Ask(
             $"Remove the worktree at:\n{w.Path}\n\n" +
             "This deletes the working directory (the branch itself is kept).",
-            "Remove worktree", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes) return;
+            "Remove worktree", MessageButtons.YesNo, MessageIcon.Warning);
+        if (confirm != MessageResult.Yes) return;
 
         try
         {
@@ -200,11 +203,11 @@ public partial class WorktreesViewModel : BaseViewModel
         catch (Exception)
         {
             // Likely dirty/locked — offer a forced removal.
-            var force = _windowService.ShowMessage(
+            var force = _windowService.Ask(
                 "The worktree could not be removed cleanly (it may have uncommitted changes or be locked).\n\n" +
                 "Force removal?",
-                "Remove worktree", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (force != MessageBoxResult.Yes) return;
+                "Remove worktree", MessageButtons.YesNo, MessageIcon.Warning);
+            if (force != MessageResult.Yes) return;
 
             try
             {
@@ -226,10 +229,10 @@ public partial class WorktreesViewModel : BaseViewModel
             ? string.Join("\n", prunable)
             : "(stale administrative entries)";
 
-        var confirm = _windowService.ShowMessage(
+        var confirm = _windowService.Ask(
             $"Prune stale worktree entries?\n\n{preview}",
-            "Prune worktrees", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes) return;
+            "Prune worktrees", MessageButtons.YesNo, MessageIcon.Question);
+        if (confirm != MessageResult.Yes) return;
 
         try
         {

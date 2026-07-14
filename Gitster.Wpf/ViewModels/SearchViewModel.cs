@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -26,25 +25,30 @@ public partial class SearchViewModel : BaseViewModel
 {
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
-    private readonly IWindowService _windowService;
-    private IDialogService Dialogs => new WpfDialogService(_windowService);
+    private readonly IUserInteraction _windowService;
+    private readonly IDialogService _dialogs;
+    private readonly IClipboard _clipboard;
     private readonly GitFeatureService _features;
     private CancellationTokenSource? _cts;
 
-    public SearchViewModel(IGitBackend git, CommitHistoryService history, IWindowService? windowService)
-        : this(git, history, windowService, new GitFeatureService())
+    public SearchViewModel(IGitBackend git, CommitHistoryService history, IUserInteraction? windowService, IDialogService? dialogs = null, IClipboard? clipboard = null)
+        : this(git, history, windowService, new GitFeatureService(), dialogs, clipboard)
     {
     }
 
     public SearchViewModel(
         IGitBackend git,
         CommitHistoryService history,
-        IWindowService? windowService,
-        GitFeatureService features)
+        IUserInteraction? windowService,
+        GitFeatureService features,
+        IDialogService? dialogs = null,
+        IClipboard? clipboard = null)
     {
         _git = git;
         _history = history;
-        _windowService = windowService ?? new WindowService();
+        _windowService = windowService ?? NullUserInteraction.Instance;
+        _dialogs = dialogs ?? NullDialogService.Instance;
+        _clipboard = clipboard ?? NullClipboard.Instance;
         _features = features;
     }
 
@@ -293,7 +297,7 @@ public partial class SearchViewModel : BaseViewModel
     [RelayCommand]
     private void PickBlameFile()
     {
-        var picked = Dialogs.PickFile("Pick a file to blame", _git.RepositoryPath);
+        var picked = _dialogs.PickFile("Pick a file to blame", _git.RepositoryPath);
         if (picked is null) return;
 
         var root = _git.RepositoryPath?.TrimEnd('\\', '/');
@@ -332,7 +336,7 @@ public partial class SearchViewModel : BaseViewModel
             return;
 
         var shortSha = GitSha.Short(entry.Sha);
-        var value = Dialogs.PromptText(
+        var value = _dialogs.PromptText(
             "Create branch from reflog",
             $"New branch name at {entry.Selector} ({shortSha}):",
             $"rescue/{shortSha}");
@@ -362,7 +366,7 @@ public partial class SearchViewModel : BaseViewModel
 
         try
         {
-            Clipboard.SetText(entry.Sha);
+            _clipboard.SetText(entry.Sha);
         }
         catch (Exception ex)
         {

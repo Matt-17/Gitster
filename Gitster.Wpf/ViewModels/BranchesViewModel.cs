@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Data;
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -128,8 +127,8 @@ public partial class BranchesViewModel : BaseViewModel
     private readonly SnapshotService          _snapshots;
     private readonly SourceArchiveService     _archiveService;
     private readonly UiPreferencesService     _ui;
-    private readonly IWindowService           _windowService;
-    private IDialogService Dialogs => new WpfDialogService(_windowService);
+    private readonly IUserInteraction         _windowService;
+    private readonly IDialogService           _dialogs;
     private readonly BranchFavoritesService?  _favorites;
     private readonly Func<Task>               _onChanged;
 
@@ -187,9 +186,10 @@ public partial class BranchesViewModel : BaseViewModel
         SnapshotService          snapshots,
         SourceArchiveService     archiveService,
         UiPreferencesService     ui,
-        IWindowService?          windowService,
+        IUserInteraction?        windowService,
         BranchFavoritesService   favorites,
-        RepositoryCommandContext commandContext)
+        RepositoryCommandContext commandContext,
+        IDialogService           dialogs)
         : this(
             git,
             feedback,
@@ -199,7 +199,8 @@ public partial class BranchesViewModel : BaseViewModel
             ui,
             windowService,
             commandContext.RefreshSidebarBadges,
-            favorites)
+            favorites,
+            dialogs)
     {
     }
 
@@ -210,9 +211,10 @@ public partial class BranchesViewModel : BaseViewModel
         SnapshotService          snapshots,
         SourceArchiveService     archiveService,
         UiPreferencesService     ui,
-        IWindowService?          windowService,
+        IUserInteraction?        windowService,
         Func<Task>               onChanged,
-        BranchFavoritesService?  favorites = null)
+        BranchFavoritesService?  favorites = null,
+        IDialogService?          dialogs = null)
     {
         _git       = git;
         _feedback  = feedback;
@@ -220,7 +222,8 @@ public partial class BranchesViewModel : BaseViewModel
         _snapshots = snapshots;
         _archiveService = archiveService;
         _ui        = ui;
-        _windowService = windowService ?? new WindowService();
+        _windowService = windowService ?? NullUserInteraction.Instance;
+        _dialogs   = dialogs ?? NullDialogService.Instance;
         _favorites = favorites;
         _onChanged = onChanged;
 
@@ -496,12 +499,12 @@ public partial class BranchesViewModel : BaseViewModel
         catch (CheckoutConflictException)
         {
             // Dirty working tree would be overwritten — offer stash-and-checkout.
-            var choice = _windowService.ShowMessage(
+            var choice = _windowService.Ask(
                 "You have uncommitted changes that would be overwritten by this checkout.\n\n" +
                 "Stash your changes and switch anyway?",
                 "Uncommitted changes",
-                MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-            if (choice != MessageBoxResult.OK) return;
+                MessageButtons.OkCancel, MessageIcon.Warning);
+            if (choice != MessageResult.Ok) return;
 
             try
             {
@@ -542,7 +545,7 @@ public partial class BranchesViewModel : BaseViewModel
             return;
         }
 
-        var strategy = Dialogs.MergeBranch(row.Name, current.Name);
+        var strategy = _dialogs.MergeBranch(row.Name, current.Name);
         if (strategy is null) return;
 
         try
@@ -580,7 +583,7 @@ public partial class BranchesViewModel : BaseViewModel
         catch (GitConflictException ex)
         {
             await AfterChangeAsync();
-            await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Merge", ex);
+            await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Merge", ex);
         }
         catch (Exception ex)
         {
@@ -607,7 +610,7 @@ public partial class BranchesViewModel : BaseViewModel
             return;
         }
 
-        if (!Dialogs.ConfirmHistoryStitch(preview))
+        if (!_dialogs.ConfirmHistoryStitch(preview))
             return;
 
         try
@@ -652,7 +655,7 @@ public partial class BranchesViewModel : BaseViewModel
     {
         if (SelectedBranch is not { } row) return;
 
-        var value = Dialogs.PromptText(
+        var value = _dialogs.PromptText(
             "Rename branch", $"New name for '{row.Name}':", row.IsRemote ? string.Empty : row.Name);
         if (value is null) return;
 
@@ -681,9 +684,9 @@ public partial class BranchesViewModel : BaseViewModel
             : $"Branch '{row.Name}' is NOT merged into the current branch.\n\n" +
               "Deleting it may permanently lose its commits. Delete anyway?";
 
-        var confirm = _windowService.ShowMessage(warn, "Delete branch",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes) return;
+        var confirm = _windowService.Ask(warn, "Delete branch",
+            MessageButtons.YesNo, MessageIcon.Warning);
+        if (confirm != MessageResult.Yes) return;
 
         try
         {
@@ -702,7 +705,7 @@ public partial class BranchesViewModel : BaseViewModel
     {
         if (SelectedBranch is not { } row) return;
 
-        var value = Dialogs.PromptText(
+        var value = _dialogs.PromptText(
             "Create branch", $"New branch name (starting from '{row.Name}'):", string.Empty);
         if (value is null) return;
 
