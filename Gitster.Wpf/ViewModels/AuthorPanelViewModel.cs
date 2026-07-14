@@ -8,7 +8,7 @@ using Gitster.Core.Models;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
-using Gitster.Views;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -17,6 +17,7 @@ public partial class AuthorPanelViewModel : BaseViewModel
     private readonly IGitBackend? _git;
     private readonly AuthorDirectoryService _authorDir;
     private readonly IWindowService _windowService;
+    private readonly IDialogService _dialogs;
 
     [ObservableProperty]
     public partial ObservableCollection<AuthorEntry> Authors { get; set; } = [];
@@ -35,11 +36,12 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool IsApplyEnabled { get; set; }
 
-    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir, IWindowService? windowService = null)
+    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir, IWindowService? windowService = null, IDialogService? dialogs = null)
     {
         _git = git;
         _authorDir = authorDir;
         _windowService = windowService ?? new WindowService();
+        _dialogs = dialogs ?? new WpfDialogService(_windowService);
         Authors = authorDir.Authors;
         authorDir.PropertyChanged += (_, e) =>
         {
@@ -111,8 +113,7 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [RelayCommand]
     private void AddAuthor()
     {
-        var dialog = new AddAuthorDialog();
-        if (_windowService.ShowDialog(dialog) == true && dialog.Result is { } entry)
+        if (_dialogs.AddAuthor() is { } entry)
         {
             _authorDir.Authors.Add(entry);
             AuthorText = entry.DisplayName;
@@ -122,11 +123,10 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [RelayCommand]
     private void OpenEditAuthors()
     {
-        var dialog = new Views.EditAuthorsDialog(_authorDir);
-        if (_windowService.ShowDialog(dialog) == true)
+        if (_dialogs.EditAuthors(_authorDir) is { } selection)
         {
-            AuthorText    = dialog.SelectedAuthorText;
-            CommitterText = dialog.SelectedCommitterText;
+            AuthorText    = selection.AuthorText;
+            CommitterText = selection.CommitterText;
         }
     }
 
