@@ -18,6 +18,7 @@
             <converters:NullToCollapsedConverter x:Key="NullToCollapsedConverter"/>
             <converters:RelativeDateConverter x:Key="RelativeDateConverter"/>
             <converters:RelativeTimeConverter x:Key="RelativeTimeConverter"/>
+            <converters:StatusColorToBrushConverter x:Key="StatusColorToBrushConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

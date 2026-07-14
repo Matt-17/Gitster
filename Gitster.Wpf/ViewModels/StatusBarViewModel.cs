@@ -1,15 +1,13 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Windows;
-using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Gitster.Core.Models;
-using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -17,19 +15,22 @@ public partial class StatusBarViewModel : BaseViewModel
 {
     private readonly RepositoryStateService _stateService;
     private readonly OperationFeedbackService _feedbackService;
-    private readonly IWindowService _windowService;
+    private readonly IUserInteraction _windowService;
+    private readonly IClipboard _clipboard;
     private readonly GitFeatureService _features;
     private int _submoduleRequestVersion;
 
     public StatusBarViewModel(
         RepositoryStateService stateService,
         OperationFeedbackService feedbackService,
-        IWindowService windowService,
-        GitFeatureService features)
+        IUserInteraction windowService,
+        GitFeatureService features,
+        IClipboard? clipboard = null)
     {
         _stateService = stateService;
         _feedbackService = feedbackService;
         _windowService = windowService;
+        _clipboard = clipboard ?? NullClipboard.Instance;
         _features = features;
 
         _stateService.PropertyChanged += OnServiceChanged;
@@ -42,7 +43,7 @@ public partial class StatusBarViewModel : BaseViewModel
     public partial string StateText { get; set; } = "No repository";
 
     [ObservableProperty]
-    public partial Brush StateIndicatorBrush { get; set; } = Brushes.Gray;
+    public partial StatusColor StateIndicatorColor { get; set; } = StatusColor.Neutral;
 
     [ObservableProperty]
     public partial bool HasFeedback { get; set; }
@@ -60,7 +61,7 @@ public partial class StatusBarViewModel : BaseViewModel
     public partial string FeedbackIcon { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial Brush FeedbackBrush { get; set; } = Brushes.Gray;
+    public partial StatusColor FeedbackColor { get; set; } = StatusColor.Neutral;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRepositoryPath))]
@@ -114,7 +115,7 @@ public partial class StatusBarViewModel : BaseViewModel
 
         try
         {
-            Clipboard.SetText(path);
+            _clipboard.SetText(path);
         }
         catch (Exception ex)
         {
@@ -138,29 +139,29 @@ public partial class StatusBarViewModel : BaseViewModel
         {
             case WorkingTreeState.Clean:
                 StateText = string.IsNullOrWhiteSpace(branch) ? "Clean" : $"Clean · {branch}";
-                StateIndicatorBrush = ResolveBrush("AccentSuccess", Brushes.ForestGreen);
+                StateIndicatorColor = StatusColor.Success;
                 break;
 
             case WorkingTreeState.Dirty dirty:
                 StateText = $"{dirty.Modified} modified, {dirty.Staged} staged, {dirty.Untracked} untracked";
-                StateIndicatorBrush = ResolveBrush("AccentWarning", Brushes.DarkOrange);
+                StateIndicatorColor = StatusColor.Warning;
                 break;
 
             case WorkingTreeState.Merging:
                 StateText = "MERGING";
-                StateIndicatorBrush = ResolveBrush("AccentDanger", Brushes.IndianRed);
+                StateIndicatorColor = StatusColor.Danger;
                 break;
 
             case WorkingTreeState.Rebasing rebasing:
                 StateText = rebasing.TotalSteps > 0
                     ? $"REBASING ({rebasing.CurrentStep}/{rebasing.TotalSteps})"
                     : "REBASING";
-                StateIndicatorBrush = ResolveBrush("AccentBlue", Brushes.DodgerBlue);
+                StateIndicatorColor = StatusColor.Info;
                 break;
 
             case WorkingTreeState.CherryPicking cherryPicking:
                 StateText = $"CHERRY-PICKING {ShortSha(cherryPicking.Sha)}";
-                StateIndicatorBrush = ResolveBrush("AccentBlue", Brushes.DodgerBlue);
+                StateIndicatorColor = StatusColor.Info;
                 break;
         }
 
@@ -172,7 +173,7 @@ public partial class StatusBarViewModel : BaseViewModel
                 IsFailure = false;
                 FeedbackText = string.Empty;
                 FeedbackIcon = string.Empty;
-                FeedbackBrush = ResolveBrush("TextSecondary", Brushes.Gray);
+                FeedbackColor = StatusColor.Neutral;
                 break;
 
             case OperationFeedback.Running running:
@@ -181,7 +182,7 @@ public partial class StatusBarViewModel : BaseViewModel
                 IsFailure = false;
                 FeedbackIcon = string.Empty;
                 FeedbackText = $"{running.Verb}...";
-                FeedbackBrush = ResolveBrush("TextSecondary", Brushes.Gray);
+                FeedbackColor = StatusColor.Neutral;
                 break;
 
             case OperationFeedback.Success success:
@@ -192,7 +193,7 @@ public partial class StatusBarViewModel : BaseViewModel
                 FeedbackText = string.IsNullOrWhiteSpace(success.Detail)
                     ? $"{success.Verb} completed"
                     : $"{success.Verb}: {success.Detail}";
-                FeedbackBrush = ResolveBrush("AccentSuccess", Brushes.ForestGreen);
+                FeedbackColor = StatusColor.Success;
                 break;
 
             case OperationFeedback.Failure failure:
@@ -201,7 +202,7 @@ public partial class StatusBarViewModel : BaseViewModel
                 IsFailure = true;
                 FeedbackIcon = "!";
                 FeedbackText = $"{failure.Verb} failed: {failure.Reason}";
-                FeedbackBrush = ResolveBrush("AccentDanger", Brushes.IndianRed);
+                FeedbackColor = StatusColor.Danger;
                 break;
         }
     }
@@ -261,13 +262,5 @@ public partial class StatusBarViewModel : BaseViewModel
             HasSubmoduleStatus = false;
             SubmoduleStatusText = string.Empty;
         }
-    }
-
-    private static Brush ResolveBrush(string key, Brush fallback)
-    {
-        if (App.Current?.Resources[key] is Brush brush)
-            return brush;
-
-        return fallback;
     }
 }
