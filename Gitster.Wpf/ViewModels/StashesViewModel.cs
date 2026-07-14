@@ -8,7 +8,6 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Core.Models;
 using Gitster.Services;
 using Gitster.Core;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
@@ -303,7 +302,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Apply stash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Apply stash", ex))
                 return;
 
             _windowService.Warning(ex.Message, "Apply failed");
@@ -338,7 +337,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Pop stash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Pop stash", ex))
                 return;
 
             _windowService.Warning(ex.Message, "Pop failed");
@@ -443,7 +442,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Convert stash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Convert stash", ex))
                 return;
 
             _windowService.Warning(ex.Message, "Convert failed");

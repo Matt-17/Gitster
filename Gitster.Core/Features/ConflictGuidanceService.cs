@@ -1,9 +1,7 @@
 using Gitster.Core.Git;
-using Gitster.Views;
+using Gitster.Core.Ui;
 
-using Gitster.Core;
-
-namespace Gitster.Services.Features;
+namespace Gitster.Core.Features;
 
 public enum ConflictGuidanceAction
 {
@@ -68,7 +66,8 @@ public static class ConflictGuidanceService
     }
 
     public static async Task<bool> ShowIfConflictAsync(
-        IWindowService windows,
+        IDialogService dialogs,
+        IUserInteraction ui,
         IGitBackend git,
         string operationName,
         Exception ex)
@@ -77,10 +76,8 @@ public static class ConflictGuidanceService
             return false;
 
         var guidance = await BuildAsync(git, operationName, ex);
-        var dialog = new ConflictGuidanceDialog(guidance);
-        var result = windows.ShowDialog(dialog);
 
-        if (result == true && dialog.SelectedAction == ConflictGuidanceAction.OpenMergeTool)
+        if (dialogs.ShowConflict(guidance) == ConflictGuidanceAction.OpenMergeTool)
         {
             try
             {
@@ -88,7 +85,7 @@ public static class ConflictGuidanceService
             }
             catch (Exception launchEx)
             {
-                windows.Warning(launchEx.Message, "Merge tool");
+                ui.Warning(launchEx.Message, "Merge tool");
             }
         }
 

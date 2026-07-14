@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
 using Gitster.Core;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
@@ -128,7 +127,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Reword", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Reword", ex))
                 return;
 
             _windowService.Error($"Reword failed:\n{ex.Message}", "Gitster");
@@ -181,7 +180,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Fixup", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Fixup", ex))
                 return;
 
             _windowService.Error($"Fixup failed:\n{ex.Message}", "Gitster");
@@ -253,7 +252,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Squash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Squash", ex))
                 return;
 
             _windowService.Error($"Squash failed:\n{ex.Message}", "Gitster");
@@ -320,7 +319,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Cherry-pick", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Cherry-pick", ex))
                 return;
 
             _windowService.Error($"Cherry-pick failed:\n{ex.Message}", "Gitster");

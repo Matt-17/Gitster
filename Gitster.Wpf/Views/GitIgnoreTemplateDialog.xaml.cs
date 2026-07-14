@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 
 namespace Gitster.Views;
