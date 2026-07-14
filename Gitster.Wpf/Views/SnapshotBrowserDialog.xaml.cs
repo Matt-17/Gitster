@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 namespace Gitster.Views;
 

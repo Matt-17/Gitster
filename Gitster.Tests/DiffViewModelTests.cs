@@ -1,4 +1,4 @@
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.ViewModels;
 
 namespace Gitster.Tests;

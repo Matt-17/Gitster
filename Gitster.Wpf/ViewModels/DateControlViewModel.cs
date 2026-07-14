@@ -6,8 +6,8 @@ using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Controls;
-using Gitster.Helpers;
-using Gitster.Models;
+using Gitster.Core.Common;
+using Gitster.Core.Models;
 
 namespace Gitster.ViewModels;
 

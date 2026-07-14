@@ -1,6 +1,6 @@
 using System.IO;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
 using Gitster.ViewModels;
 

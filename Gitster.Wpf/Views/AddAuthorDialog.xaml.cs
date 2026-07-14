@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 namespace Gitster.Views;
 

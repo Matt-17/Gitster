@@ -3,7 +3,7 @@ using System.Text.Json;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 namespace Gitster.Services;
 

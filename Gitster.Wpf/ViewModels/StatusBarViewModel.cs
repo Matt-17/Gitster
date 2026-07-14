@@ -5,10 +5,10 @@ using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
 using Gitster.Services.Features;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 namespace Gitster.ViewModels;
 

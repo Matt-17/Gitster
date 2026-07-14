@@ -2,9 +2,9 @@
 using System.IO;
 using Gitster.Services;
 using Gitster.Services.Capabilities;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using Gitster.Services.Features;
-using Gitster.Services.History;
+using Gitster.Core.History;
 using Gitster.Services.Logging;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;

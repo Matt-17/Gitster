@@ -4,11 +4,11 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using Gitster.Models;
-using Gitster.Services.Git;
+using Gitster.Core.Models;
+using Gitster.Core.Git;
 using Gitster.Services.Features;
-using Gitster.Services.History;
-using Gitster.Services.Search;
+using Gitster.Core.History;
+using Gitster.Core.Search;
 
 namespace Gitster.ViewModels;
 

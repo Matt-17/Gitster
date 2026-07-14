@@ -2,8 +2,8 @@ using System.Collections.ObjectModel;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.Models;
-using Gitster.Services.History;
+using Gitster.Core.Models;
+using Gitster.Core.History;
 
 namespace Gitster.Services;
 

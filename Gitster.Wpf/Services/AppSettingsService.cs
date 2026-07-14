@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 
 namespace Gitster.Services;
 

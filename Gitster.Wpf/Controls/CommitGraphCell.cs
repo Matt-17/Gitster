@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Media;
 
-using Gitster.Services.Git;
-using Gitster.Services.History;
+using Gitster.Core.Git;
+using Gitster.Core.History;
 
 namespace Gitster.Controls;
 

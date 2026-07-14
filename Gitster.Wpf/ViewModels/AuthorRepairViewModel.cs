@@ -3,10 +3,10 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
-using Gitster.Services.Git;
-using Gitster.Services.History;
+using Gitster.Core.Git;
+using Gitster.Core.History;
 
 namespace Gitster.ViewModels;
 

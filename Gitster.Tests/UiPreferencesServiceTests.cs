@@ -1,7 +1,7 @@
 using System.IO;
 using System.Xml.Linq;
 
-using Gitster.Models;
+using Gitster.Core.Models;
 using Gitster.Services;
 
 namespace Gitster.Tests;

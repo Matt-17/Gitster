@@ -1,7 +1,7 @@
 using System.IO;
 using System.IO.Compression;
 
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 using LibGit2Sharp;
 

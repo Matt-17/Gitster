@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
 using Gitster.Services.Features;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
 

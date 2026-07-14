@@ -2,8 +2,8 @@ using System.IO;
 using System.Text;
 using System.Windows;
 
-using Gitster.Models;
-using Gitster.Services.Git;
+using Gitster.Core.Models;
+using Gitster.Core.Git;
 
 using Microsoft.Win32;
 
@@ -141,7 +141,7 @@ public sealed class SourceArchiveService
     private static string NormalizeDirectoryPath(string path) =>
         Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-    private static string ShortSha(string value) => Git.GitSha.Short(value);
+    private static string ShortSha(string value) => Gitster.Core.Git.GitSha.Short(value);
 
     private static string FormatSize(long bytes)
     {

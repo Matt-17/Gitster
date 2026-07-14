@@ -1,6 +1,6 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 using Timer = System.Timers.Timer;
 
 namespace Gitster.Services;

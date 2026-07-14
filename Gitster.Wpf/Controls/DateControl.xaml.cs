@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Gitster.Helpers;
+using Gitster.Core.Common;
 using Gitster.ViewModels;
 
 namespace Gitster.Controls;

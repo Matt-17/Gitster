@@ -1,9 +1,9 @@
 using System.IO;
 
 using Gitster.Services;
-using Gitster.Services.Git;
-using Gitster.Services.History;
-using Gitster.Services.Search;
+using Gitster.Core.Git;
+using Gitster.Core.History;
+using Gitster.Core.Search;
 using Gitster.ViewModels;
 using NSubstitute;
 using System.Reflection;

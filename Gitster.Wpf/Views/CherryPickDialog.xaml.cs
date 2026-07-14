@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-using Gitster.Services.Git;
+using Gitster.Core.Git;
 
 namespace Gitster.Views;
 
