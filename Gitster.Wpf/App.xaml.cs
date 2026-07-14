@@ -15,6 +15,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using Gitster.ApplicationLayer.Ui;
+
 namespace Gitster;
 
 /// <summary>
@@ -52,7 +54,12 @@ public partial class App : Application
 				})
 				.ConfigureServices((_, services) =>
 				{
-					services.AddSingleton<IWindowService, WindowService>();
+					services.AddSingleton<WindowService>();
+					services.AddSingleton<IWindowService>(sp => sp.GetRequiredService<WindowService>());
+					services.AddSingleton<IUserInteraction>(sp => sp.GetRequiredService<WindowService>());
+					services.AddSingleton<IDispatcher, WpfDispatcher>();
+					services.AddSingleton<IClipboard, WpfClipboard>();
+					services.AddSingleton<IAppLifetime, WpfAppLifetime>();
 					services.AddSingleton<AppSettingsService>();
 					services.AddSingleton<IGitBackend, HybridGitBackend>();
 					services.AddSingleton<RepositoryStateService>();

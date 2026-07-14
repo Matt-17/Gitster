@@ -3,10 +3,11 @@ using Gitster.Views;
 using Microsoft.Win32;
 
 using Gitster.Core;
+using Gitster.ApplicationLayer.Ui;
 
 namespace Gitster.Services;
 
-public sealed class WindowService : IWindowService
+public sealed class WindowService : IWindowService, IUserInteraction
 {
     private Window? _owner;
 
@@ -46,6 +47,34 @@ public sealed class WindowService : IWindowService
     public bool Confirm(string text, string caption)
     {
         return ShowMessage(text, caption, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+    }
+
+    // IUserInteraction: the WPF-free prompt used by ViewModels. Maps neutral enums to the styled
+    // GitsterDialog and back, so callers never see a System.Windows type.
+    public MessageResult Ask(string text, string caption, MessageButtons buttons = MessageButtons.Ok, MessageIcon icon = MessageIcon.None)
+    {
+        var wpfButton = buttons switch
+        {
+            MessageButtons.OkCancel => MessageBoxButton.OKCancel,
+            MessageButtons.YesNo => MessageBoxButton.YesNo,
+            MessageButtons.YesNoCancel => MessageBoxButton.YesNoCancel,
+            _ => MessageBoxButton.OK,
+        };
+        var wpfImage = icon switch
+        {
+            MessageIcon.Information => MessageBoxImage.Information,
+            MessageIcon.Warning => MessageBoxImage.Warning,
+            MessageIcon.Error => MessageBoxImage.Error,
+            MessageIcon.Question => MessageBoxImage.Question,
+            _ => MessageBoxImage.None,
+        };
+        return ShowMessage(text, caption, wpfButton, wpfImage) switch
+        {
+            MessageBoxResult.Yes => MessageResult.Yes,
+            MessageBoxResult.No => MessageResult.No,
+            MessageBoxResult.Cancel => MessageResult.Cancel,
+            _ => MessageResult.Ok,
+        };
     }
 
     public void Info(string text, string caption = "Gitster")
