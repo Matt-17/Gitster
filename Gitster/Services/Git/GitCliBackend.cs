@@ -566,6 +566,42 @@ public sealed class GitCliBackend : IGitBackend
         await UpdateTrackingRefAfterPushAsync(remote, resolvedSha, ct);
     }
 
+    public async Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
+    {
+        EnsurePath();
+        EnsureCli();
+
+        if (string.IsNullOrWhiteSpace(commitSha))
+            throw new ArgumentException("Commit SHA is required.", nameof(commitSha));
+
+        var branch = await GitCli.RunAsync(RepositoryPath, ["symbolic-ref", "HEAD"], ct: ct);
+        if (!branch.Success)
+            throw new InvalidOperationException("Check out a local branch before rewinding the remote.");
+
+        var targetRef = branch.Stdout.Trim();
+        var resolved = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", $"{commitSha}^{{commit}}"], ct: ct);
+        if (!resolved.Success)
+            throw new InvalidOperationException($"Commit not found: {commitSha}");
+
+        var resolvedSha = resolved.Stdout.Trim();
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote, ct);
+
+        // Rewinding the remote branch to an earlier commit is a non-fast-forward update, so it
+        // needs a force push. --force-with-lease still guards against clobbering commits that
+        // landed on the remote since our last fetch.
+        var r = await GitCli.RunAsync(
+            RepositoryPath,
+            ["push", "--force-with-lease", remote, $"{resolvedSha}:{targetRef}"],
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
+        if (!r.Success)
+            throw new InvalidOperationException($"Force push failed:\n{r.Output}");
+
+        await UpdateTrackingRefAfterPushAsync(remote, resolvedSha, ct);
+    }
+
     private async Task UpdateTrackingRefAfterPushAsync(string remoteName, string commitSha, CancellationToken ct = default)
     {
         var upstream = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--symbolic-full-name", "@{u}"], ct: ct);

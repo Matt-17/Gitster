@@ -75,6 +75,7 @@ public interface IRemoteOps : IRepositoryContext
     Task PullAsync(string remoteName = "origin", CancellationToken ct = default);
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default);
     Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default);
+    Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default);
     Task PushTagAsync(string tagName, string remoteName = "origin", CancellationToken ct = default);
 }
 

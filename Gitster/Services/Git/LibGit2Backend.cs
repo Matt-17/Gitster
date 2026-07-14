@@ -100,6 +100,9 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
     public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushThroughCommitAsync));
 
+    public Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
+        => ServerWorkNotSupportedAsync(nameof(ForceRemoteToCommitAsync));
+
     public Task<string> GetReflogSelectorForHeadAsync() => _rewrite.GetReflogSelectorForHeadAsync();
 
     public Task ResetMixedAsync(string targetReference, string? branchName = null)
