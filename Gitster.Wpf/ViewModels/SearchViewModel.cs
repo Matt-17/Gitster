@@ -13,9 +13,7 @@ using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.History;
 using Gitster.Core.Search;
-using Gitster.Views;
-
-using Microsoft.Win32;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -30,6 +28,7 @@ public partial class SearchViewModel : BaseViewModel
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
     private readonly IWindowService _windowService;
+    private IDialogService Dialogs => new WpfDialogService(_windowService);
     private readonly GitFeatureService _features;
     private CancellationTokenSource? _cts;
 
@@ -295,15 +294,10 @@ public partial class SearchViewModel : BaseViewModel
     [RelayCommand]
     private void PickBlameFile()
     {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Pick a file to blame",
-            InitialDirectory = _git.RepositoryPath,
-        };
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var picked = Dialogs.PickFile("Pick a file to blame", _git.RepositoryPath);
+        if (picked is null) return;
 
         var root = _git.RepositoryPath?.TrimEnd('\\', '/');
-        var picked = dialog.FileName;
         // Store a repo-relative path for git.
         BlameFilePath = !string.IsNullOrEmpty(root) && picked.StartsWith(root, StringComparison.OrdinalIgnoreCase)
             ? picked[(root.Length + 1)..].Replace('\\', '/')
@@ -339,17 +333,14 @@ public partial class SearchViewModel : BaseViewModel
             return;
 
         var shortSha = GitSha.Short(entry.Sha);
-        var dialog = new TextInputDialog
-        {
-            Title = "Create branch from reflog",
-            Prompt = $"New branch name at {entry.Selector} ({shortSha}):",
-            Value = $"rescue/{shortSha}",
-        };
-
-        if (_windowService.ShowDialog(dialog) != true)
+        var value = Dialogs.PromptText(
+            "Create branch from reflog",
+            $"New branch name at {entry.Selector} ({shortSha}):",
+            $"rescue/{shortSha}");
+        if (value is null)
             return;
 
-        var branchName = dialog.Value.Trim();
+        var branchName = value.Trim();
         if (string.IsNullOrWhiteSpace(branchName))
             return;
 

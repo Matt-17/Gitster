@@ -9,7 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
-using Gitster.Views;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -36,6 +36,7 @@ public partial class WorktreesViewModel : BaseViewModel
     private readonly OperationFeedbackService _feedback;
     private readonly SnapshotService          _snapshots;
     private readonly IWindowService           _windowService;
+    private IDialogService Dialogs => new WpfDialogService(_windowService);
     private readonly Func<string>             _getCurrentPath;
     private readonly Action<string>           _openInGitster;
 
@@ -138,8 +139,8 @@ public partial class WorktreesViewModel : BaseViewModel
     [RelayCommand]
     private async Task Add()
     {
-        var dialog = new AddWorktreeDialog(_getCurrentPath());
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var dialog = Dialogs.AddWorktree(_getCurrentPath());
+        if (dialog is null) return;
 
         try
         {
