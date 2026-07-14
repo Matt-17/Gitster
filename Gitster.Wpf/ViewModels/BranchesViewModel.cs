@@ -9,7 +9,6 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Core.Models;
 using Gitster.Services;
 using Gitster.Core;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
@@ -581,7 +580,7 @@ public partial class BranchesViewModel : BaseViewModel
         catch (GitConflictException ex)
         {
             await AfterChangeAsync();
-            await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _git, "Merge", ex);
+            await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Merge", ex);
         }
         catch (Exception ex)
         {

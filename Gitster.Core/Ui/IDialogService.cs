@@ -1,3 +1,4 @@
+using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.Models;
 
@@ -50,6 +51,9 @@ public interface IDialogService
 
     /// <summary>Shows the history-stitch preview. Returns true if the user confirmed.</summary>
     bool ConfirmHistoryStitch(HistoryStitchPreview preview);
+
+    /// <summary>Shows conflict guidance. Returns the chosen action, or null if dismissed.</summary>
+    ConflictGuidanceAction? ShowConflict(ConflictGuidance guidance);
 }
 
 /// <summary>Author/committer identity text chosen in the author-directory editor.</summary>

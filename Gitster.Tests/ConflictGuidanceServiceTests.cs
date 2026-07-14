@@ -1,4 +1,3 @@
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using NSubstitute;

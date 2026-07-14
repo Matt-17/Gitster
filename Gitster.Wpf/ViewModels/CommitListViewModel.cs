@@ -6,7 +6,6 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Core.Models;
 using Gitster.Core.Git;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.History;
 using Gitster.Core.Search;

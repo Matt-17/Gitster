@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Core.Git;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.History;
 

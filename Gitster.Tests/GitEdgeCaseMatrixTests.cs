@@ -1,6 +1,5 @@
 using System.IO;
 using Gitster.Core.Models;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.History;

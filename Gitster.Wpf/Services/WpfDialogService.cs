@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 
 using Gitster.Core;
+using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.Models;
 using Gitster.Core.Ui;
@@ -110,5 +111,11 @@ public sealed class WpfDialogService : IDialogService
     {
         var dialog = new HistoryStitchDialog(preview);
         return _windows.ShowDialog(dialog) == true;
+    }
+
+    public ConflictGuidanceAction? ShowConflict(ConflictGuidance guidance)
+    {
+        var dialog = new ConflictGuidanceDialog(guidance);
+        return _windows.ShowDialog(dialog) == true ? dialog.SelectedAction : null;
     }
 }

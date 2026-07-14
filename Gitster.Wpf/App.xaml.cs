@@ -4,7 +4,6 @@ using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Capabilities;
 using Gitster.Core.Git;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.History;
 using Gitster.Core.Logging;

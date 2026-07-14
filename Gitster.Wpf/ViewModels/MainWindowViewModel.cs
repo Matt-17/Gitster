@@ -10,7 +10,6 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Capabilities;
-using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.History;
@@ -1069,7 +1068,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _gitBackend, "Fixup", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(new WpfDialogService(_windowService), _windowService, _gitBackend, "Fixup", ex))
                 return;
 
             _windowService.Error($"Fixup failed:\n{ex.Message}", "Gitster");
@@ -1417,7 +1416,7 @@ public partial class MainWindowViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(_windowService, _gitBackend, "Cherry-pick", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(new WpfDialogService(_windowService), _windowService, _gitBackend, "Cherry-pick", ex))
                 return;
 
             _windowService.Error($"Cherry-pick failed:\n{ex.Message}", "Gitster");
