@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.Controls;
 

@@ -3,6 +3,7 @@ using System.Xml.Linq;
 
 using Gitster.Core.Models;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.Tests;
 

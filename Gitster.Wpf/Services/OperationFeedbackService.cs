@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Windows;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public abstract record OperationFeedback

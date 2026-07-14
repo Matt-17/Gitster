@@ -2,7 +2,7 @@ using System.IO;
 
 using Gitster.Core.Git;
 
-namespace Gitster.Services.Features;
+namespace Gitster.ApplicationLayer.Features;
 
 public sealed class GitFeatureService
 {

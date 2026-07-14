@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.Views.Helper;
 

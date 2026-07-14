@@ -2,6 +2,8 @@ using System.ComponentModel;
 
 using Gitster.ViewModels;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public sealed class CommitSelectionCoordinator

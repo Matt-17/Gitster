@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public interface ISelectionContext

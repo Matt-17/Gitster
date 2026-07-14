@@ -1,4 +1,4 @@
-namespace Gitster.Services.Features;
+namespace Gitster.ApplicationLayer.Features;
 
 public sealed record SubmoduleStatus(string Path, string Sha, bool IsInitialized, bool HasChanges);
 

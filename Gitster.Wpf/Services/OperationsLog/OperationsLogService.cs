@@ -8,6 +8,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Gitster.Core.Models;
 using Gitster.Core.Git;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services.OperationsLog;
 
 public partial class OperationsLogService : ObservableObject

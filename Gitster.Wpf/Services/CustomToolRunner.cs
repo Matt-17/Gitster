@@ -2,6 +2,8 @@ using Gitster.Core.Models;
 using Gitster.Core.Git;
 using Gitster.Views;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public sealed record CustomToolRunContext(

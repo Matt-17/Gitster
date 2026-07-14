@@ -1,6 +1,8 @@
 using System.Windows;
 using Microsoft.Win32;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public interface IWindowService

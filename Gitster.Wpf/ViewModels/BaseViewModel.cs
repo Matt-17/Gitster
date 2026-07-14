@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 using Microsoft.Extensions.Logging;
 
 namespace Gitster.ViewModels;

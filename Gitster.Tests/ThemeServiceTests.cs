@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.Tests;
 

@@ -2,7 +2,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
 
-namespace Gitster.Services.Features;
+namespace Gitster.ApplicationLayer.Features;
 
 public sealed record UpdateCheckResult(
     bool HasUpdate,

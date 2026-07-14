@@ -8,8 +8,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
-using Gitster.Services.Capabilities;
+using Gitster.ApplicationLayer;
+using Gitster.ApplicationLayer.Capabilities;
 using Gitster.Services.Features;
+using Gitster.ApplicationLayer.Features;
 using Gitster.Core.Git;
 using Gitster.Core.History;
 using Gitster.Services.OperationsLog;
@@ -250,7 +252,7 @@ public partial class MainWindowViewModel : BaseViewModel
 
         // Load saved path or use default
         _suppressFolderPathChanged = true;
-        Path = _appSettings.LoadRepositoryPath() ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        Path = _appSettings.LoadRepositoryPath(Properties.Settings.Default.Path) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         FolderPath = Path;
         _suppressFolderPathChanged = false;
 

@@ -3,6 +3,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Gitster.Core.Git;
 using Timer = System.Timers.Timer;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public partial class AutoFetchService : ObservableObject, IDisposable

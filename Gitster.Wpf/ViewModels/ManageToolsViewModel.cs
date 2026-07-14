@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Core.Models;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.ViewModels;
 

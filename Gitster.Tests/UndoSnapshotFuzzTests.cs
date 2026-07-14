@@ -1,5 +1,6 @@
 using System.IO;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 using Gitster.Core.Git;
 using Gitster.Services.OperationsLog;
 using LibGit2Sharp;

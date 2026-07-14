@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 using Gitster.Core.Git;
 using Gitster.Views;
 
