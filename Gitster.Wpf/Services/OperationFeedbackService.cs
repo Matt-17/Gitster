@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using System.Windows;
 
 using Gitster.Core;
+using Gitster.Core.Ui;
 
 namespace Gitster.Services;
 
@@ -16,15 +16,17 @@ public partial class OperationFeedbackService : ObservableObject
 {
     private const int SuccessFadeOutMs = 3000;
     private readonly RepositoryStateService? _stateService;
+    private readonly IDispatcher? _dispatcher;
     private CancellationTokenSource? _fadeOutCts;
 
     public OperationFeedbackService()
     {
     }
 
-    public OperationFeedbackService(RepositoryStateService stateService)
+    public OperationFeedbackService(RepositoryStateService stateService, IDispatcher? dispatcher = null)
     {
         _stateService = stateService;
+        _dispatcher = dispatcher;
     }
 
     [ObservableProperty]
@@ -84,11 +86,15 @@ public partial class OperationFeedbackService : ObservableObject
             try
             {
                 await Task.Delay(SuccessFadeOutMs, token);
-                await Application.Current.Dispatcher.InvokeAsync(() =>
+                void ClearIfStillSuccess()
                 {
                     if (Current is OperationFeedback.Success)
                         Current = null;
-                });
+                }
+                if (_dispatcher is not null)
+                    await _dispatcher.InvokeAsync(ClearIfStillSuccess);
+                else
+                    ClearIfStillSuccess();
             }
             catch (TaskCanceledException)
             {
