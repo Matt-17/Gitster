@@ -14,7 +14,7 @@ public sealed class AccessibilityAuditTests
         var root = FindRepoRoot();
         foreach (var palette in new[] { "Palette.Light.xaml", "Palette.Dark.xaml" })
         {
-            var brushes = LoadBrushColors(Path.Combine(root, "Gitster", "Themes", palette));
+            var brushes = LoadBrushColors(Path.Combine(root, "Gitster.Wpf", "Themes", palette));
             AssertContrast(brushes["TextTertiary"], brushes["BackgroundPrimary"], palette, "BackgroundPrimary");
             AssertContrast(brushes["TextTertiary"], brushes["BackgroundSecondary"], palette, "BackgroundSecondary");
         }
@@ -24,7 +24,7 @@ public sealed class AccessibilityAuditTests
     public void Xaml_IconOnlyButtons_HaveAutomationNames()
     {
         var root = FindRepoRoot();
-        var xamlFiles = Directory.EnumerateFiles(Path.Combine(root, "Gitster"), "*.xaml", SearchOption.AllDirectories)
+        var xamlFiles = Directory.EnumerateFiles(Path.Combine(root, "Gitster.Wpf"), "*.xaml", SearchOption.AllDirectories)
             .Where(path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
 
@@ -146,7 +146,7 @@ public sealed class AccessibilityAuditTests
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "Gitster", "Gitster.csproj")))
+            if (File.Exists(Path.Combine(dir.FullName, "Gitster.slnx")))
                 return dir.FullName;
             dir = dir.Parent;
         }

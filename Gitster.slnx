@@ -1,4 +1,7 @@
 <Solution>
+  <Project Path="Gitster.Core/Gitster.Core.csproj" />
+  <Project Path="Gitster.ApplicationLayer/Gitster.ApplicationLayer.csproj" />
+  <Project Path="Gitster.Presentation/Gitster.Presentation.csproj" />
+  <Project Path="Gitster.Wpf/Gitster.Wpf.csproj" />
   <Project Path="Gitster.Tests/Gitster.Tests.csproj" />
-  <Project Path="Gitster/Gitster.csproj" />
 </Solution>

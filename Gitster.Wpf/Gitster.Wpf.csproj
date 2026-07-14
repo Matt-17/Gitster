@@ -8,6 +8,9 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
 		<ApplicationIcon>Assets\Icon.ico</ApplicationIcon>
+		<!-- Keep the shipped exe and default namespace stable while the project is renamed to Gitster.Wpf. -->
+		<AssemblyName>Gitster</AssemblyName>
+		<RootNamespace>Gitster</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -17,6 +20,12 @@
 	<ItemGroup>
 		<Resource Include="Assets\Logo.png" />
 		<Resource Include="Assets\Icon.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Gitster.Presentation\Gitster.Presentation.csproj" />
+		<ProjectReference Include="..\Gitster.ApplicationLayer\Gitster.ApplicationLayer.csproj" />
+		<ProjectReference Include="..\Gitster.Core\Gitster.Core.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
