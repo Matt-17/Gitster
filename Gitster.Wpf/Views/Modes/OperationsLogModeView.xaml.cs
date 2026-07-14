@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 using Gitster.ViewModels;
 
 namespace Gitster.Views.Modes;

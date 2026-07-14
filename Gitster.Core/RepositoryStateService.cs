@@ -5,9 +5,7 @@ using Gitster.Core.Git;
 using Gitster.Core.Ui;
 using Timer = System.Timers.Timer;
 
-using Gitster.Core;
-
-namespace Gitster.Services;
+namespace Gitster.Core;
 
 [Flags]
 public enum RepositoryActivationChange

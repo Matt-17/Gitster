@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 
 namespace Gitster.ViewModels;
 

@@ -12,7 +12,7 @@ using Gitster.Core;
 using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 using Gitster.Views;
 
 using LibGit2Sharp;

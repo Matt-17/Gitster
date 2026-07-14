@@ -1,6 +1,6 @@
 using System.Windows;
 
-using Gitster.Services.OperationsLog;
+using Gitster.Core.OperationsLog;
 
 namespace Gitster.Views;
 

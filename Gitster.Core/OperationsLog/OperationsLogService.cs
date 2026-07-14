@@ -11,7 +11,7 @@ using Gitster.Core.Ui;
 
 using Gitster.Core;
 
-namespace Gitster.Services.OperationsLog;
+namespace Gitster.Core.OperationsLog;
 
 public partial class OperationsLogService : ObservableObject
 {
