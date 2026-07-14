@@ -22,6 +22,16 @@ public sealed class WpfDispatcher : IDispatcher
         return dispatcher.InvokeAsync(action).Task;
     }
 
+    public Task<T> InvokeAsync<T>(Func<T> func)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            return Task.FromResult(func());
+
+        return dispatcher.InvokeAsync(func).Task;
+    }
+
     public void Post(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);

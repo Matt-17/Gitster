@@ -13,6 +13,9 @@ public interface IDispatcher
     /// <summary>Runs <paramref name="action"/> on the UI thread and awaits its completion.</summary>
     Task InvokeAsync(Action action);
 
+    /// <summary>Runs <paramref name="func"/> on the UI thread and returns its result.</summary>
+    Task<T> InvokeAsync<T>(Func<T> func);
+
     /// <summary>Queues <paramref name="action"/> on the UI thread and returns immediately.</summary>
     void Post(Action action);
 }
