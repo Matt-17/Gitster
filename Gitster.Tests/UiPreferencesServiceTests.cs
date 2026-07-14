@@ -156,8 +156,8 @@ public sealed class UiPreferencesServiceTests
     public void PaletteDictionaries_ExposeSameKeys()
     {
         var root = FindRepositoryRoot();
-        var light = ReadResourceKeys(Path.Combine(root, "Gitster", "Themes", "Palette.Light.xaml"));
-        var dark = ReadResourceKeys(Path.Combine(root, "Gitster", "Themes", "Palette.Dark.xaml"));
+        var light = ReadResourceKeys(Path.Combine(root, "Gitster.Wpf", "Themes", "Palette.Light.xaml"));
+        var dark = ReadResourceKeys(Path.Combine(root, "Gitster.Wpf", "Themes", "Palette.Dark.xaml"));
 
         CollectionAssert.AreEqual(light.Order().ToArray(), dark.Order().ToArray());
     }
@@ -174,13 +174,13 @@ public sealed class UiPreferencesServiceTests
         var dir = AppContext.BaseDirectory;
         while (!string.IsNullOrWhiteSpace(dir))
         {
-            if (File.Exists(Path.Combine(dir, "Gitster.sln")))
+            if (File.Exists(Path.Combine(dir, "Gitster.slnx")))
                 return dir;
 
             dir = Directory.GetParent(dir)?.FullName;
         }
 
-        throw new DirectoryNotFoundException("Could not find Gitster.sln from test output directory.");
+        throw new DirectoryNotFoundException("Could not find Gitster.slnx from test output directory.");
     }
 
     private static string[] ReadResourceKeys(string path)

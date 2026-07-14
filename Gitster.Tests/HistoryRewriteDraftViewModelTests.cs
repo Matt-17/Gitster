@@ -355,7 +355,7 @@ public sealed class HistoryRewriteDraftViewModelTests
     public void ApplyIcon_UsesButtonForegroundForDisabledState()
     {
         XNamespace ns = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-        var doc = XDocument.Load(RepoFile("Gitster", "Controls", "HistoryRewriteDraftPanel.xaml"));
+        var doc = XDocument.Load(RepoFile("Gitster.Wpf", "Controls", "HistoryRewriteDraftPanel.xaml"));
         var applyButton = doc.Descendants(ns + "Button")
             .Single(b => (string?)b.Attribute("Command") == "{Binding ApplyCommand}");
         var checkPath = applyButton.Descendants(ns + "Path")
@@ -394,7 +394,7 @@ public sealed class HistoryRewriteDraftViewModelTests
     private static string RepoFile(params string[] parts)
     {
         var dir = new DirectoryInfo(Path.GetDirectoryName(CurrentSourceFile())!);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Gitster.sln")))
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Gitster.slnx")))
             dir = dir.Parent;
 
         Assert.IsNotNull(dir, "Could not find repository root.");
