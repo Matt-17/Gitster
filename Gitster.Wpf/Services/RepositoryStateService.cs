@@ -1,8 +1,8 @@
 using System.IO;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Gitster.Core.Models;
 using Gitster.Core.Git;
+using Gitster.Core.Ui;
 using Timer = System.Timers.Timer;
 
 using Gitster.Core;
@@ -20,6 +20,7 @@ public enum RepositoryActivationChange
 public partial class RepositoryStateService : ObservableObject, IDisposable
 {
     private readonly IGitBackend _git;
+    private readonly IDispatcher? _dispatcher;
     private FileSystemWatcher? _indexWatcher;
     private FileSystemWatcher? _gitWatcher;
     private FileSystemWatcher? _workingDirWatcher;
@@ -46,9 +47,10 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isOperationRunning;
 
-    public RepositoryStateService(IGitBackend git)
+    public RepositoryStateService(IGitBackend git, IDispatcher? dispatcher = null)
     {
         _git = git;
+        _dispatcher = dispatcher;
         _debounceTimer = new Timer(DebounceMs) { AutoReset = false };
         _debounceTimer.Elapsed += async (_, _) => await RefreshAsync();
     }
@@ -168,8 +170,7 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
                 "Updating repository status.",
                 80));
 
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher is null || dispatcher.CheckAccess())
+            if (_dispatcher is null || _dispatcher.IsDispatcherThread)
             {
                 if (!string.Equals(RepositoryPath, repoPath, StringComparison.OrdinalIgnoreCase))
                     return;
@@ -178,7 +179,7 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
             }
             else
             {
-                var applied = await dispatcher.InvokeAsync(() =>
+                var applied = await _dispatcher.InvokeAsync(() =>
                 {
                     if (!string.Equals(RepositoryPath, repoPath, StringComparison.OrdinalIgnoreCase))
                         return false;
@@ -301,14 +302,13 @@ public partial class RepositoryStateService : ObservableObject, IDisposable
 
     private void SetOperationRunning(bool value)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (_dispatcher is null || _dispatcher.IsDispatcherThread)
         {
             IsOperationRunning = value;
             return;
         }
 
-        _ = dispatcher.InvokeAsync(() => IsOperationRunning = value);
+        _dispatcher.Post(() => IsOperationRunning = value);
     }
 
     private static RepositoryStateSnapshot CaptureSnapshot(string repoPath)

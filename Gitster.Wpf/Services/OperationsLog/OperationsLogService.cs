@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Core.Models;
 using Gitster.Core.Git;
+using Gitster.Core.Ui;
 
 using Gitster.Core;
 
@@ -14,7 +15,13 @@ namespace Gitster.Services.OperationsLog;
 
 public partial class OperationsLogService : ObservableObject
 {
+    private readonly IDispatcher? _dispatcher;
     private string? _storagePath;
+
+    public OperationsLogService(IDispatcher? dispatcher = null)
+    {
+        _dispatcher = dispatcher;
+    }
 
     [ObservableProperty]
     public partial ObservableCollection<OperationRecord> Records { get; set; } = [];
@@ -101,25 +108,23 @@ public partial class OperationsLogService : ObservableObject
     /// Records is bound to the UI; every mutation must happen on the dispatcher.
     /// Falls back to inline execution in unit tests (no Application).
     /// </summary>
-    private static Task RunOnUiThreadAsync(Action action)
+    private Task RunOnUiThreadAsync(Action action)
     {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (_dispatcher is null || _dispatcher.IsDispatcherThread)
         {
             action();
             return Task.CompletedTask;
         }
 
-        return dispatcher.InvokeAsync(action).Task;
+        return _dispatcher.InvokeAsync(action);
     }
 
-    private static async Task<T> RunOnUiThreadAsync<T>(Func<T> func)
+    private async Task<T> RunOnUiThreadAsync<T>(Func<T> func)
     {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (_dispatcher is null || _dispatcher.IsDispatcherThread)
             return func();
 
-        return await dispatcher.InvokeAsync(func).Task;
+        return await _dispatcher.InvokeAsync(func);
     }
 
     public async Task<UndoPlan> PrepareUndoAsync(
