@@ -1,11 +1,13 @@
 ﻿using System.Windows;
 using System.IO;
 using Gitster.Services;
-using Gitster.Services.Capabilities;
+using Gitster.ApplicationLayer;
+using Gitster.ApplicationLayer.Capabilities;
 using Gitster.Core.Git;
 using Gitster.Services.Features;
+using Gitster.ApplicationLayer.Features;
 using Gitster.Core.History;
-using Gitster.Services.Logging;
+using Gitster.ApplicationLayer.Logging;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;
 using Gitster.ViewModels;

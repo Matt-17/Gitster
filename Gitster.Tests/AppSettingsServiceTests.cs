@@ -4,6 +4,7 @@ using System.Windows;
 
 using Gitster.Core.Models;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.Tests;
 
@@ -16,7 +17,7 @@ public sealed class AppSettingsServiceTests
         var path = SettingsPath();
         var service = new AppSettingsService(path);
 
-        service.SaveWindowSettings(new AppSettingsService.WindowSettings(1, 2, 800, 600, WindowState.Normal));
+        service.SaveWindowSettings(new AppSettingsService.WindowSettings(1, 2, 800, 600, WindowStateKind.Normal));
 
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         Assert.AreEqual(1, doc.RootElement.GetProperty("Version").GetInt32());

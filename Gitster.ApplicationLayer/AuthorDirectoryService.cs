@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Gitster.Core.Models;
 using Gitster.Core.History;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 public partial class AuthorDirectoryService : ObservableObject
 {

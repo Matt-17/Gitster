@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using Gitster.Core.Models;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 using Gitster.ViewModels;
 
 namespace Gitster;
@@ -183,7 +184,7 @@ public partial class MainWindow : Window
         Width  = s.Width;
         Height = s.Height;
 
-        if (s.State == WindowState.Maximized)
+        if (s.State == WindowStateKind.Maximized)
             WindowState = WindowState.Maximized;
     }
 
@@ -195,9 +196,9 @@ public partial class MainWindow : Window
             ? RestoreBounds
             : new Rect(Left, Top, Width, Height);
 
-        var state = WindowState == WindowState.Minimized
-            ? WindowState.Normal   // never persist Minimized
-            : WindowState;
+        var state = WindowState == WindowState.Maximized
+            ? WindowStateKind.Maximized
+            : WindowStateKind.Normal;   // never persist Minimized
 
         _appSettings.SaveWindowSettings(new AppSettingsService.WindowSettings(
             bounds.Left, bounds.Top, bounds.Width, bounds.Height, state));

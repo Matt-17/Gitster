@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 
 namespace Gitster.ViewModels;
 

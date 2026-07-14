@@ -8,7 +8,7 @@ using Gitster.Core.Models;
 
 using LibGit2Sharp;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 /// <summary>Result of running a custom tool's command.</summary>
 public sealed record ToolRunResult(int ExitCode, string Output)

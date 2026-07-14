@@ -1,6 +1,8 @@
 using Gitster.Core.Git;
 using Gitster.Views;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services.Features;
 
 public enum ConflictGuidanceAction

@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Media.Imaging;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 /// <summary>

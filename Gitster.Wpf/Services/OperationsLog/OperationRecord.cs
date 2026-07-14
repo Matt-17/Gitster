@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 
 using Gitster.Core.Git;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services.OperationsLog;
 
 public enum OperationKind { Amend, Reword, Reset, Rebase, CherryPick, CommitOnBranch, AuthorRepair, AuthorAmend, RangeRewrite, StashDrop, StashPop, StashConvert, Fixup, Squash, CherryPickTimestamp, Snapshot, Commit, HistoryEdit, Merge, Revert }

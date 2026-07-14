@@ -1,4 +1,4 @@
-namespace Gitster.Services.Features;
+namespace Gitster.ApplicationLayer.Features;
 
 public sealed record ReflogEntry(string Selector, string Sha, string Action, string Message, DateTimeOffset? Date)
 {

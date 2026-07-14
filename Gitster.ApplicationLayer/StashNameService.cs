@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 /// <summary>
 /// Persists user-assigned stash display names in .git/gitster/stash-names.json,

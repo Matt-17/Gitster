@@ -4,7 +4,7 @@ using System.Text.Json;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 /// <summary>
 /// Persists branch favourites for the title-bar branch picker:

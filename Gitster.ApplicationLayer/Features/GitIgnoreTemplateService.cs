@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Gitster.Services.Features;
+namespace Gitster.ApplicationLayer.Features;
 
 public sealed class GitIgnoreTemplateService
 {

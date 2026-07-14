@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Core.Models;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 /// <summary>
 /// Persisted, observable UI preferences (plan A10 date mode, A13 branch tree, A14 gravatar).

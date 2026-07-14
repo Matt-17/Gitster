@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 public record RecentRepoEntry(string FullPath, DateTime LastOpenedAt)
 {

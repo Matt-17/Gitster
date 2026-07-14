@@ -4,7 +4,7 @@ using System.Text.Json;
 using Gitster.Core.Models;
 using Gitster.Core.Git;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 /// <summary>
 /// Captures a snapshot of all repo refs whenever HEAD moves.

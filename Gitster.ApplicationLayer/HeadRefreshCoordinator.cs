@@ -1,4 +1,4 @@
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 public sealed class HeadRefreshCoordinator : IDisposable
 {

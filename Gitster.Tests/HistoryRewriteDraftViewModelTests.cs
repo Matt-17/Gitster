@@ -1,5 +1,6 @@
 using Gitster.Core.Git;
 using Gitster.Services;
+using Gitster.ApplicationLayer;
 using Gitster.Services.OperationsLog;
 using Gitster.ViewModels;
 using NSubstitute;

@@ -7,6 +7,8 @@ using Gitster.Core.Models;
 
 using Microsoft.Win32;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public sealed class ThemeService : IDisposable

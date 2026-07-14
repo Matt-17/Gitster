@@ -1,4 +1,4 @@
-namespace Gitster.Services.Features;
+namespace Gitster.ApplicationLayer.Features;
 
 public static class TimestampPresetResolver
 {

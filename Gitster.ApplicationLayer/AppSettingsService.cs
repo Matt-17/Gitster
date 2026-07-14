@@ -1,11 +1,10 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Windows;
 
 using Gitster.Core.Models;
 
-namespace Gitster.Services;
+namespace Gitster.ApplicationLayer;
 
 /// <summary>
 /// Persists app-wide settings in %AppData%/Gitster/settings.json. Recent repositories
@@ -36,7 +35,7 @@ public sealed class AppSettingsService
         double Top,
         double Width,
         double Height,
-        WindowState State);
+        WindowStateKind State);
 
     public sealed class UiSettings
     {
@@ -83,14 +82,18 @@ public sealed class AppSettingsService
         SaveDocument(document);
     }
 
-    public string? LoadRepositoryPath()
+    /// <summary>
+    /// Returns the persisted repository path, falling back to <paramref name="legacyFallback"/>
+    /// (the old WPF user-setting) when the consolidated store has none. The caller supplies the
+    /// legacy value so this service stays free of any UI-framework settings provider.
+    /// </summary>
+    public string? LoadRepositoryPath(string? legacyFallback = null)
     {
         var document = LoadDocument();
         if (!string.IsNullOrWhiteSpace(document.RepositoryPath))
             return document.RepositoryPath;
 
-        var legacy = Properties.Settings.Default.Path;
-        return string.IsNullOrWhiteSpace(legacy) ? null : legacy;
+        return string.IsNullOrWhiteSpace(legacyFallback) ? null : legacyFallback;
     }
 
     public void SaveRepositoryPath(string path)

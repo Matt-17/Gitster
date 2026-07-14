@@ -2,6 +2,8 @@ using System.Windows;
 using Gitster.Views;
 using Microsoft.Win32;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public sealed class WindowService : IWindowService

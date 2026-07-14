@@ -5,6 +5,8 @@ using Gitster.Core.Models;
 using Gitster.ViewModels;
 using Gitster.Views;
 
+using Gitster.ApplicationLayer;
+
 namespace Gitster.Services;
 
 public sealed record RepositorySwitchRequest(
