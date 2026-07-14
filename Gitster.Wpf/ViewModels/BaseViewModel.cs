@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using Gitster.ApplicationLayer.Ui;
+using Gitster.Core.Ui;
 using Gitster.Core;
 using Gitster.Services;
 using Microsoft.Extensions.Logging;

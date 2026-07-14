@@ -1,4 +1,4 @@
-using Gitster.ApplicationLayer.Ui;
+using Gitster.Core.Ui;
 
 namespace Gitster.Services;
 
