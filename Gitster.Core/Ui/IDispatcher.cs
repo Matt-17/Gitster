@@ -1,4 +1,4 @@
-namespace Gitster.ApplicationLayer.Ui;
+namespace Gitster.Core.Ui;
 
 /// <summary>
 /// Marshals work onto the UI thread without binding the ViewModels to a specific UI framework.

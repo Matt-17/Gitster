@@ -1,4 +1,4 @@
-namespace Gitster.ApplicationLayer.Ui;
+namespace Gitster.Core.Ui;
 
 /// <summary>Buttons offered by a message prompt (UI-framework-neutral).</summary>
 public enum MessageButtons { Ok, OkCancel, YesNo, YesNoCancel }

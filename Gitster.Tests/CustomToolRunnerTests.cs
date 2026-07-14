@@ -9,7 +9,7 @@ using Gitster.Views;
 using Microsoft.Win32;
 using NSubstitute;
 
-using Gitster.ApplicationLayer.Ui;
+using Gitster.Core.Ui;
 
 namespace Gitster.Tests;
 
