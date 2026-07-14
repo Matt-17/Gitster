@@ -575,7 +575,7 @@ public partial class MainWindowViewModel : BaseViewModel
     private void OpenOptions()
     {
         if (BranchesVM.Favorites is not { } favorites) return;
-        var window = new OptionsWindow(new OptionsViewModel(favorites));
+        var window = new OptionsWindow(new OptionsViewModel(favorites, _uiPreferences));
         _windowService.ShowDialog(window);
     }
 

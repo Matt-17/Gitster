@@ -13,6 +13,9 @@ namespace Gitster.Services;
 /// </summary>
 public partial class UiPreferencesService : ObservableObject
 {
+    /// <summary>Default branch-tree font: the proportional UI face, not a monospace one.</summary>
+    public const string DefaultBranchFontFamily = "Segoe UI Variable Text, Segoe UI";
+
     private readonly AppSettingsService? _settingsService;
     private readonly string _filePath;
     private readonly Dictionary<string, double> _splitterLengths = new(StringComparer.Ordinal);
@@ -46,6 +49,7 @@ public partial class UiPreferencesService : ObservableObject
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
         public ThemePreference ThemePreference { get; set; } = ThemePreference.System;
+        public string BranchFontFamily { get; set; } = DefaultBranchFontFamily;
         public Dictionary<string, double>? SplitterLengths { get; set; }
     }
 
@@ -70,6 +74,9 @@ public partial class UiPreferencesService : ObservableObject
     [ObservableProperty]
     public partial ThemePreference ThemePreference { get; set; } = ThemePreference.System;
 
+    [ObservableProperty]
+    public partial string BranchFontFamily { get; set; } = DefaultBranchFontFamily;
+
     public bool IsLightTheme => ThemePreference == ThemePreference.Light;
     public bool IsDarkTheme => ThemePreference == ThemePreference.Dark;
     public bool IsSystemTheme => ThemePreference == ThemePreference.System;
@@ -80,6 +87,7 @@ public partial class UiPreferencesService : ObservableObject
     partial void OnCommitRefPaneCollapsedChanged(bool value) => Save();
     partial void OnUpdateChecksEnabledChanged(bool value) => Save();
     partial void OnPersistentLoggingEnabledChanged(bool value) => Save();
+    partial void OnBranchFontFamilyChanged(string value) => Save();
     partial void OnThemePreferenceChanged(ThemePreference value)
     {
         OnPropertyChanged(nameof(IsLightTheme));
@@ -145,6 +153,7 @@ public partial class UiPreferencesService : ObservableObject
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
                     ThemePreference = ThemePreference,
+                    BranchFontFamily = BranchFontFamily,
                     SplitterLengths = new Dictionary<string, double>(_splitterLengths),
                 });
                 return;
@@ -164,6 +173,7 @@ public partial class UiPreferencesService : ObservableObject
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
                     ThemePreference = ThemePreference,
+                    BranchFontFamily = BranchFontFamily,
                     SplitterLengths = new Dictionary<string, double>(_splitterLengths),
                 },
                 new JsonSerializerOptions { WriteIndented = true });
@@ -187,6 +197,9 @@ public partial class UiPreferencesService : ObservableObject
         UpdateChecksEnabled = settings.UpdateChecksEnabled;
         PersistentLoggingEnabled = settings.PersistentLoggingEnabled;
         ThemePreference = settings.ThemePreference;
+        BranchFontFamily = string.IsNullOrWhiteSpace(settings.BranchFontFamily)
+            ? DefaultBranchFontFamily
+            : settings.BranchFontFamily;
         ReplaceSplitterLengths(settings.SplitterLengths);
     }
 
@@ -199,6 +212,9 @@ public partial class UiPreferencesService : ObservableObject
         UpdateChecksEnabled = p.UpdateChecksEnabled;
         PersistentLoggingEnabled = p.PersistentLoggingEnabled;
         ThemePreference = p.ThemePreference;
+        BranchFontFamily = string.IsNullOrWhiteSpace(p.BranchFontFamily)
+            ? DefaultBranchFontFamily
+            : p.BranchFontFamily;
         ReplaceSplitterLengths(p.SplitterLengths);
     }
 
