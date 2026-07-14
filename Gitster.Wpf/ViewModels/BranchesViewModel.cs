@@ -13,7 +13,7 @@ using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
-using Gitster.Views;
+using Gitster.Core.Ui;
 
 using LibGit2Sharp;
 
@@ -130,6 +130,7 @@ public partial class BranchesViewModel : BaseViewModel
     private readonly SourceArchiveService     _archiveService;
     private readonly UiPreferencesService     _ui;
     private readonly IWindowService           _windowService;
+    private IDialogService Dialogs => new WpfDialogService(_windowService);
     private readonly BranchFavoritesService?  _favorites;
     private readonly Func<Task>               _onChanged;
 
@@ -542,8 +543,8 @@ public partial class BranchesViewModel : BaseViewModel
             return;
         }
 
-        var dialog = new MergeBranchDialog(row.Name, current.Name);
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var strategy = Dialogs.MergeBranch(row.Name, current.Name);
+        if (strategy is null) return;
 
         try
         {
@@ -552,7 +553,7 @@ public partial class BranchesViewModel : BaseViewModel
 
             var result = await _feedback.RunAsync(
                 "Merge",
-                () => _git.MergeBranchAsync(row.Name, dialog.SelectedStrategy),
+                () => _git.MergeBranchAsync(row.Name, strategy.Value),
                 DescribeMergeOutcome);
 
             if (result.Outcome != BranchMergeOutcome.UpToDate)
@@ -561,7 +562,7 @@ public partial class BranchesViewModel : BaseViewModel
                     Id:             Guid.NewGuid().ToString(),
                     Timestamp:      DateTimeOffset.Now,
                     Kind:           OperationKind.Merge,
-                    Description:    $"Merge {row.Name} ({DescribeStrategy(dialog.SelectedStrategy)})",
+                    Description:    $"Merge {row.Name} ({DescribeStrategy(strategy.Value)})",
                     BranchName:     result.TargetBranch,
                     BeforeSha:      beforeSha,
                     AfterSha:       result.HeadSha,
@@ -607,8 +608,7 @@ public partial class BranchesViewModel : BaseViewModel
             return;
         }
 
-        var dialog = new HistoryStitchDialog(preview);
-        if (_windowService.ShowDialog(dialog) != true)
+        if (!Dialogs.ConfirmHistoryStitch(preview))
             return;
 
         try
@@ -653,15 +653,11 @@ public partial class BranchesViewModel : BaseViewModel
     {
         if (SelectedBranch is not { } row) return;
 
-        var dialog = new TextInputDialog
-        {
-            Title  = "Rename branch",
-            Prompt = $"New name for '{row.Name}':",
-            Value  = row.IsRemote ? string.Empty : row.Name,
-        };
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var value = Dialogs.PromptText(
+            "Rename branch", $"New name for '{row.Name}':", row.IsRemote ? string.Empty : row.Name);
+        if (value is null) return;
 
-        var newName = dialog.Value.Trim();
+        var newName = value.Trim();
         if (string.IsNullOrEmpty(newName) || newName == row.Name) return;
 
         try
@@ -707,15 +703,11 @@ public partial class BranchesViewModel : BaseViewModel
     {
         if (SelectedBranch is not { } row) return;
 
-        var dialog = new TextInputDialog
-        {
-            Title  = "Create branch",
-            Prompt = $"New branch name (starting from '{row.Name}'):",
-            Value  = string.Empty,
-        };
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var value = Dialogs.PromptText(
+            "Create branch", $"New branch name (starting from '{row.Name}'):", string.Empty);
+        if (value is null) return;
 
-        var name = dialog.Value.Trim();
+        var name = value.Trim();
         if (string.IsNullOrEmpty(name)) return;
 
         try

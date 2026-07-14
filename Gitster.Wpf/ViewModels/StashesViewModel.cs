@@ -12,7 +12,7 @@ using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
-using Gitster.Views;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -71,6 +71,7 @@ public partial class StashesViewModel : BaseViewModel
     private readonly SnapshotService       _snapshotService;
     private readonly StashNameService      _nameService;
     private readonly IWindowService        _windowService;
+    private IDialogService Dialogs => new WpfDialogService(_windowService);
     private readonly Func<Task>            _onStashesChanged;
 
     private List<StashItem> _allStashes = [];
@@ -270,8 +271,8 @@ public partial class StashesViewModel : BaseViewModel
     [RelayCommand]
     private async Task NewStash()
     {
-        var dialog = new NewStashDialog();
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var dialog = Dialogs.NewStash();
+        if (dialog is null) return;
 
         try
         {
@@ -391,15 +392,11 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        var dialog = new TextInputDialog
-        {
-            Title  = "Rename stash",
-            Prompt = "New name (leave empty to reset to auto-name):",
-            Value  = stash.UserName,
-        };
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var value = Dialogs.PromptText(
+            "Rename stash", "New name (leave empty to reset to auto-name):", stash.UserName);
+        if (value is null) return;
 
-        await _nameService.SetNameAsync(stash.CommitSha, dialog.Value.Trim());
+        await _nameService.SetNameAsync(stash.CommitSha, value.Trim());
         await LoadAsync(); // rebuilds display names
     }
 
@@ -408,15 +405,10 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        var dialog = new TextInputDialog
-        {
-            Title  = "Convert stash to branch",
-            Prompt = "New branch name:",
-            Value  = stash.SlugName,
-        };
-        if (_windowService.ShowDialog(dialog) != true) return;
+        var value = Dialogs.PromptText("Convert stash to branch", "New branch name:", stash.SlugName);
+        if (value is null) return;
 
-        var branchName = dialog.Value.Trim();
+        var branchName = value.Trim();
         if (string.IsNullOrEmpty(branchName))
         {
             _windowService.Warning("Branch name cannot be empty.", "Convert to branch");

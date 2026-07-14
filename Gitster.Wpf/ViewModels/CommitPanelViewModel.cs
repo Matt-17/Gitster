@@ -9,6 +9,7 @@ using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -58,6 +59,7 @@ public partial class CommitPanelViewModel : BaseViewModel
     private readonly SnapshotService _snapshots;
     private readonly AuthorDirectoryService _authorDir;
     private readonly IWindowService _windowService;
+    private IDialogService Dialogs => new WpfDialogService(_windowService);
     private readonly Func<Task> _onChanged;
     private readonly Func<string> _getBranch;
     private readonly Func<string?> _getRemote;
@@ -209,11 +211,10 @@ public partial class CommitPanelViewModel : BaseViewModel
     [RelayCommand]
     private void EditAuthor()
     {
-        var dialog = new Views.EditAuthorsDialog(_authorDir);
-        if (_windowService.ShowDialog(dialog) == true)
+        if (Dialogs.EditAuthors(_authorDir) is { } sel)
         {
-            _authorText = dialog.SelectedAuthorText;
-            _committerText = dialog.SelectedCommitterText;
+            _authorText = sel.AuthorText;
+            _committerText = sel.CommitterText;
             AuthorLabel = string.IsNullOrWhiteSpace(_authorText)
                 ? "Author: default"
                 : $"Author: {_authorText}";

@@ -8,7 +8,7 @@ using Gitster.Services.Features;
 using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.OperationsLog;
-using Gitster.Views;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -23,6 +23,7 @@ public partial class QuickActionsViewModel : BaseViewModel
     private readonly SnapshotService          _snapshots;
     private readonly SourceArchiveService     _archiveService;
     private readonly IWindowService           _windowService;
+    private IDialogService Dialogs => new WpfDialogService(_windowService);
     private readonly Func<CommitItem?>        _getSelected;
     private readonly Func<List<CommitItem>>   _getMultiSelected;
     private readonly Func<Task>               _onRefresh;
@@ -99,10 +100,8 @@ public partial class QuickActionsViewModel : BaseViewModel
             if (r != MessageBoxResult.Yes) return;
         }
 
-        var dlg = new RewordDialog(commit.Message);
-        if (_windowService.ShowDialog(dlg) != true) return;
-
-        var newMessage = dlg.NewMessage;
+        var newMessage = Dialogs.RewordCommit(commit.Message);
+        if (newMessage is null) return;
 
         try
         {
@@ -225,8 +224,8 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
 
         var combined = string.Join("\n\n", commits.Select(c => c.Message));
-        var dlg = new SquashDialog(combined);
-        if (_windowService.ShowDialog(dlg) != true) return;
+        var dlg = Dialogs.SquashCommits(combined);
+        if (dlg is null) return;
 
         try
         {
@@ -279,8 +278,8 @@ public partial class QuickActionsViewModel : BaseViewModel
             return;
         }
 
-        var dlg = new CherryPickDialog(_git, branches);
-        if (_windowService.ShowDialog(dlg) != true || dlg.SelectedSha is null) return;
+        var dlg = Dialogs.CherryPick(_git, branches);
+        if (dlg is null) return;
 
         try
         {
@@ -353,8 +352,8 @@ public partial class QuickActionsViewModel : BaseViewModel
             .Select(b => b.Name)
             .ToList();
 
-        var dlg = new CommitToBranchDialog(localTargets);
-        if (_windowService.ShowDialog(dlg) != true) return;
+        var dlg = Dialogs.CommitToBranch(localTargets);
+        if (dlg is null) return;
 
         try
         {
@@ -402,8 +401,8 @@ public partial class QuickActionsViewModel : BaseViewModel
     [RelayCommand]
     private async Task SnapshotToBranch()
     {
-        var dlg = new SnapshotBranchDialog();
-        if (_windowService.ShowDialog(dlg) != true) return;
+        var dlg = Dialogs.SnapshotBranch();
+        if (dlg is null) return;
 
         try
         {
