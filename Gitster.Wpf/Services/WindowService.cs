@@ -2,7 +2,7 @@ using System.Windows;
 using Gitster.Views;
 using Microsoft.Win32;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 

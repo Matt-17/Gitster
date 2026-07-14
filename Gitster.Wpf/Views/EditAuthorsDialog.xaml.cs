@@ -1,6 +1,6 @@
 using System.Windows;
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 using Gitster.ViewModels;
 
 namespace Gitster.Views;

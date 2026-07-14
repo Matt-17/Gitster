@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 using Gitster.Core.Git;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services.OperationsLog;
 

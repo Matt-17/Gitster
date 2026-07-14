@@ -1,4 +1,4 @@
-namespace Gitster.ApplicationLayer;
+namespace Gitster.Core;
 
 public sealed record ShortcutEntry(string Area, string Gesture, string Command);
 

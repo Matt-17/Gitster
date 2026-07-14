@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 

@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 using Gitster.Views.Helper;
 
 namespace Gitster.Tests;

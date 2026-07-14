@@ -1,4 +1,4 @@
-namespace Gitster.ApplicationLayer;
+namespace Gitster.Core;
 
 public sealed class RepositoryCommandContext
 {

@@ -7,7 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Core.Models;
 using Gitster.Core.Git;
 using Gitster.Services.Features;
-using Gitster.ApplicationLayer.Features;
+using Gitster.Core.Features;
 using Gitster.Core.History;
 using Gitster.Core.Search;
 
@@ -32,7 +32,7 @@ public partial class CommitListViewModel : BaseViewModel
     private readonly CommitGraphLayoutService _graphLayout = new();
 
     /// <summary>Shared UI preferences (date display mode, gravatar) for row bindings.</summary>
-    public Gitster.ApplicationLayer.UiPreferencesService Ui { get; }
+    public Gitster.Core.UiPreferencesService Ui { get; }
 
     private List<CommitItem> _allRows = [];
     private List<CommitItem> _incomingRows = [];
@@ -51,7 +51,7 @@ public partial class CommitListViewModel : BaseViewModel
     public CommitListViewModel(
         IGitBackend git,
         CommitHistoryService history,
-        Gitster.ApplicationLayer.UiPreferencesService ui,
+        Gitster.Core.UiPreferencesService ui,
         GitFeatureService? features = null)
     {
         _git = git;

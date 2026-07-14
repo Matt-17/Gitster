@@ -23,7 +23,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Gitster.Presentation\Gitster.Presentation.csproj" />
 		<ProjectReference Include="..\Gitster.ApplicationLayer\Gitster.ApplicationLayer.csproj" />
 		<ProjectReference Include="..\Gitster.Core\Gitster.Core.csproj" />
 	</ItemGroup>

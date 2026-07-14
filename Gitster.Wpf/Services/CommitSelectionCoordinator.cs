@@ -2,7 +2,7 @@ using System.ComponentModel;
 
 using Gitster.ViewModels;
 
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Services;
 

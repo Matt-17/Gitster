@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using Gitster.Core.Git;
 
-namespace Gitster.ApplicationLayer.Capabilities;
+namespace Gitster.Core.Capabilities;
 
 public partial class CapabilityService : ObservableObject
 {

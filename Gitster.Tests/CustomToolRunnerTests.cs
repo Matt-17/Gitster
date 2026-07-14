@@ -2,7 +2,7 @@ using System.Windows;
 
 using Gitster.Core.Models;
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 using Gitster.Core.Git;
 using Gitster.Views;
 

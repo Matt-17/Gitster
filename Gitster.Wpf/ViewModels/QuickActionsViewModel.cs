@@ -3,9 +3,9 @@ using System.Windows;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 using Gitster.Services.Features;
-using Gitster.ApplicationLayer.Features;
+using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Services.OperationsLog;
 using Gitster.Views;

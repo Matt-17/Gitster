@@ -8,10 +8,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Services;
-using Gitster.ApplicationLayer;
-using Gitster.ApplicationLayer.Capabilities;
+using Gitster.Core;
+using Gitster.Core.Capabilities;
 using Gitster.Services.Features;
-using Gitster.ApplicationLayer.Features;
+using Gitster.Core.Features;
 using Gitster.Core.Git;
 using Gitster.Core.History;
 using Gitster.Services.OperationsLog;

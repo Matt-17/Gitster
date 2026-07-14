@@ -1,5 +1,5 @@
 using Gitster.Services;
-using Gitster.ApplicationLayer;
+using Gitster.Core;
 
 namespace Gitster.Tests;
 
