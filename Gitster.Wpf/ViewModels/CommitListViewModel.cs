@@ -1,6 +1,3 @@
-using System.Windows;
-using System.Windows.Threading;
-
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -9,6 +6,7 @@ using Gitster.Core.Git;
 using Gitster.Core.Features;
 using Gitster.Core.History;
 using Gitster.Core.Search;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
@@ -28,6 +26,7 @@ public partial class CommitListViewModel : BaseViewModel
     private readonly IGitBackend _git;
     private readonly CommitHistoryService _history;
     private readonly GitFeatureService _features;
+    private readonly IDispatcher? _dispatcher;
     private readonly CommitGraphLayoutService _graphLayout = new();
 
     /// <summary>Shared UI preferences (date display mode, gravatar) for row bindings.</summary>
@@ -51,11 +50,13 @@ public partial class CommitListViewModel : BaseViewModel
         IGitBackend git,
         CommitHistoryService history,
         Gitster.Core.UiPreferencesService ui,
-        GitFeatureService? features = null)
+        GitFeatureService? features = null,
+        IDispatcher? dispatcher = null)
     {
         _git = git;
         _history = history;
         _features = features ?? new GitFeatureService();
+        _dispatcher = dispatcher;
         Ui = ui;
     }
 
@@ -290,7 +291,7 @@ public partial class CommitListViewModel : BaseViewModel
         {
             if (string.IsNullOrWhiteSpace(_git.RepositoryPath))
             {
-                await Application.Current.Dispatcher.InvokeAsync(ClearList, DispatcherPriority.Normal);
+                await InvokeOnUiAsync(ClearList);
                 return;
             }
 
@@ -892,16 +893,15 @@ public partial class CommitListViewModel : BaseViewModel
         Unavailable,
     }
 
-    private static Task InvokeOnUiAsync(Action action)
+    private Task InvokeOnUiAsync(Action action)
     {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
+        if (_dispatcher is null || _dispatcher.IsDispatcherThread)
         {
             action();
             return Task.CompletedTask;
         }
 
-        return dispatcher.InvokeAsync(action, DispatcherPriority.Normal).Task;
+        return _dispatcher.InvokeAsync(action);
     }
 
     partial void OnSelectedCommitChanged(CommitItem? value)
