@@ -16,7 +16,7 @@ public partial class AuthorPanelViewModel : BaseViewModel
 {
     private readonly IGitBackend? _git;
     private readonly AuthorDirectoryService _authorDir;
-    private readonly IWindowService _windowService;
+    private readonly IUserInteraction _windowService;
     private readonly IDialogService _dialogs;
 
     [ObservableProperty]
@@ -36,12 +36,12 @@ public partial class AuthorPanelViewModel : BaseViewModel
     [ObservableProperty]
     public partial bool IsApplyEnabled { get; set; }
 
-    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir, IWindowService? windowService = null, IDialogService? dialogs = null)
+    public AuthorPanelViewModel(IGitBackend? git, AuthorDirectoryService authorDir, IUserInteraction? windowService = null, IDialogService? dialogs = null)
     {
         _git = git;
         _authorDir = authorDir;
-        _windowService = windowService ?? new WindowService();
-        _dialogs = dialogs ?? new WpfDialogService(_windowService);
+        _windowService = windowService ?? NullUserInteraction.Instance;
+        _dialogs = dialogs ?? NullDialogService.Instance;
         Authors = authorDir.Authors;
         authorDir.PropertyChanged += (_, e) =>
         {

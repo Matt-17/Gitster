@@ -68,7 +68,8 @@ public sealed class BranchesViewModelTests
             {
                 refreshCount++;
                 return Task.CompletedTask;
-            });
+            },
+            dialogs: new WpfDialogService(window));
 
         await vm.LoadAsync();
         vm.SelectedBranch = vm.Branches.Single(b => b.Name == "old/history");

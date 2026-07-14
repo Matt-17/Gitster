@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -69,8 +68,8 @@ public partial class StashesViewModel : BaseViewModel
     private readonly OperationsLogService  _opsLogService;
     private readonly SnapshotService       _snapshotService;
     private readonly StashNameService      _nameService;
-    private readonly IWindowService        _windowService;
-    private IDialogService Dialogs => new WpfDialogService(_windowService);
+    private readonly IUserInteraction      _windowService;
+    private readonly IDialogService        _dialogs;
     private readonly Func<Task>            _onStashesChanged;
 
     private List<StashItem> _allStashes = [];
@@ -122,8 +121,9 @@ public partial class StashesViewModel : BaseViewModel
         OperationsLogService opsLogService,
         SnapshotService snapshotService,
         StashNameService nameService,
-        IWindowService? windowService,
-        RepositoryCommandContext commandContext)
+        IUserInteraction? windowService,
+        RepositoryCommandContext commandContext,
+        IDialogService dialogs)
         : this(
             git,
             feedbackService,
@@ -131,7 +131,8 @@ public partial class StashesViewModel : BaseViewModel
             snapshotService,
             nameService,
             windowService,
-            commandContext.RefreshSidebarBadges)
+            commandContext.RefreshSidebarBadges,
+            dialogs)
     {
     }
 
@@ -141,15 +142,17 @@ public partial class StashesViewModel : BaseViewModel
         OperationsLogService opsLogService,
         SnapshotService snapshotService,
         StashNameService nameService,
-        IWindowService? windowService,
-        Func<Task> onStashesChanged)
+        IUserInteraction? windowService,
+        Func<Task> onStashesChanged,
+        IDialogService? dialogs = null)
     {
         _git              = git;
         _feedbackService  = feedbackService;
         _opsLogService    = opsLogService;
         _snapshotService  = snapshotService;
         _nameService      = nameService;
-        _windowService    = windowService ?? new WindowService();
+        _windowService    = windowService ?? NullUserInteraction.Instance;
+        _dialogs          = dialogs ?? NullDialogService.Instance;
         _onStashesChanged = onStashesChanged;
     }
 
@@ -270,7 +273,7 @@ public partial class StashesViewModel : BaseViewModel
     [RelayCommand]
     private async Task NewStash()
     {
-        var dialog = Dialogs.NewStash();
+        var dialog = _dialogs.NewStash();
         if (dialog is null) return;
 
         try
@@ -302,7 +305,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Apply stash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Apply stash", ex))
                 return;
 
             _windowService.Warning(ex.Message, "Apply failed");
@@ -337,7 +340,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Pop stash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Pop stash", ex))
                 return;
 
             _windowService.Warning(ex.Message, "Pop failed");
@@ -349,13 +352,13 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        var confirm = _windowService.ShowMessage(
+        var confirm = _windowService.Ask(
             $"Drop \"{stash.DisplayName}\" ({stash.Ref})?\n\n" +
             "Dropped stashes cannot be recovered from the reflog easily.",
             "Drop stash",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes) return;
+            MessageButtons.YesNo,
+            MessageIcon.Warning);
+        if (confirm != MessageResult.Yes) return;
 
         await _snapshotService.CaptureAsync(_git, $"Drop {stash.Ref}");
 
@@ -391,7 +394,7 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        var value = Dialogs.PromptText(
+        var value = _dialogs.PromptText(
             "Rename stash", "New name (leave empty to reset to auto-name):", stash.UserName);
         if (value is null) return;
 
@@ -404,7 +407,7 @@ public partial class StashesViewModel : BaseViewModel
     {
         if (SelectedStash is not { } stash) return;
 
-        var value = Dialogs.PromptText("Convert stash to branch", "New branch name:", stash.SlugName);
+        var value = _dialogs.PromptText("Convert stash to branch", "New branch name:", stash.SlugName);
         if (value is null) return;
 
         var branchName = value.Trim();
@@ -442,7 +445,7 @@ public partial class StashesViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Convert stash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Convert stash", ex))
                 return;
 
             _windowService.Warning(ex.Message, "Convert failed");

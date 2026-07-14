@@ -1,19 +1,18 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Gitster.Core.Models;
-using Gitster.Services;
 using Gitster.Core;
+using Gitster.Core.Ui;
 
 namespace Gitster.ViewModels;
 
 public partial class ManageToolsViewModel : BaseViewModel
 {
     private readonly CustomToolsService _service;
-    private readonly IWindowService _windowService;
+    private readonly IUserInteraction _windowService;
 
     public ObservableCollection<CustomTool> Tools { get; } = [];
 
@@ -33,10 +32,10 @@ public partial class ManageToolsViewModel : BaseViewModel
 
     public bool HasSelection => SelectedTool != null;
 
-    public ManageToolsViewModel(CustomToolsService service, IWindowService? windowService = null)
+    public ManageToolsViewModel(CustomToolsService service, IUserInteraction? windowService = null)
     {
         _service = service;
-        _windowService = windowService ?? new WindowService();
+        _windowService = windowService ?? NullUserInteraction.Instance;
         // Repository scope only if a repo is open; otherwise default to global.
         IsRepoScope = false;
         ReloadFromDisk();
@@ -113,9 +112,9 @@ public partial class ManageToolsViewModel : BaseViewModel
     {
         if (SelectedTool is not { } sel) return;
 
-        var confirm = _windowService.ShowMessage($"Delete tool '{sel.Name}'?", "Manage tools",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes) return;
+        var confirm = _windowService.Ask($"Delete tool '{sel.Name}'?", "Manage tools",
+            MessageButtons.YesNo, MessageIcon.Warning);
+        if (confirm != MessageResult.Yes) return;
 
         var working = Tools.Where(t => t != sel).ToList();
         PersistAndReload(working);

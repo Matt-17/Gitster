@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
-using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -58,8 +57,8 @@ public partial class CommitPanelViewModel : BaseViewModel
     private readonly OperationsLogService _opsLog;
     private readonly SnapshotService _snapshots;
     private readonly AuthorDirectoryService _authorDir;
-    private readonly IWindowService _windowService;
-    private IDialogService Dialogs => new WpfDialogService(_windowService);
+    private readonly IUserInteraction _windowService;
+    private readonly IDialogService _dialogs;
     private readonly Func<Task> _onChanged;
     private readonly Func<string> _getBranch;
     private readonly Func<string?> _getRemote;
@@ -75,8 +74,9 @@ public partial class CommitPanelViewModel : BaseViewModel
         OperationsLogService opsLog,
         SnapshotService snapshots,
         AuthorDirectoryService authorDir,
-        IWindowService? windowService,
-        RepositoryCommandContext commandContext)
+        IUserInteraction? windowService,
+        RepositoryCommandContext commandContext,
+        IDialogService dialogs)
         : this(
             git,
             feedback,
@@ -86,7 +86,8 @@ public partial class CommitPanelViewModel : BaseViewModel
             windowService,
             commandContext.RefreshAll,
             () => commandContext.CurrentBranch,
-            () => commandContext.SelectedRemote)
+            () => commandContext.SelectedRemote,
+            dialogs)
     {
     }
 
@@ -96,17 +97,19 @@ public partial class CommitPanelViewModel : BaseViewModel
         OperationsLogService opsLog,
         SnapshotService snapshots,
         AuthorDirectoryService authorDir,
-        IWindowService? windowService,
+        IUserInteraction? windowService,
         Func<Task> onChanged,
         Func<string> getBranch,
-        Func<string?> getRemote)
+        Func<string?> getRemote,
+        IDialogService? dialogs = null)
     {
         _git = git;
         _feedback = feedback;
         _opsLog = opsLog;
         _snapshots = snapshots;
         _authorDir = authorDir;
-        _windowService = windowService ?? new WindowService();
+        _windowService = windowService ?? NullUserInteraction.Instance;
+        _dialogs = dialogs ?? NullDialogService.Instance;
         _onChanged = onChanged;
         _getBranch = getBranch;
         _getRemote = getRemote;
@@ -211,7 +214,7 @@ public partial class CommitPanelViewModel : BaseViewModel
     [RelayCommand]
     private void EditAuthor()
     {
-        if (Dialogs.EditAuthors(_authorDir) is { } sel)
+        if (_dialogs.EditAuthors(_authorDir) is { } sel)
         {
             _authorText = sel.AuthorText;
             _committerText = sel.CommitterText;

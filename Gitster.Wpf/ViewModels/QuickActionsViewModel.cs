@@ -1,4 +1,3 @@
-using System.Windows;
 
 using CommunityToolkit.Mvvm.Input;
 
@@ -21,8 +20,8 @@ public partial class QuickActionsViewModel : BaseViewModel
     private readonly OperationsLogService     _opsLog;
     private readonly SnapshotService          _snapshots;
     private readonly SourceArchiveService     _archiveService;
-    private readonly IWindowService           _windowService;
-    private IDialogService Dialogs => new WpfDialogService(_windowService);
+    private readonly IUserInteraction         _windowService;
+    private readonly IDialogService           _dialogs;
     private readonly Func<CommitItem?>        _getSelected;
     private readonly Func<List<CommitItem>>   _getMultiSelected;
     private readonly Func<Task>               _onRefresh;
@@ -35,17 +34,19 @@ public partial class QuickActionsViewModel : BaseViewModel
         OperationsLogService     opsLog,
         SnapshotService          snapshots,
         SourceArchiveService     archiveService,
-        IWindowService?          windowService,
+        IUserInteraction?        windowService,
         Func<CommitItem?>        getSelected,
         Func<List<CommitItem>>   getMultiSelected,
-        Func<Task>               onRefresh)
+        Func<Task>               onRefresh,
+        IDialogService?          dialogs = null)
     {
         _git              = git;
         _feedback         = feedback;
         _opsLog           = opsLog;
         _snapshots        = snapshots;
         _archiveService   = archiveService;
-        _windowService    = windowService ?? new WindowService();
+        _windowService    = windowService ?? NullUserInteraction.Instance;
+        _dialogs          = dialogs ?? NullDialogService.Instance;
         _getSelected      = getSelected;
         _getMultiSelected = getMultiSelected;
         _onRefresh        = onRefresh;
@@ -57,8 +58,9 @@ public partial class QuickActionsViewModel : BaseViewModel
         OperationsLogService opsLog,
         SnapshotService snapshots,
         SourceArchiveService archiveService,
-        IWindowService windowService,
-        ISelectionContext selectionContext)
+        IUserInteraction windowService,
+        ISelectionContext selectionContext,
+        IDialogService dialogs)
     {
         _git = git;
         _feedback = feedback;
@@ -66,6 +68,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         _snapshots = snapshots;
         _archiveService = archiveService;
         _windowService = windowService;
+        _dialogs = dialogs;
         _getSelected = () => selectionContext.SelectedCommit;
         _getMultiSelected = () => selectionContext.SelectedCommits.ToList();
         _onRefresh = () => RefreshAfterActionAsync();
@@ -93,13 +96,13 @@ public partial class QuickActionsViewModel : BaseViewModel
         // force-push warning must fire for any already-pushed commit.
         if (commit.RemoteState == CommitRemoteState.OnRemote)
         {
-            var r = _windowService.ShowMessage(
+            var r = _windowService.Ask(
                 "This commit has already been pushed. Rewording it will require a force-push.\n\nContinue?",
-                "Force-push warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (r != MessageBoxResult.Yes) return;
+                "Force-push warning", MessageButtons.YesNo, MessageIcon.Warning);
+            if (r != MessageResult.Yes) return;
         }
 
-        var newMessage = Dialogs.RewordCommit(commit.Message);
+        var newMessage = _dialogs.RewordCommit(commit.Message);
         if (newMessage is null) return;
 
         try
@@ -127,7 +130,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Reword", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Reword", ex))
                 return;
 
             _windowService.Error($"Reword failed:\n{ex.Message}", "Gitster");
@@ -146,10 +149,10 @@ public partial class QuickActionsViewModel : BaseViewModel
 
         if (commit.RemoteState == CommitRemoteState.OnRemote)
         {
-            var r = _windowService.ShowMessage(
+            var r = _windowService.Ask(
                 "This commit has already been pushed. Fixup will rewrite history and require a force-push.\n\nContinue?",
-                "Force-push warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (r != MessageBoxResult.Yes) return;
+                "Force-push warning", MessageButtons.YesNo, MessageIcon.Warning);
+            if (r != MessageResult.Yes) return;
         }
 
         try
@@ -180,7 +183,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Fixup", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Fixup", ex))
                 return;
 
             _windowService.Error($"Fixup failed:\n{ex.Message}", "Gitster");
@@ -216,14 +219,14 @@ public partial class QuickActionsViewModel : BaseViewModel
         var anyOnRemote = commits.Any(c => c.RemoteState == CommitRemoteState.OnRemote);
         if (anyOnRemote)
         {
-            var r = _windowService.ShowMessage(
+            var r = _windowService.Ask(
                 "One or more selected commits have already been pushed. Squashing will rewrite history and require a force-push.\n\nContinue?",
-                "Force-push warning", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (r != MessageBoxResult.Yes) return;
+                "Force-push warning", MessageButtons.YesNo, MessageIcon.Warning);
+            if (r != MessageResult.Yes) return;
         }
 
         var combined = string.Join("\n\n", commits.Select(c => c.Message));
-        var dlg = Dialogs.SquashCommits(combined);
+        var dlg = _dialogs.SquashCommits(combined);
         if (dlg is null) return;
 
         try
@@ -252,7 +255,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Squash", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Squash", ex))
                 return;
 
             _windowService.Error($"Squash failed:\n{ex.Message}", "Gitster");
@@ -277,7 +280,7 @@ public partial class QuickActionsViewModel : BaseViewModel
             return;
         }
 
-        var dlg = Dialogs.CherryPick(_git, branches);
+        var dlg = _dialogs.CherryPick(_git, branches);
         if (dlg is null) return;
 
         try
@@ -319,7 +322,7 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            if (await ConflictGuidanceService.ShowIfConflictAsync(Dialogs, _windowService, _git, "Cherry-pick", ex))
+            if (await ConflictGuidanceService.ShowIfConflictAsync(_dialogs, _windowService, _git, "Cherry-pick", ex))
                 return;
 
             _windowService.Error($"Cherry-pick failed:\n{ex.Message}", "Gitster");
@@ -351,7 +354,7 @@ public partial class QuickActionsViewModel : BaseViewModel
             .Select(b => b.Name)
             .ToList();
 
-        var dlg = Dialogs.CommitToBranch(localTargets);
+        var dlg = _dialogs.CommitToBranch(localTargets);
         if (dlg is null) return;
 
         try
@@ -400,7 +403,7 @@ public partial class QuickActionsViewModel : BaseViewModel
     [RelayCommand]
     private async Task SnapshotToBranch()
     {
-        var dlg = Dialogs.SnapshotBranch();
+        var dlg = _dialogs.SnapshotBranch();
         if (dlg is null) return;
 
         try
