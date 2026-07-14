@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using Gitster.Services;
+using Gitster.ApplicationLayer.Ui;
 using Gitster.Core;
+using Gitster.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Gitster.ViewModels;
@@ -15,7 +16,7 @@ public abstract class BaseViewModel : ObservableRecipient
         Func<Task> action,
         string operationName,
         OperationFeedbackService? feedback = null,
-        IWindowService? windowService = null,
+        IUserInteraction? windowService = null,
         ILogger? logger = null)
     {
         try
