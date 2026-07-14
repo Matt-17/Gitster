@@ -9,6 +9,8 @@ using Gitster.Views;
 using Microsoft.Win32;
 using NSubstitute;
 
+using Gitster.ApplicationLayer.Ui;
+
 namespace Gitster.Tests;
 
 [STATestClass]
@@ -230,6 +232,13 @@ public sealed class CustomToolRunnerTests
             MessageBoxButton button = MessageBoxButton.OK,
             MessageBoxImage image = MessageBoxImage.None) =>
             MessageBoxResult.OK;
+
+        public MessageResult Ask(
+            string text,
+            string caption,
+            MessageButtons buttons = MessageButtons.Ok,
+            MessageIcon icon = MessageIcon.None) =>
+            MessageResult.Ok;
 
         public bool Confirm(string text, string caption)
         {
