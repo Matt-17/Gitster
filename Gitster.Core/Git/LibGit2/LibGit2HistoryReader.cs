@@ -92,7 +92,8 @@ internal sealed class LibGit2HistoryReader
                 c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
                 c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
                 CommitRemoteState.Incoming, c.Id.Sha,
-                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList())).ToList();
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                CommitterDate: c.Committer.When.DateTime)).ToList();
         }
 
         IEnumerable<Commit> commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
@@ -134,7 +135,8 @@ internal sealed class LibGit2HistoryReader
                     c.Author.Email ?? string.Empty,
                     remoteState,
                     c.Id.Sha,
-                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList());
+                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                    CommitterDate: c.Committer.When.DateTime);
             })
             .ToList();
 
@@ -212,7 +214,8 @@ internal sealed class LibGit2HistoryReader
                 c.Author.Email ?? string.Empty,
                 CommitRemoteState.OnRemote,
                 c.Id.Sha,
-                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList());
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                CommitterDate: c.Committer.When.DateTime);
 
             if ((++counter & 1023) == 0)
                 await Task.Yield();
@@ -262,7 +265,8 @@ internal sealed class LibGit2HistoryReader
                     c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
                     c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
                     CommitRemoteState.Incoming, c.Id.Sha,
-                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()));
+                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                    CommitterDate: c.Committer.When.DateTime));
 
             var outgoingTreeMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var sha in outgoing)
@@ -326,7 +330,8 @@ internal sealed class LibGit2HistoryReader
             commit.Author.Name ?? string.Empty,
             commit.Author.Email ?? string.Empty,
             commit.Committer.Name ?? string.Empty,
-            commit.Committer.Email ?? string.Empty));
+            commit.Committer.Email ?? string.Empty,
+            commit.Committer.When.DateTime));
     }
 
     public Task<string> GetHeadShaAsync()
@@ -362,7 +367,8 @@ internal sealed class LibGit2HistoryReader
                 c.Author.Name ?? string.Empty,
                 c.Author.Email ?? string.Empty,
                 FullSha: c.Id.Sha,
-                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()))
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                CommitterDate: c.Committer.When.DateTime))
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
     }
@@ -515,7 +521,8 @@ internal sealed class LibGit2HistoryReader
                 c.Author.Email ?? string.Empty,
                 CommitRemoteState.LocalOnly,
                 c.Id.Sha,
-                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList()))
+                ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                CommitterDate: c.Committer.When.DateTime))
             .ToList();
         return Task.FromResult<IReadOnlyList<CommitInfo>>(result);
     }

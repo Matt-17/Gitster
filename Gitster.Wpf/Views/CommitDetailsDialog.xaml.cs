@@ -18,6 +18,7 @@ public partial class CommitDetailsDialog : Window
             ? details.CommitterName
             : $"{details.CommitterName} <{details.CommitterEmail}>";
         DateBox.Text = details.Date.ToString("yyyy-MM-dd HH:mm:ss");
+        CommitterDateBox.Text = details.CommitterDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—";
         MessageBox.Text = details.Message;
     }
 

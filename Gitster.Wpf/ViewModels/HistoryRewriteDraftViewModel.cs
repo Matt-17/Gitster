@@ -25,7 +25,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     private string _authorName = string.Empty;
     private string _authorEmail = string.Empty;
     private DateTime? _authorDate;
-    private bool _updateCommitterTimestamp = true;
+    private DateTime? _committerDate;
     private bool _isLoadingDetails;
     private bool _isApplying;
     private bool _isSelectedCommitEditable;
@@ -126,15 +126,18 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         }
     }
 
-    public bool UpdateCommitterTimestamp
+    public DateTime? CommitterDate
     {
-        get => _updateCommitterTimestamp;
+        get => _committerDate;
         set
         {
-            if (SetProperty(ref _updateCommitterTimestamp, value))
+            if (SetProperty(ref _committerDate, value))
                 UpdateDraftFromEditor();
         }
     }
+
+    [RelayCommand]
+    private void SyncCommitterDate() => CommitterDate = AuthorDate;
 
     public bool IsLoadingDetails
     {
@@ -389,7 +392,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 AuthorName = string.Empty;
                 AuthorEmail = string.Empty;
                 AuthorDate = null;
-                UpdateCommitterTimestamp = true;
+                CommitterDate = null;
                 return;
             }
 
@@ -400,7 +403,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 AuthorName = draft.NewAuthorName;
                 AuthorEmail = draft.NewAuthorEmail;
                 AuthorDate = draft.NewAuthorDate;
-                UpdateCommitterTimestamp = draft.UpdateCommitterTimestamp;
+                CommitterDate = draft.NewCommitterDate;
             }
             else
             {
@@ -408,7 +411,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 AuthorName = original.AuthorName;
                 AuthorEmail = original.AuthorEmail;
                 AuthorDate = original.Date;
-                UpdateCommitterTimestamp = true;
+                CommitterDate = original.CommitterDate;
             }
         }
         finally
@@ -434,7 +437,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         draft.NewAuthorName = AuthorName.Trim();
         draft.NewAuthorEmail = AuthorEmail.Trim();
         draft.NewAuthorDate = AuthorDate;
-        draft.UpdateCommitterTimestamp = UpdateCommitterTimestamp;
+        draft.NewCommitterDate = CommitterDate;
 
         if (!draft.HasChanges)
             _drafts.Remove(SelectedCommit.FullSha);
@@ -461,14 +464,16 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 details.Message,
                 details.AuthorName,
                 details.AuthorEmail,
-                details.Date);
+                details.Date,
+                details.CommitterDate ?? details.Date);
         }
 
         return new OriginalCommit(
             commit.Message,
             commit.AuthorName,
             commit.AuthorEmail,
-            commit.Date);
+            commit.Date,
+            commit.CommitterDate ?? commit.Date);
     }
 
     private void RefreshProjection()
@@ -505,11 +510,12 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 row.IsHistoryEditDirect = true;
                 row.HasPendingMessageChange = draft.HasMessageChange;
                 row.HasPendingAuthorChange = draft.HasAuthorChange;
-                row.HasPendingTimeChange = draft.HasTimeChange;
+                row.HasPendingTimeChange = draft.HasTimeChange || draft.HasCommitterTimeChange;
                 row.PendingMessage = draft.HasMessageChange ? FirstLine(draft.NewMessage) : null;
                 row.PendingAuthorName = draft.HasAuthorChange ? draft.NewAuthorName : null;
                 row.PendingAuthorEmail = draft.HasAuthorChange ? draft.NewAuthorEmail : null;
                 row.PendingDate = draft.HasTimeChange ? draft.NewAuthorDate : null;
+                row.PendingCommitterDate = draft.HasCommitterTimeChange ? draft.NewCommitterDate : null;
                 row.HistoryEditTooltip = BuildDirectTooltip(draft, remoteRisk);
             }
             else
@@ -585,6 +591,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         if (draft.HasMessageChange) parts.Add("message");
         if (draft.HasAuthorChange) parts.Add("author");
         if (draft.HasTimeChange) parts.Add("time");
+        if (draft.HasCommitterTimeChange) parts.Add("committer time");
         var suffix = remoteRisk ? " Remote contains old copies." : string.Empty;
         return $"Pending edit: {string.Join(", ", parts)}.{suffix}";
     }
@@ -749,6 +756,13 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 return false;
         }
 
+        if (rewrite.NewCommitterDate is not null)
+        {
+            var actual = details?.CommitterDate ?? candidate.Commit.CommitterDate;
+            if (actual is not null && !SameMinute(actual, rewrite.NewCommitterDate.Value.DateTime))
+                return false;
+        }
+
         return true;
     }
 
@@ -821,7 +835,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         string Message,
         string AuthorName,
         string AuthorEmail,
-        DateTime Date);
+        DateTime Date,
+        DateTime CommitterDate);
 
     private sealed record RewritePlan(
         IReadOnlyList<AffectedCommit> Affected,
@@ -855,11 +870,12 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             OriginalAuthorName = original.AuthorName;
             OriginalAuthorEmail = original.AuthorEmail;
             OriginalAuthorDate = original.Date;
+            OriginalCommitterDate = original.CommitterDate;
             NewMessage = original.Message;
             NewAuthorName = original.AuthorName;
             NewAuthorEmail = original.AuthorEmail;
             NewAuthorDate = original.Date;
-            UpdateCommitterTimestamp = true;
+            NewCommitterDate = original.CommitterDate;
         }
 
         public string Sha { get; }
@@ -867,11 +883,12 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         public string OriginalAuthorName { get; private set; }
         public string OriginalAuthorEmail { get; private set; }
         public DateTime OriginalAuthorDate { get; private set; }
+        public DateTime OriginalCommitterDate { get; private set; }
         public string NewMessage { get; set; }
         public string NewAuthorName { get; set; }
         public string NewAuthorEmail { get; set; }
         public DateTime? NewAuthorDate { get; set; }
-        public bool UpdateCommitterTimestamp { get; set; }
+        public DateTime? NewCommitterDate { get; set; }
 
         public bool HasMessageChange
             => !string.Equals(NormalizeMessage(NewMessage), NormalizeMessage(OriginalMessage), StringComparison.Ordinal);
@@ -882,16 +899,22 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
 
         public bool HasTimeChange => NewAuthorDate.HasValue && !SameMinute(NewAuthorDate, OriginalAuthorDate);
 
-        public bool HasChanges => HasMessageChange || HasAuthorChange || HasTimeChange;
+        public bool HasCommitterTimeChange => NewCommitterDate.HasValue && !SameMinute(NewCommitterDate, OriginalCommitterDate);
+
+        public bool HasChanges => HasMessageChange || HasAuthorChange || HasTimeChange || HasCommitterTimeChange;
 
         public void UpdateOriginalDetails(CommitDetails details, bool updatePendingIfUnchanged)
         {
             var oldMessage = OriginalMessage;
             var messageWasUnchanged = !HasMessageChange;
+            var committerWasUnchanged = !HasCommitterTimeChange;
             OriginalMessage = details.Message;
             OriginalAuthorName = details.AuthorName;
             OriginalAuthorEmail = details.AuthorEmail;
             OriginalAuthorDate = details.Date;
+            OriginalCommitterDate = details.CommitterDate ?? details.Date;
+            if (committerWasUnchanged)
+                NewCommitterDate = OriginalCommitterDate;
 
             if (messageWasUnchanged && string.Equals(NewMessage, oldMessage, StringComparison.Ordinal))
                 NewMessage = details.Message;
@@ -902,13 +925,12 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         public CommitRewrite ToRewrite()
         {
             DateTimeOffset? newAuthorDate = null;
-            DateTimeOffset? newCommitterDate = null;
             if (HasTimeChange && NewAuthorDate.HasValue)
-            {
                 newAuthorDate = RewriteDate.Build(NewAuthorDate.Value, OriginalAuthorDate);
-                if (UpdateCommitterTimestamp)
-                    newCommitterDate = newAuthorDate;
-            }
+
+            DateTimeOffset? newCommitterDate = null;
+            if (HasCommitterTimeChange && NewCommitterDate.HasValue)
+                newCommitterDate = RewriteDate.Build(NewCommitterDate.Value, OriginalCommitterDate);
 
             return new CommitRewrite(
                 Sha,

@@ -19,7 +19,8 @@ public sealed record CommitInfo(
     string FullSha = "",
     string? OrphanedPairSha = null,
     IReadOnlyList<string>? ParentShas = null,
-    IReadOnlyList<CommitRefLabel>? RefLabels = null)
+    IReadOnlyList<CommitRefLabel>? RefLabels = null,
+    DateTime? CommitterDate = null)
 {
     /// <summary>7-char display form of <see cref="Sha"/>.</summary>
     public string ShortSha => GitSha.Short(Sha);

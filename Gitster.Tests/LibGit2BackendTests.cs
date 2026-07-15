@@ -242,6 +242,32 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task GetCommit_ReturnsDistinctAuthorAndCommitterDates()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "a.txt", "1");
+        var authorWhen = new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero);
+        var committerWhen = new DateTimeOffset(2026, 3, 5, 17, 30, 0, TimeSpan.Zero);
+        string sha;
+        using (var r = new Repository(repo.Path))
+        {
+            File.WriteAllText(System.IO.Path.Combine(repo.Path, "a.txt"), "2");
+            Commands.Stage(r, "a.txt");
+            sha = r.Commit("two dates",
+                new Signature("Tester", "tester@gitster.test", authorWhen),
+                new Signature("Tester", "tester@gitster.test", committerWhen)).Sha;
+        }
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var details = await backend.GetCommitAsync(sha);
+
+        Assert.AreEqual(authorWhen.DateTime, details.Date);
+        Assert.AreEqual(committerWhen.DateTime, details.CommitterDate);
+    }
+
+    [TestMethod]
     public async Task CreateTag_PointsTagAtSelectedCommit()
     {
         using var repo = new GitTestRepo();

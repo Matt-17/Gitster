@@ -7,4 +7,5 @@ public sealed record CommitDetails(
     string AuthorName,
     string AuthorEmail = "",
     string CommitterName = "",
-    string CommitterEmail = "");
+    string CommitterEmail = "",
+    DateTime? CommitterDate = null);
