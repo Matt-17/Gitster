@@ -67,8 +67,12 @@ public static class PersistedGridSplitter
         if (d is not GridSplitter splitter)
             return;
 
+        // Only wire up here — do NOT apply the saved length yet. XAML assigns attached properties
+        // one at a time in document order, so when Key arrives TargetIndex is still -1 and the
+        // fallback below would resolve to the wrong definition and overwrite it with an absolute
+        // pixel width (which silently destroys a "*" column). Loaded/Initialize apply it once every
+        // property is set.
         EnsureAttached(splitter);
-        ApplySavedLength(splitter);
     }
 
     private static void EnsureAttached(GridSplitter splitter)
@@ -81,6 +85,12 @@ public static class PersistedGridSplitter
         splitter.IsVisibleChanged += OnIsVisibleChanged;
         splitter.DragCompleted += OnDragCompleted;
         Track(splitter);
+
+        // XAML always finishes setting the attached properties before Loaded, so Loaded is the
+        // natural apply point. A splitter configured from code may already be loaded, though —
+        // deferring lets the remaining properties land first.
+        if (splitter.IsLoaded)
+            splitter.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => ApplySavedLength(splitter));
     }
 
     private static void Track(GridSplitter splitter)
@@ -177,10 +187,10 @@ public static class PersistedGridSplitter
         if (splitter.Parent is not Grid grid)
             return false;
 
+        // No guessing: an index inferred from the splitter's own position is frequently wrong
+        // (a splitter often resizes the definition *before* it), and writing an absolute width to
+        // the wrong column silently turns a "*" column into a fixed one.
         var index = GetTargetIndex(splitter);
-        if (index < 0)
-            index = Grid.GetColumn(splitter) + 1;
-
         if (index < 0 || index >= grid.ColumnDefinitions.Count)
             return false;
 
@@ -195,9 +205,6 @@ public static class PersistedGridSplitter
             return false;
 
         var index = GetTargetIndex(splitter);
-        if (index < 0)
-            index = Grid.GetRow(splitter) + 1;
-
         if (index < 0 || index >= grid.RowDefinitions.Count)
             return false;
 
