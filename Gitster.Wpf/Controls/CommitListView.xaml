@@ -485,23 +485,35 @@
                                TextTrimming="CharacterEllipsis"
                                Style="{StaticResource CommitSecondaryTextStyle}"/>
                 </StackPanel>
-                <TextBlock Grid.Column="3" VerticalAlignment="Center" FontSize="11"
-                           Style="{StaticResource CommitSecondaryTextStyle}">
-                    <TextBlock.Text>
-                        <MultiBinding Converter="{StaticResource DateCellConverter}">
-                            <Binding Path="DisplayDate"/>
-                            <Binding Path="DataContext.Ui.UseRelativeDates"
-                                     RelativeSource="{RelativeSource AncestorType=ListView}"/>
-                        </MultiBinding>
-                    </TextBlock.Text>
-                    <TextBlock.ToolTip>
-                        <MultiBinding Converter="{StaticResource DateTooltipConverter}">
-                            <Binding Path="DisplayDate"/>
-                            <Binding Path="DataContext.Ui.UseRelativeDates"
-                                     RelativeSource="{RelativeSource AncestorType=ListView}"/>
-                        </MultiBinding>
-                    </TextBlock.ToolTip>
-                </TextBlock>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center" FontSize="11"
+                               Style="{StaticResource CommitSecondaryTextStyle}">
+                        <TextBlock.Text>
+                            <MultiBinding Converter="{StaticResource DateCellConverter}">
+                                <Binding Path="DisplayDate"/>
+                                <Binding Path="DataContext.Ui.UseRelativeDates"
+                                         RelativeSource="{RelativeSource AncestorType=ListView}"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                        <TextBlock.ToolTip>
+                            <MultiBinding Converter="{StaticResource DateTooltipConverter}">
+                                <Binding Path="DisplayDate"/>
+                                <Binding Path="DataContext.Ui.UseRelativeDates"
+                                         RelativeSource="{RelativeSource AncestorType=ListView}"/>
+                            </MultiBinding>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+                    <Path Width="11" Height="11"
+                          Stretch="Uniform"
+                          Fill="Transparent"
+                          Stroke="{DynamicResource TextSecondary}"
+                          StrokeThickness="1.4"
+                          Data="M8,1.5 A6.5,6.5 0 1 0 8.01,1.5 M8,4.5 L8,8.5 L10.8,10.2"
+                          Margin="5,0,0,0"
+                          VerticalAlignment="Center"
+                          ToolTip="{Binding CommitterDateTooltip}"
+                          Visibility="{Binding HasDivergedCommitterDate, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </StackPanel>
                 <TextBlock Grid.Column="4" Text="{Binding CommitId}" VerticalAlignment="Center"
                            Style="{StaticResource CommitMonoTextStyle}"/>
             </Grid>

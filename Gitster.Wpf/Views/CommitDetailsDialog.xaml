@@ -13,6 +13,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="12"/>
             <RowDefinition Height="220"/>
             <RowDefinition Height="16"/>
@@ -35,17 +36,20 @@
         <TextBlock Grid.Row="3" Grid.Column="0" Text="Committer" Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,8"/>
         <TextBox Grid.Row="3" Grid.Column="1" x:Name="CommitterBox" IsReadOnly="True" BorderThickness="0" Margin="0,0,0,8"/>
 
-        <TextBlock Grid.Row="4" Grid.Column="0" Text="Date" Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,0"/>
-        <TextBox Grid.Row="4" Grid.Column="1" x:Name="DateBox" IsReadOnly="True" BorderThickness="0"/>
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Author date" Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,8"/>
+        <TextBox Grid.Row="4" Grid.Column="1" x:Name="DateBox" IsReadOnly="True" BorderThickness="0" Margin="0,0,0,8"/>
 
-        <TextBlock Grid.Row="6" Grid.Column="0" Text="Message" Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,0"/>
-        <TextBox Grid.Row="6" Grid.Column="1" x:Name="MessageBox"
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="Commit date" Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,0"/>
+        <TextBox Grid.Row="5" Grid.Column="1" x:Name="CommitterDateBox" IsReadOnly="True" BorderThickness="0"/>
+
+        <TextBlock Grid.Row="7" Grid.Column="0" Text="Message" Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,0"/>
+        <TextBox Grid.Row="7" Grid.Column="1" x:Name="MessageBox"
                  IsReadOnly="True"
                  AcceptsReturn="True"
                  TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto"/>
 
-        <Button Grid.Row="8" Grid.Column="1"
+        <Button Grid.Row="9" Grid.Column="1"
                 Content="Cl_ose"
                 Style="{StaticResource DialogButton}"
                 HorizontalAlignment="Right"

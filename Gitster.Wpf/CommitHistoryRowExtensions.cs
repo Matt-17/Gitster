@@ -19,5 +19,6 @@ public static class CommitHistoryRowExtensions
         row.FullSha,
         row.OrphanedPairSha,
         row.ParentShas ?? Array.Empty<string>(),
-        row.RefLabels ?? Array.Empty<CommitRefLabel>());
+        row.RefLabels ?? Array.Empty<CommitRefLabel>(),
+        row.CommitterDate);
 }

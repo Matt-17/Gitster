@@ -563,10 +563,10 @@ public sealed class CommitHistoryService
             INSERT OR REPLACE INTO history_commits
                 (repo_key, branch_name, sequence, full_sha, short_sha, message, author_name,
                  author_email, author_date_ticks, tree_sha, remote_state, orphaned_pair_sha,
-                 parent_shas, ref_labels)
+                 parent_shas, ref_labels, committer_date_ticks)
             VALUES
                 ($repo, $branch, $sequence, $full, $short, $message, $author, $email,
-                 $date, $tree, $remote, $orphan, $parents, $refs);
+                 $date, $tree, $remote, $orphan, $parents, $refs, $committerDate);
             """;
         insert.Parameters.AddWithValue("$repo", context.RepoKey);
         insert.Parameters.AddWithValue("$branch", context.BranchName);
@@ -582,6 +582,7 @@ public sealed class CommitHistoryService
         var orphan = insert.Parameters.Add("$orphan", SqliteType.Text);
         var parents = insert.Parameters.Add("$parents", SqliteType.Text);
         var refs = insert.Parameters.Add("$refs", SqliteType.Text);
+        var committerDate = insert.Parameters.Add("$committerDate", SqliteType.Integer);
 
         foreach (var row in rows)
         {
@@ -597,6 +598,7 @@ public sealed class CommitHistoryService
             orphan.Value = (object?)row.OrphanedPairSha ?? DBNull.Value;
             parents.Value = Serialize(row.ParentShas ?? Array.Empty<string>());
             refs.Value = Serialize(row.RefLabels ?? Array.Empty<CommitRefLabel>());
+            committerDate.Value = row.CommitterDate?.Ticks ?? 0L;
             insert.ExecuteNonQuery();
         }
     }
@@ -701,7 +703,8 @@ public sealed class CommitHistoryService
         commit.Parents.Select(p => p.Id.Sha).ToList(),
         refLabels.TryGetValue(commit.Id.Sha, out var labels)
             ? labels
-            : Array.Empty<CommitRefLabel>());
+            : Array.Empty<CommitRefLabel>(),
+        commit.Committer.When.DateTime);
 
     private IReadOnlyList<CommitHistoryRow> ReadRows(
         SqliteConnection conn,
@@ -712,7 +715,8 @@ public sealed class CommitHistoryService
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT sequence, full_sha, short_sha, message, author_date_ticks, author_name,
-                   author_email, tree_sha, remote_state, orphaned_pair_sha, parent_shas, ref_labels
+                   author_email, tree_sha, remote_state, orphaned_pair_sha, parent_shas, ref_labels,
+                   committer_date_ticks
             FROM history_commits
             WHERE repo_key = $repo AND branch_name = $branch
             ORDER BY sequence
@@ -742,7 +746,8 @@ public sealed class CommitHistoryService
         (CommitRemoteState)reader.GetInt32(8),
         reader.IsDBNull(9) ? null : reader.GetString(9),
         reader.IsDBNull(10) ? Array.Empty<string>() : DeserializeList<string>(reader.GetString(10)),
-        reader.IsDBNull(11) ? Array.Empty<CommitRefLabel>() : DeserializeList<CommitRefLabel>(reader.GetString(11)));
+        reader.IsDBNull(11) ? Array.Empty<CommitRefLabel>() : DeserializeList<CommitRefLabel>(reader.GetString(11)),
+        reader.IsDBNull(12) || reader.GetInt64(12) == 0 ? null : new DateTime(reader.GetInt64(12)));
 
     private IReadOnlyList<CommitHistoryRow> SearchRows(
         SqliteConnection conn,
@@ -765,7 +770,8 @@ public sealed class CommitHistoryService
 
         cmd.CommandText = $"""
             SELECT sequence, full_sha, short_sha, message, author_date_ticks, author_name,
-                   author_email, tree_sha, remote_state, orphaned_pair_sha, parent_shas, ref_labels
+                   author_email, tree_sha, remote_state, orphaned_pair_sha, parent_shas, ref_labels,
+                   committer_date_ticks
             FROM history_commits
             WHERE {string.Join(" AND ", clauses)}
             ORDER BY sequence
@@ -889,7 +895,7 @@ public sealed class CommitHistoryService
             SELECT COUNT(*)
             FROM history_commits
             WHERE repo_key = $repo AND branch_name = $branch
-              AND (parent_shas = '' OR ref_labels = '');
+              AND (parent_shas = '' OR ref_labels = '' OR committer_date_ticks = 0);
             """;
         cmd.Parameters.AddWithValue("$repo", context.RepoKey);
         cmd.Parameters.AddWithValue("$branch", context.BranchName);
@@ -1149,6 +1155,7 @@ public sealed class CommitHistoryService
                 orphaned_pair_sha TEXT NULL,
                 parent_shas TEXT NOT NULL DEFAULT '',
                 ref_labels TEXT NOT NULL DEFAULT '',
+                committer_date_ticks INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(repo_key, branch_name, full_sha)
             );
 
@@ -1170,6 +1177,7 @@ public sealed class CommitHistoryService
         cmd.ExecuteNonQuery();
         EnsureColumn("history_commits", "parent_shas", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn("history_commits", "ref_labels", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn("history_commits", "committer_date_ticks", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private void EnsureColumn(string tableName, string columnName, string definition)

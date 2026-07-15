@@ -502,7 +502,8 @@ public partial class CommitListViewModel : BaseViewModel
         info.FullSha,
         info.OrphanedPairSha,
         info.ParentShas,
-        info.RefLabels);
+        info.RefLabels,
+        info.CommitterDate);
 
     private async Task ApplySigningStatusesAsync(IReadOnlyList<CommitItem> rows, CancellationToken ct)
     {

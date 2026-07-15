@@ -90,7 +90,7 @@
                     </StackPanel>
                 </Grid>
 
-                <TextBlock Text="Timestamp"
+                <TextBlock Text="Author timestamp"
                            FontSize="10"
                            Foreground="{DynamicResource TextTertiary}"
                            Margin="0,0,0,3"/>
@@ -99,11 +99,37 @@
                                       Height="30"
                                       Margin="0,0,0,6"/>
 
-                <CheckBox IsChecked="{Binding UpdateCommitterTimestamp}"
-                          Content="Update committer timestamp"
-                          FontSize="11"
-                          Foreground="{DynamicResource TextSecondary}"
-                          Margin="0,0,0,8"/>
+                <TextBlock Text="Committer timestamp"
+                           FontSize="10"
+                           Foreground="{DynamicResource TextTertiary}"
+                           Margin="0,0,0,3"/>
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <controls:DateControl Grid.Column="0"
+                                          SelectedDate="{Binding CommitterDate, Mode=TwoWay}"
+                                          EditMode="DateTime"
+                                          Height="30"/>
+                    <Button Grid.Column="2"
+                            Width="30"
+                            Height="30"
+                            Padding="0"
+                            AutomationProperties.Name="Sync committer timestamp with author timestamp"
+                            ToolTip="Take over the author timestamp"
+                            Command="{Binding SyncCommitterDateCommand}"
+                            Style="{StaticResource GhostButton}">
+                        <Path Width="13"
+                              Height="13"
+                              Stretch="Uniform"
+                              Fill="Transparent"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.5"
+                              Data="M16,5 A7,7 0 1 0 17,10 M17,4 L17,9 L12,9"/>
+                    </Button>
+                </Grid>
             </StackPanel>
 
             <Border Padding="8,6"

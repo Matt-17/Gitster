@@ -14,7 +14,8 @@ public sealed record CommitHistoryRow(
     CommitRemoteState RemoteState,
     string? OrphanedPairSha,
     IReadOnlyList<string>? ParentShas = null,
-    IReadOnlyList<CommitRefLabel>? RefLabels = null)
+    IReadOnlyList<CommitRefLabel>? RefLabels = null,
+    DateTime? CommitterDate = null)
 {
     public CommitInfo ToCommitInfo() => new(
         ShortSha,
@@ -26,5 +27,6 @@ public sealed record CommitHistoryRow(
         FullSha,
         OrphanedPairSha,
         ParentShas ?? Array.Empty<string>(),
-        RefLabels ?? Array.Empty<CommitRefLabel>());
+        RefLabels ?? Array.Empty<CommitRefLabel>(),
+        CommitterDate);
 }

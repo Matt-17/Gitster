@@ -25,10 +25,12 @@ public partial class CommitItem : ObservableObject
         string fullSha = "",
         string? orphanedPairSha = null,
         IReadOnlyList<string>? parentShas = null,
-        IReadOnlyList<CommitRefLabel>? refLabels = null)
+        IReadOnlyList<CommitRefLabel>? refLabels = null,
+        DateTime? committerDate = null)
     {
         Message = message;
         Date = date;
+        CommitterDate = committerDate;
         CommitId = commitId;
         AuthorName = authorName;
         AuthorEmail = authorEmail;
@@ -45,6 +47,7 @@ public partial class CommitItem : ObservableObject
 
     public string Message { get; }
     public DateTime Date { get; }
+    public DateTime? CommitterDate { get; }
     public string CommitId { get; }
     public string AuthorName { get; }
     public string AuthorEmail { get; }
@@ -63,6 +66,16 @@ public partial class CommitItem : ObservableObject
     public DateTime DisplayDate => PendingDate ?? Date;
     public string DisplayAuthorName => PendingAuthorName ?? AuthorName;
     public string DisplayAuthorEmail => PendingAuthorEmail ?? AuthorEmail;
+    public DateTime? DisplayCommitterDate => PendingCommitterDate ?? CommitterDate;
+
+    /// <summary>True when the committer date differs from the author date (e.g. rebase or amend).</summary>
+    public bool HasDivergedCommitterDate =>
+        DisplayCommitterDate is { } committer
+        && (committer - DisplayDate).Duration() >= TimeSpan.FromMinutes(1);
+
+    public string CommitterDateTooltip => DisplayCommitterDate is { } committer
+        ? $"Author date: {DisplayDate:yyyy-MM-dd HH:mm:ss}\nCommit date: {committer:yyyy-MM-dd HH:mm:ss}"
+        : string.Empty;
 
     public bool HasHistoryEditOverlay => IsHistoryEditDirect || IsHistoryEditTransitive;
     public bool HasAnyHistoryEditIcon =>
@@ -91,7 +104,15 @@ public partial class CommitItem : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayDate))]
+    [NotifyPropertyChangedFor(nameof(HasDivergedCommitterDate))]
+    [NotifyPropertyChangedFor(nameof(CommitterDateTooltip))]
     public partial DateTime? PendingDate { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayCommitterDate))]
+    [NotifyPropertyChangedFor(nameof(HasDivergedCommitterDate))]
+    [NotifyPropertyChangedFor(nameof(CommitterDateTooltip))]
+    public partial DateTime? PendingCommitterDate { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayAuthorName))]
@@ -168,6 +189,7 @@ public partial class CommitItem : ObservableObject
     {
         PendingMessage = null;
         PendingDate = null;
+        PendingCommitterDate = null;
         PendingAuthorName = null;
         PendingAuthorEmail = null;
         IsHistoryEditDirect = false;
