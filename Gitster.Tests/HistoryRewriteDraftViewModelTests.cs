@@ -367,14 +367,209 @@ public sealed class HistoryRewriteDraftViewModelTests
             (string?)checkPath.Attribute("Stroke"));
     }
 
+    [TestMethod]
+    public void MultiSelect_IdenticalValuesShowValue_DifferingValuesAreMixed()
+    {
+        var a = Item("same", "1111111111111111111111111111111111111111", date: new DateTime(2026, 3, 1, 8, 30, 0));
+        var b = Item("other", "2222222222222222222222222222222222222222", date: new DateTime(2026, 3, 1, 17, 45, 0));
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+
+        // Author name/email are identical across both rows, the message and the time of day are not.
+        Assert.IsFalse(vm.IsAuthorNameMixed);
+        Assert.AreEqual("Tester", vm.AuthorName);
+        Assert.IsTrue(vm.IsMessageMixed);
+        Assert.AreEqual(string.Empty, vm.MessageText);
+        Assert.IsFalse(vm.IsAuthorDateMixed);
+        Assert.AreEqual(new DateTime(2026, 3, 1), vm.AuthorDatePart);
+        Assert.IsTrue(vm.IsAuthorTimeMixed);
+        Assert.IsNull(vm.AuthorTimePart);
+    }
+
+    [TestMethod]
+    public void MultiSelect_MessageEdit_AppliesToEverySelectedCommit()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111");
+        var b = Item("c2", "2222222222222222222222222222222222222222");
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+        vm.MessageText = "shared message";
+
+        Assert.AreEqual(2, vm.DirectEditCount);
+        CollectionAssert.AreEquivalent(
+            new[] { "shared message", "shared message" },
+            vm.BuildRewrites().Select(r => r.NewMessage).ToArray());
+        Assert.IsFalse(vm.IsMessageMixed);
+    }
+
+    [TestMethod]
+    public void MultiSelect_DateEdit_KeepsIndividualTimes()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111", date: new DateTime(2026, 3, 1, 8, 30, 0));
+        var b = Item("c2", "2222222222222222222222222222222222222222", date: new DateTime(2026, 3, 2, 17, 45, 0));
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+        vm.AuthorDatePart = new DateTime(2026, 5, 20);
+
+        var dates = vm.BuildRewrites()
+            .ToDictionary(r => r.Sha, r => r.NewAuthorDate!.Value.DateTime, StringComparer.OrdinalIgnoreCase);
+        Assert.AreEqual(new DateTime(2026, 5, 20, 8, 30, 0), dates[a.FullSha]);
+        Assert.AreEqual(new DateTime(2026, 5, 20, 17, 45, 0), dates[b.FullSha]);
+    }
+
+    [TestMethod]
+    public void MultiSelect_TimeEdit_KeepsIndividualDates()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111", date: new DateTime(2026, 3, 1, 8, 30, 0));
+        var b = Item("c2", "2222222222222222222222222222222222222222", date: new DateTime(2026, 3, 2, 17, 45, 0));
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+        vm.AuthorTimePart = new DateTime(2000, 1, 1, 21, 5, 0);
+
+        var dates = vm.BuildRewrites()
+            .ToDictionary(r => r.Sha, r => r.NewAuthorDate!.Value.DateTime, StringComparer.OrdinalIgnoreCase);
+        Assert.AreEqual(new DateTime(2026, 3, 1, 21, 5, 0), dates[a.FullSha]);
+        Assert.AreEqual(new DateTime(2026, 3, 2, 21, 5, 0), dates[b.FullSha]);
+    }
+
+    [TestMethod]
+    public void MultiSelect_AuthorDateEdit_LeavesCommitterTimestampsUntouched()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111", date: new DateTime(2026, 3, 1, 8, 30, 0));
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([a]);
+        vm.SetSelectedCommits([a]);
+        vm.AuthorDatePart = new DateTime(2026, 5, 20);
+
+        Assert.IsNull(vm.BuildRewrites().Single().NewCommitterDate);
+    }
+
+    [TestMethod]
+    public void SyncCommitterWithAuthor_On_DragsCommitterTimestampAlongPerCommit()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111", date: new DateTime(2026, 3, 1, 8, 30, 0));
+        var b = Item("c2", "2222222222222222222222222222222222222222", date: new DateTime(2026, 3, 2, 17, 45, 0));
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+        vm.SyncCommitterWithAuthor = true;
+        vm.AuthorDatePart = new DateTime(2026, 5, 20);
+
+        var rewrites = vm.BuildRewrites().ToDictionary(r => r.Sha, r => r, StringComparer.OrdinalIgnoreCase);
+        Assert.AreEqual(new DateTime(2026, 5, 20, 8, 30, 0), rewrites[a.FullSha].NewCommitterDate!.Value.DateTime);
+        Assert.AreEqual(new DateTime(2026, 5, 20, 17, 45, 0), rewrites[b.FullSha].NewCommitterDate!.Value.DateTime);
+    }
+
+    [TestMethod]
+    public void SyncCommitterWithAuthor_Off_LeavesCommitterTimestampAlone()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111", date: new DateTime(2026, 3, 1, 8, 30, 0));
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([a]);
+        vm.SetSelectedCommits([a]);
+        vm.AuthorDatePart = new DateTime(2026, 5, 20);
+
+        Assert.IsFalse(vm.SyncCommitterWithAuthor);
+        Assert.IsNull(vm.BuildRewrites().Single().NewCommitterDate);
+    }
+
+    [TestMethod]
+    public void MultiSelect_WithIncomingCommit_DisablesEditor()
+    {
+        var local = Item("c1", "1111111111111111111111111111111111111111");
+        var incoming = Item("c2", "2222222222222222222222222222222222222222", CommitRemoteState.Incoming);
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([incoming, local]);
+        vm.SetSelectedCommits([incoming, local]);
+        vm.MessageText = "should not apply";
+
+        Assert.IsFalse(vm.IsSelectedCommitEditable);
+        Assert.IsFalse(vm.HasDrafts);
+        Assert.AreEqual(0, vm.BuildRewrites().Count);
+    }
+
+    [TestMethod]
+    public async Task MultiSelect_KeepFirstMessageLine_TrimsEachCommitToItsOwnSubject()
+    {
+        var shaA = "1111111111111111111111111111111111111111";
+        var shaB = "2222222222222222222222222222222222222222";
+        var a = Item("c1", shaA);
+        var b = Item("c2", shaB);
+        var git = Substitute.For<IGitBackend>();
+        git.GetCommitAsync(Arg.Any<string>()).Returns(call =>
+        {
+            var sha = (string)call[0]!;
+            var subject = sha == shaA ? "c1" : "c2";
+            return Task.FromResult(new CommitDetails(
+                sha,
+                $"{subject}\n\nbody line\nmore body\n",
+                new DateTime(2026, 1, 1, 12, 0, 0),
+                "Tester",
+                "tester@gitster.test"));
+        });
+
+        var vm = new HistoryRewriteDraftViewModel(
+            git,
+            new OperationFeedbackService(),
+            new OperationsLogService(),
+            new SnapshotService(),
+            Substitute.For<IWindowService>(),
+            () => "master",
+            _ => Task.CompletedTask);
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+
+        for (var i = 0; i < 50 && vm.IsLoadingDetails; i++)
+            await Task.Delay(10);
+
+        vm.KeepFirstMessageLineCommand.Execute(null);
+
+        var messages = vm.BuildRewrites().ToDictionary(r => r.Sha, r => r.NewMessage, StringComparer.OrdinalIgnoreCase);
+        Assert.AreEqual("c1", messages[shaA]);
+        Assert.AreEqual("c2", messages[shaB]);
+    }
+
+    [TestMethod]
+    public void MultiSelect_ResetSelected_ClearsDraftsOfAllSelectedCommits()
+    {
+        var a = Item("c1", "1111111111111111111111111111111111111111");
+        var b = Item("c2", "2222222222222222222222222222222222222222");
+        var vm = new HistoryRewriteDraftViewModel();
+
+        vm.SetCommits([b, a]);
+        vm.SetSelectedCommits([b, a]);
+        vm.AuthorName = "Alice";
+        Assert.AreEqual(2, vm.DirectEditCount);
+
+        vm.ResetSelectedCommand.Execute(null);
+
+        Assert.IsFalse(vm.HasDrafts);
+        Assert.AreEqual(0, vm.BuildRewrites().Count);
+        Assert.AreEqual("Tester", vm.AuthorName);
+    }
+
     private static CommitItem Item(
         string message,
         string sha,
         CommitRemoteState state = CommitRemoteState.LocalOnly,
-        string? orphanedPairSha = null)
+        string? orphanedPairSha = null,
+        DateTime? date = null)
         => new(
             message,
-            new DateTime(2026, 1, 1, 12, 0, 0),
+            date ?? new DateTime(2026, 1, 1, 12, 0, 0),
             sha[..7],
             "Tester",
             "tester@gitster.test",

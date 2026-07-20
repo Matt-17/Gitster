@@ -11,4 +11,30 @@
         <Setter Property="Padding"          Value="{StaticResource PaddingMdThickness}"/>
     </Style>
 
+    <!-- ── Mixed value indicator ─────────────────────────────────── -->
+    <!-- Diagonal hatching that marks an input whose selected items disagree. -->
+    <DrawingBrush x:Key="MixedValueBrush"
+                  TileMode="Tile"
+                  Viewport="0,0,6,6"
+                  ViewportUnits="Absolute"
+                  Opacity="0.35">
+        <DrawingBrush.Drawing>
+            <GeometryDrawing Geometry="M0,6 L6,0">
+                <GeometryDrawing.Pen>
+                    <Pen Brush="{DynamicResource TextTertiary}" Thickness="1"/>
+                </GeometryDrawing.Pen>
+            </GeometryDrawing>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+
+    <!-- Overlay border placed on top of an input; never takes input itself. -->
+    <Style x:Key="MixedValueOverlay" TargetType="Border">
+        <Setter Property="Background"      Value="{StaticResource MixedValueBrush}"/>
+        <Setter Property="BorderBrush"     Value="{DynamicResource BorderTertiary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius"    Value="{DynamicResource TextInputCornerRadius}"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Margin"          Value="1"/>
+    </Style>
+
 </ResourceDictionary>

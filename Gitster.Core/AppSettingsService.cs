@@ -45,6 +45,7 @@ public sealed class AppSettingsService
         public bool CommitRefPaneCollapsed { get; set; }
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
+        public bool SyncCommitterWithAuthorDate { get; set; }
         public ThemePreference ThemePreference { get; set; } = ThemePreference.System;
         public string BranchFontFamily { get; set; } = UiPreferencesService.DefaultBranchFontFamily;
         public Dictionary<string, double> SplitterLengths { get; set; } = new(StringComparer.Ordinal);

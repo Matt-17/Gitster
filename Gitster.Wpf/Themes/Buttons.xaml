@@ -115,6 +115,81 @@
         <Setter Property="Background"      Value="Transparent"/>
     </Style>
 
+    <!-- ── LinkToggleButton ──────────────────────────────────────── -->
+    <!-- Square icon toggle; the checked state reads as an active accent. -->
+    <Style x:Key="LinkToggleButton" TargetType="ToggleButton">
+        <Setter Property="Width"            Value="30"/>
+        <Setter Property="Height"           Value="30"/>
+        <Setter Property="Padding"          Value="0"/>
+        <Setter Property="Background"       Value="Transparent"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BorderSecondary}"/>
+        <Setter Property="BorderThickness"  Value="1"/>
+        <Setter Property="Foreground"       Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Cursor"           Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource TextInputCornerRadius}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource BackgroundSecondary}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource AccentInfoBackground}"/>
+                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── LinkTextButton ────────────────────────────────────────── -->
+    <!-- Discreet inline text action next to a field label.          -->
+    <Style x:Key="LinkTextButton" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding"         Value="4,0"/>
+        <Setter Property="FontSize"        Value="10"/>
+        <Setter Property="FontFamily"      Value="{StaticResource FontFamilyUi}"/>
+        <Setter Property="Foreground"      Value="{DynamicResource TextTertiary}"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter x:Name="Content"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="TextBlock.TextDecorations" TargetName="Content" Value="Underline"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- ── CopyGlyphButton ───────────────────────────────────────── -->
     <!-- Borderless copy glyph (A9): no border, slightly muted, hover darkens. -->
     <Style x:Key="CopyGlyphButton" TargetType="Button">
