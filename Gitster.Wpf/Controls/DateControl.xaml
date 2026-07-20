@@ -139,8 +139,17 @@
                 </TextBox>
                 <Button Grid.Column="2"
                         Click="Button_Click"
-                        Style="{StaticResource PopupTriggerButtonStyle}"
                         AutomationProperties.Name="Open calendar">
+                    <Button.Style>
+                        <!-- The calendar popup only makes sense while a date is part of the input. -->
+                        <Style TargetType="Button" BasedOn="{StaticResource PopupTriggerButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding EditMode}" Value="{x:Static controls:EditMode.TimeOnly}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                     <Path Stretch="Uniform"
                           Width="14"
                           Height="14"

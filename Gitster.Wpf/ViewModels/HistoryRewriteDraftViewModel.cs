@@ -16,16 +16,28 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     private readonly IWindowService? _windowService;
     private readonly Func<string?>? _getBranchName;
     private readonly Func<string?, Task>? _refreshAfterApply;
+    private readonly UiPreferencesService? _uiPreferences;
+    private bool _syncCommitterWithAuthor;
 
     private readonly Dictionary<string, CommitDetails> _loadedDetails = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CommitDraft> _drafts = new(StringComparer.OrdinalIgnoreCase);
     private List<CommitItem> _commits = [];
+    private List<CommitItem> _selectedCommits = [];
     private CommitItem? _selectedCommit;
     private string _messageText = string.Empty;
     private string _authorName = string.Empty;
     private string _authorEmail = string.Empty;
-    private DateTime? _authorDate;
-    private DateTime? _committerDate;
+    private DateTime? _authorDatePart;
+    private DateTime? _authorTimePart;
+    private DateTime? _committerDatePart;
+    private DateTime? _committerTimePart;
+    private bool _isMessageMixed;
+    private bool _isAuthorNameMixed;
+    private bool _isAuthorEmailMixed;
+    private bool _isAuthorDateMixed;
+    private bool _isAuthorTimeMixed;
+    private bool _isCommitterDateMixed;
+    private bool _isCommitterTimeMixed;
     private bool _isLoadingDetails;
     private bool _isApplying;
     private bool _isSelectedCommitEditable;
@@ -50,7 +62,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         OperationsLogService opsLog,
         SnapshotService snapshots,
         IWindowService windowService,
-        RepositoryCommandContext commandContext)
+        RepositoryCommandContext commandContext,
+        UiPreferencesService uiPreferences)
         : this(
             git,
             feedback,
@@ -58,7 +71,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             snapshots,
             windowService,
             () => commandContext.CurrentBranch,
-            commandContext.RefreshAfterHistoryRewrite)
+            commandContext.RefreshAfterHistoryRewrite,
+            uiPreferences)
     {
     }
 
@@ -69,7 +83,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         SnapshotService snapshots,
         IWindowService windowService,
         Func<string?> getBranchName,
-        Func<string?, Task> refreshAfterApply)
+        Func<string?, Task> refreshAfterApply,
+        UiPreferencesService? uiPreferences = null)
     {
         _git = git;
         _feedback = feedback;
@@ -78,6 +93,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         _windowService = windowService;
         _getBranchName = getBranchName;
         _refreshAfterApply = refreshAfterApply;
+        _uiPreferences = uiPreferences;
     }
 
     public CommitItem? SelectedCommit
@@ -92,7 +108,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         set
         {
             if (SetProperty(ref _messageText, value))
-                UpdateDraftFromEditor();
+                ApplyToSelection((draft, v) => draft.NewMessage = v, value, () => IsMessageMixed = false);
         }
     }
 
@@ -102,7 +118,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         set
         {
             if (SetProperty(ref _authorName, value))
-                UpdateDraftFromEditor();
+                ApplyToSelection((draft, v) => draft.NewAuthorName = v.Trim(), value, () => IsAuthorNameMixed = false);
         }
     }
 
@@ -112,32 +128,198 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         set
         {
             if (SetProperty(ref _authorEmail, value))
-                UpdateDraftFromEditor();
+                ApplyToSelection((draft, v) => draft.NewAuthorEmail = v.Trim(), value, () => IsAuthorEmailMixed = false);
         }
     }
 
-    public DateTime? AuthorDate
+    /// <summary>Date part of the author timestamp; editing it never touches the per-commit time of day.</summary>
+    public DateTime? AuthorDatePart
     {
-        get => _authorDate;
+        get => _authorDatePart;
         set
         {
-            if (SetProperty(ref _authorDate, value))
-                UpdateDraftFromEditor();
+            if (SetProperty(ref _authorDatePart, value))
+            {
+                ApplyToSelection(
+                    (draft, v) =>
+                    {
+                        draft.NewAuthorDate = CombineDate(v, draft.EffectiveAuthorDate);
+                        PullCommitterAlong(draft);
+                    },
+                    value,
+                    () => IsAuthorDateMixed = false);
+            }
         }
     }
 
-    public DateTime? CommitterDate
+    /// <summary>Time part of the author timestamp; the carrier date is ignored.</summary>
+    public DateTime? AuthorTimePart
     {
-        get => _committerDate;
+        get => _authorTimePart;
         set
         {
-            if (SetProperty(ref _committerDate, value))
-                UpdateDraftFromEditor();
+            if (SetProperty(ref _authorTimePart, value))
+            {
+                ApplyToSelection(
+                    (draft, v) =>
+                    {
+                        draft.NewAuthorDate = CombineTime(v, draft.EffectiveAuthorDate);
+                        PullCommitterAlong(draft);
+                    },
+                    value,
+                    () => IsAuthorTimeMixed = false);
+            }
         }
     }
 
+    public DateTime? CommitterDatePart
+    {
+        get => _committerDatePart;
+        set
+        {
+            if (SetProperty(ref _committerDatePart, value))
+            {
+                ApplyToSelection(
+                    (draft, v) => draft.NewCommitterDate = CombineDate(v, draft.EffectiveCommitterDate),
+                    value,
+                    () => IsCommitterDateMixed = false);
+            }
+        }
+    }
+
+    public DateTime? CommitterTimePart
+    {
+        get => _committerTimePart;
+        set
+        {
+            if (SetProperty(ref _committerTimePart, value))
+            {
+                ApplyToSelection(
+                    (draft, v) => draft.NewCommitterDate = CombineTime(v, draft.EffectiveCommitterDate),
+                    value,
+                    () => IsCommitterTimeMixed = false);
+            }
+        }
+    }
+
+    public bool IsMessageMixed
+    {
+        get => _isMessageMixed;
+        private set => SetProperty(ref _isMessageMixed, value);
+    }
+
+    public bool IsAuthorNameMixed
+    {
+        get => _isAuthorNameMixed;
+        private set => SetProperty(ref _isAuthorNameMixed, value);
+    }
+
+    public bool IsAuthorEmailMixed
+    {
+        get => _isAuthorEmailMixed;
+        private set => SetProperty(ref _isAuthorEmailMixed, value);
+    }
+
+    public bool IsAuthorDateMixed
+    {
+        get => _isAuthorDateMixed;
+        private set => SetProperty(ref _isAuthorDateMixed, value);
+    }
+
+    public bool IsAuthorTimeMixed
+    {
+        get => _isAuthorTimeMixed;
+        private set => SetProperty(ref _isAuthorTimeMixed, value);
+    }
+
+    public bool IsCommitterDateMixed
+    {
+        get => _isCommitterDateMixed;
+        private set => SetProperty(ref _isCommitterDateMixed, value);
+    }
+
+    public bool IsCommitterTimeMixed
+    {
+        get => _isCommitterTimeMixed;
+        private set => SetProperty(ref _isCommitterTimeMixed, value);
+    }
+
+    public int SelectedCommitCount => _selectedCommits.Count;
+
+    public bool IsMultiSelection => _selectedCommits.Count > 1;
+
+    /// <summary>Header suffix that only appears while more than one commit is selected.</summary>
+    public string SelectionSuffix => IsMultiSelection ? $" · {SelectedCommitCount} commits" : string.Empty;
+
+    /// <summary>
+    /// While on, every author timestamp edit drags the committer timestamp with it. Persisted in the UI settings.
+    /// </summary>
+    public bool SyncCommitterWithAuthor
+    {
+        get => _uiPreferences?.SyncCommitterWithAuthorDate ?? _syncCommitterWithAuthor;
+        set
+        {
+            if (value == SyncCommitterWithAuthor)
+                return;
+
+            if (_uiPreferences is not null)
+                _uiPreferences.SyncCommitterWithAuthorDate = value;
+            else
+                _syncCommitterWithAuthor = value;
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsCommitterTimestampEditable));
+
+            // Turning it on immediately brings the current selection in line.
+            if (value)
+                SyncCommitterDate();
+        }
+    }
+
+    /// <summary>The committer timestamp is only hand-editable while it does not follow the author timestamp.</summary>
+    public bool IsCommitterTimestampEditable => !SyncCommitterWithAuthor;
+
+    private void PullCommitterAlong(CommitDraft draft)
+    {
+        if (SyncCommitterWithAuthor)
+            draft.NewCommitterDate = draft.EffectiveAuthorDate;
+    }
+
+    /// <summary>Drops everything below the subject line — per commit, so each keeps its own subject.</summary>
     [RelayCommand]
-    private void SyncCommitterDate() => CommitterDate = AuthorDate;
+    private void KeepFirstMessageLine()
+    {
+        if (!IsSelectedCommitEditable)
+            return;
+
+        foreach (var commit in _selectedCommits)
+        {
+            var draft = GetOrCreateDraft(commit);
+            draft.NewMessage = FirstMessageLine(draft.NewMessage);
+        }
+
+        DropUnchangedDrafts();
+        ProjectEditorFromSelection();
+        RefreshProjection();
+    }
+
+    /// <summary>Takes the author timestamp over into the committer timestamp for every selected commit.</summary>
+    [RelayCommand]
+    private void SyncCommitterDate()
+    {
+        if (!IsSelectedCommitEditable)
+            return;
+
+        foreach (var commit in _selectedCommits)
+        {
+            var draft = GetOrCreateDraft(commit);
+            draft.NewCommitterDate = draft.EffectiveAuthorDate;
+        }
+
+        DropUnchangedDrafts();
+        ProjectEditorFromSelection();
+        RefreshProjection();
+    }
 
     public bool IsLoadingDetails
     {
@@ -204,7 +386,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     }
 
     public bool CanApply => HasDrafts && !IsApplying;
-    public bool CanDiscardSelected => SelectedCommit is not null && _drafts.ContainsKey(SelectedCommit.FullSha);
+    public bool CanDiscardSelected => _selectedCommits.Any(c => _drafts.ContainsKey(c.FullSha));
 
     public void SetCommits(IEnumerable<CommitItem> commits)
     {
@@ -218,23 +400,37 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
 
     public void SetSelectedCommit(CommitItem? commit)
     {
-        _selectionVersion++;
         SelectedCommit = commit;
+
+        // A single-selection update also defines the editable set unless a wider multi-selection
+        // already contains this commit (the list view raises both notifications).
+        if (commit is null)
+            ApplySelection([]);
+        else if (!_selectedCommits.Any(c => string.Equals(c.FullSha, commit.FullSha, StringComparison.OrdinalIgnoreCase)))
+            ApplySelection([commit]);
+        else
+            RefreshSummary();
+    }
+
+    public void SetSelectedCommits(IReadOnlyList<CommitItem> commits) => ApplySelection(commits);
+
+    private void ApplySelection(IReadOnlyList<CommitItem> commits)
+    {
+        _selectionVersion++;
+        _selectedCommits = commits.ToList();
         _editorTouched = false;
-        IsSelectedCommitEditable = commit is not null && commit.RemoteState != CommitRemoteState.Incoming;
+        IsSelectedCommitEditable = _selectedCommits.Count > 0
+            && _selectedCommits.All(c => c.RemoteState != CommitRemoteState.Incoming);
+
+        OnPropertyChanged(nameof(SelectedCommitCount));
+        OnPropertyChanged(nameof(IsMultiSelection));
+        OnPropertyChanged(nameof(SelectionSuffix));
         OnPropertyChanged(nameof(CanDiscardSelected));
 
-        if (commit is null)
-        {
-            LoadEditor(null);
-            RefreshSummary();
-            return;
-        }
+        ProjectEditorFromSelection();
 
-        LoadEditor(commit);
-
-        if (_git is not null)
-            _ = LoadDetailsAsync(commit, _selectionVersion);
+        if (_git is not null && _selectedCommits.Count > 0)
+            _ = LoadDetailsAsync(_selectedCommits.ToList(), _selectionVersion);
 
         RefreshSummary();
     }
@@ -242,11 +438,13 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     [RelayCommand]
     private void ResetSelected()
     {
-        if (SelectedCommit is null)
+        if (_selectedCommits.Count == 0)
             return;
 
-        _drafts.Remove(SelectedCommit.FullSha);
-        LoadEditor(SelectedCommit);
+        foreach (var commit in _selectedCommits)
+            _drafts.Remove(commit.FullSha);
+
+        ProjectEditorFromSelection();
         RefreshProjection();
     }
 
@@ -254,7 +452,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     private void ClearAll()
     {
         _drafts.Clear();
-        LoadEditor(SelectedCommit);
+        ProjectEditorFromSelection();
         RefreshProjection();
     }
 
@@ -348,31 +546,43 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             .Select(d => d.ToRewrite())
             .ToList();
 
-    private async Task LoadDetailsAsync(CommitItem commit, int version)
+    private async Task LoadDetailsAsync(IReadOnlyList<CommitItem> commits, int version)
     {
-        if (_git is null)
+        if (_git is null || commits.Count == 0)
             return;
 
         IsLoadingDetails = true;
         try
         {
-            var details = await Task.Run(async () => await _git.GetCommitAsync(commit.FullSha));
+            foreach (var commit in commits)
+            {
+                CommitDetails details;
+                try
+                {
+                    details = await Task.Run(async () => await _git.GetCommitAsync(commit.FullSha));
+                }
+                catch
+                {
+                    // The short-row metadata is still enough to edit basic fields.
+                    continue;
+                }
+
+                if (version != _selectionVersion)
+                    return;
+
+                _loadedDetails[commit.FullSha] = details;
+
+                if (_drafts.TryGetValue(commit.FullSha, out var draft))
+                    draft.UpdateOriginalDetails(details, updatePendingIfUnchanged: !_editorTouched);
+            }
+
             if (version != _selectionVersion)
                 return;
 
-            _loadedDetails[commit.FullSha] = details;
-
-            if (_drafts.TryGetValue(commit.FullSha, out var draft))
-                draft.UpdateOriginalDetails(details, updatePendingIfUnchanged: !_editorTouched);
-
             if (!_editorTouched)
-                LoadEditor(commit);
+                ProjectEditorFromSelection();
 
             RefreshProjection();
-        }
-        catch
-        {
-            // The short-row metadata is still enough to edit basic fields.
         }
         finally
         {
@@ -381,38 +591,56 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         }
     }
 
-    private void LoadEditor(CommitItem? commit)
+    /// <summary>
+    /// Projects the editor fields over the whole selection: a field shows its value when every selected
+    /// commit agrees, otherwise it is cleared and flagged as mixed.
+    /// </summary>
+    private void ProjectEditorFromSelection()
     {
         _syncingEditor = true;
         try
         {
-            if (commit is null)
+            if (_selectedCommits.Count == 0)
             {
                 MessageText = string.Empty;
                 AuthorName = string.Empty;
                 AuthorEmail = string.Empty;
-                AuthorDate = null;
-                CommitterDate = null;
+                AuthorDatePart = null;
+                AuthorTimePart = null;
+                CommitterDatePart = null;
+                CommitterTimePart = null;
+                IsMessageMixed = false;
+                IsAuthorNameMixed = false;
+                IsAuthorEmailMixed = false;
+                IsAuthorDateMixed = false;
+                IsAuthorTimeMixed = false;
+                IsCommitterDateMixed = false;
+                IsCommitterTimeMixed = false;
                 return;
             }
 
-            var original = GetOriginal(commit);
-            if (_drafts.TryGetValue(commit.FullSha, out var draft))
-            {
-                MessageText = draft.NewMessage;
-                AuthorName = draft.NewAuthorName;
-                AuthorEmail = draft.NewAuthorEmail;
-                AuthorDate = draft.NewAuthorDate;
-                CommitterDate = draft.NewCommitterDate;
-            }
-            else
-            {
-                MessageText = original.Message;
-                AuthorName = original.AuthorName;
-                AuthorEmail = original.AuthorEmail;
-                AuthorDate = original.Date;
-                CommitterDate = original.CommitterDate;
-            }
+            var values = _selectedCommits.Select(GetEffectiveValues).ToList();
+
+            IsMessageMixed = !AllEqual(values, v => NormalizeMessage(v.Message), StringComparer.Ordinal);
+            MessageText = IsMessageMixed ? string.Empty : values[0].Message;
+
+            IsAuthorNameMixed = !AllEqual(values, v => v.AuthorName, StringComparer.Ordinal);
+            AuthorName = IsAuthorNameMixed ? string.Empty : values[0].AuthorName;
+
+            IsAuthorEmailMixed = !AllEqual(values, v => v.AuthorEmail, StringComparer.OrdinalIgnoreCase);
+            AuthorEmail = IsAuthorEmailMixed ? string.Empty : values[0].AuthorEmail;
+
+            IsAuthorDateMixed = !AllEqual(values, v => v.AuthorDate.Date, EqualityComparer<DateTime>.Default);
+            AuthorDatePart = IsAuthorDateMixed ? null : values[0].AuthorDate.Date;
+
+            IsAuthorTimeMixed = !AllEqual(values, v => MinuteOfDay(v.AuthorDate), EqualityComparer<int>.Default);
+            AuthorTimePart = IsAuthorTimeMixed ? null : AsTimeCarrier(values[0].AuthorDate);
+
+            IsCommitterDateMixed = !AllEqual(values, v => v.CommitterDate.Date, EqualityComparer<DateTime>.Default);
+            CommitterDatePart = IsCommitterDateMixed ? null : values[0].CommitterDate.Date;
+
+            IsCommitterTimeMixed = !AllEqual(values, v => MinuteOfDay(v.CommitterDate), EqualityComparer<int>.Default);
+            CommitterTimePart = IsCommitterTimeMixed ? null : AsTimeCarrier(values[0].CommitterDate);
         }
         finally
         {
@@ -422,9 +650,10 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         OnPropertyChanged(nameof(CanDiscardSelected));
     }
 
-    private void UpdateDraftFromEditor()
+    /// <summary>Writes a single edited field into every selected commit, leaving all other fields untouched.</summary>
+    private void ApplyToSelection<T>(Action<CommitDraft, T> apply, T value, Action clearMixedFlag)
     {
-        if (_syncingEditor || SelectedCommit is null)
+        if (_syncingEditor || _selectedCommits.Count == 0)
             return;
 
         _editorTouched = true;
@@ -432,17 +661,35 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         if (!IsSelectedCommitEditable)
             return;
 
-        var draft = GetOrCreateDraft(SelectedCommit);
-        draft.NewMessage = MessageText;
-        draft.NewAuthorName = AuthorName.Trim();
-        draft.NewAuthorEmail = AuthorEmail.Trim();
-        draft.NewAuthorDate = AuthorDate;
-        draft.NewCommitterDate = CommitterDate;
+        foreach (var commit in _selectedCommits)
+            apply(GetOrCreateDraft(commit), value);
 
-        if (!draft.HasChanges)
-            _drafts.Remove(SelectedCommit.FullSha);
+        clearMixedFlag();
+        DropUnchangedDrafts();
 
+        // Fields the edit changed indirectly (a pulled-along committer timestamp) must be re-read.
+        ProjectEditorFromSelection();
         RefreshProjection();
+    }
+
+    private void DropUnchangedDrafts()
+    {
+        foreach (var sha in _drafts.Where(pair => !pair.Value.HasChanges).Select(pair => pair.Key).ToList())
+            _drafts.Remove(sha);
+    }
+
+    private EffectiveValues GetEffectiveValues(CommitItem commit)
+    {
+        var original = GetOriginal(commit);
+        if (!_drafts.TryGetValue(commit.FullSha, out var draft))
+            return new EffectiveValues(original.Message, original.AuthorName, original.AuthorEmail, original.Date, original.CommitterDate);
+
+        return new EffectiveValues(
+            draft.NewMessage,
+            draft.NewAuthorName,
+            draft.NewAuthorEmail,
+            draft.EffectiveAuthorDate,
+            draft.EffectiveCommitterDate);
     }
 
     private CommitDraft GetOrCreateDraft(CommitItem commit)
@@ -547,17 +794,21 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             return;
         }
 
-        if (SelectedCommit?.RemoteState == CommitRemoteState.Incoming)
+        if (_selectedCommits.Any(c => c.RemoteState == CommitRemoteState.Incoming))
         {
             SummaryText = "Incoming commits must be pulled or cherry-picked before they can be edited.";
             return;
         }
 
+        var selectionPrefix = IsMultiSelection
+            ? $"{SelectedCommitCount} commits selected. "
+            : string.Empty;
+
         if (!HasDrafts)
         {
-            SummaryText = SelectedCommit is null
+            SummaryText = _selectedCommits.Count == 0
                 ? "Select a commit to edit history."
-                : "No pending history edits.";
+                : selectionPrefix + "No pending history edits.";
             return;
         }
 
@@ -566,8 +817,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             ? "no local descendant rewrites"
             : $"{TransitiveRewriteCount} local descendant rewrite{Plural(TransitiveRewriteCount)}";
         SummaryText = HasRemoteRewriteRisk
-            ? $"{direct}, {transitive}. Remote contains old copies: force-with-lease required."
-            : $"{direct}, {transitive}. Local cleanup.";
+            ? $"{selectionPrefix}{direct}, {transitive}. Remote contains old copies: force-with-lease required."
+            : $"{selectionPrefix}{direct}, {transitive}. Local cleanup.";
     }
 
     private void RemoveMissingDrafts()
@@ -815,6 +1066,10 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         return string.IsNullOrWhiteSpace(first) ? "(empty message)" : first;
     }
 
+    /// <summary>Subject line of a message, keeping it verbatim (no placeholder for empty messages).</summary>
+    private static string FirstMessageLine(string value)
+        => NormalizeMessage(value).Split('\n').FirstOrDefault()?.TrimEnd() ?? string.Empty;
+
     private static string NormalizeMessage(string value)
         => value.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n');
 
@@ -826,10 +1081,35 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         && left.Value.Hour == right.Hour
         && left.Value.Minute == right.Minute;
 
+    private static bool AllEqual<TKey>(
+        IReadOnlyList<EffectiveValues> values,
+        Func<EffectiveValues, TKey> selector,
+        IEqualityComparer<TKey> comparer)
+        => values.All(v => comparer.Equals(selector(v), selector(values[0])));
+
+    private static int MinuteOfDay(DateTime value) => (value.Hour * 60) + value.Minute;
+
+    /// <summary>Time-only inputs need a carrier date; only the time of day is ever read back.</summary>
+    private static DateTime AsTimeCarrier(DateTime value)
+        => new(2000, 1, 1, value.Hour, value.Minute, 0);
+
+    private static DateTime? CombineDate(DateTime? date, DateTime current)
+        => date is null ? current : date.Value.Date + current.TimeOfDay;
+
+    private static DateTime? CombineTime(DateTime? time, DateTime current)
+        => time is null ? current : current.Date.AddMinutes(MinuteOfDay(time.Value));
+
     private static string ShortSha(string sha) => GitSha.Short(sha);
 
     private static string Plural(int count)
         => count == 1 ? string.Empty : "s";
+
+    private sealed record EffectiveValues(
+        string Message,
+        string AuthorName,
+        string AuthorEmail,
+        DateTime AuthorDate,
+        DateTime CommitterDate);
 
     private sealed record OriginalCommit(
         string Message,
@@ -889,6 +1169,9 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         public string NewAuthorEmail { get; set; }
         public DateTime? NewAuthorDate { get; set; }
         public DateTime? NewCommitterDate { get; set; }
+
+        public DateTime EffectiveAuthorDate => NewAuthorDate ?? OriginalAuthorDate;
+        public DateTime EffectiveCommitterDate => NewCommitterDate ?? OriginalCommitterDate;
 
         public bool HasMessageChange
             => !string.Equals(NormalizeMessage(NewMessage), NormalizeMessage(OriginalMessage), StringComparison.Ordinal);

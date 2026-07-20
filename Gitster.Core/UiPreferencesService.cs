@@ -48,6 +48,7 @@ public partial class UiPreferencesService : ObservableObject
         public bool CommitRefPaneCollapsed { get; set; }
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
+        public bool SyncCommitterWithAuthorDate { get; set; }
         public ThemePreference ThemePreference { get; set; } = ThemePreference.System;
         public string BranchFontFamily { get; set; } = DefaultBranchFontFamily;
         public Dictionary<string, double>? SplitterLengths { get; set; }
@@ -71,6 +72,10 @@ public partial class UiPreferencesService : ObservableObject
     [ObservableProperty]
     public partial bool PersistentLoggingEnabled { get; set; }
 
+    /// <summary>History edit: keep the committer timestamp in step with the author timestamp.</summary>
+    [ObservableProperty]
+    public partial bool SyncCommitterWithAuthorDate { get; set; }
+
     [ObservableProperty]
     public partial ThemePreference ThemePreference { get; set; } = ThemePreference.System;
 
@@ -87,6 +92,7 @@ public partial class UiPreferencesService : ObservableObject
     partial void OnCommitRefPaneCollapsedChanged(bool value) => Save();
     partial void OnUpdateChecksEnabledChanged(bool value) => Save();
     partial void OnPersistentLoggingEnabledChanged(bool value) => Save();
+    partial void OnSyncCommitterWithAuthorDateChanged(bool value) => Save();
     partial void OnBranchFontFamilyChanged(string value) => Save();
     partial void OnThemePreferenceChanged(ThemePreference value)
     {
@@ -152,6 +158,7 @@ public partial class UiPreferencesService : ObservableObject
                     CommitRefPaneCollapsed = CommitRefPaneCollapsed,
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
+                    SyncCommitterWithAuthorDate = SyncCommitterWithAuthorDate,
                     ThemePreference = ThemePreference,
                     BranchFontFamily = BranchFontFamily,
                     SplitterLengths = new Dictionary<string, double>(_splitterLengths),
@@ -172,6 +179,7 @@ public partial class UiPreferencesService : ObservableObject
                     CommitRefPaneCollapsed = CommitRefPaneCollapsed,
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
+                    SyncCommitterWithAuthorDate = SyncCommitterWithAuthorDate,
                     ThemePreference = ThemePreference,
                     BranchFontFamily = BranchFontFamily,
                     SplitterLengths = new Dictionary<string, double>(_splitterLengths),
@@ -196,6 +204,7 @@ public partial class UiPreferencesService : ObservableObject
         CommitRefPaneCollapsed = settings.CommitRefPaneCollapsed;
         UpdateChecksEnabled = settings.UpdateChecksEnabled;
         PersistentLoggingEnabled = settings.PersistentLoggingEnabled;
+        SyncCommitterWithAuthorDate = settings.SyncCommitterWithAuthorDate;
         ThemePreference = settings.ThemePreference;
         BranchFontFamily = string.IsNullOrWhiteSpace(settings.BranchFontFamily)
             ? DefaultBranchFontFamily
@@ -211,6 +220,7 @@ public partial class UiPreferencesService : ObservableObject
         CommitRefPaneCollapsed = p.CommitRefPaneCollapsed;
         UpdateChecksEnabled = p.UpdateChecksEnabled;
         PersistentLoggingEnabled = p.PersistentLoggingEnabled;
+        SyncCommitterWithAuthorDate = p.SyncCommitterWithAuthorDate;
         ThemePreference = p.ThemePreference;
         BranchFontFamily = string.IsNullOrWhiteSpace(p.BranchFontFamily)
             ? DefaultBranchFontFamily

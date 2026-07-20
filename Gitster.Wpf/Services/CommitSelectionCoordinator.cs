@@ -36,8 +36,8 @@ public sealed class CommitSelectionCoordinator
 
         _commitList = commitList;
         _commitList.PropertyChanged += OnCommitListPropertyChanged;
-        ApplySelectedCommit(commitList.SelectedCommit);
         ApplySelectedCommits(commitList.SelectedCommits);
+        ApplySelectedCommit(commitList.SelectedCommit);
         _historyRewriteDraft.SetCommits(commitList.LoadedCommits);
     }
 
@@ -45,6 +45,7 @@ public sealed class CommitSelectionCoordinator
     {
         _selectionContext.SelectedCommit = null;
         _selectionContext.SelectedCommits = [];
+        _historyRewriteDraft.SetSelectedCommits([]);
         _historyRewriteDraft.SetSelectedCommit(null);
         _historyRewriteDraft.SetCommits([]);
         _quickActions.NotifySelectionChanged();
@@ -83,6 +84,7 @@ public sealed class CommitSelectionCoordinator
     private void ApplySelectedCommits(IReadOnlyList<CommitItem> commits)
     {
         _selectionContext.SelectedCommits = commits;
+        _historyRewriteDraft.SetSelectedCommits(commits);
         _quickActions.NotifySelectionChanged();
         SelectedCommitsChanged?.Invoke();
     }
