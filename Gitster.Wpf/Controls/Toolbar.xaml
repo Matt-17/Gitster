@@ -307,7 +307,7 @@
                 <ToggleButton Style="{StaticResource BranchFolderToggle}"
                               IsChecked="{Binding IsExpanded, Mode=TwoWay}"
                               Visibility="{Binding IsFolder, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Grid>
+                    <Grid Margin="{Binding LabelIndent}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="28"/>
                             <ColumnDefinition Width="*"/>
@@ -337,7 +337,8 @@
                     <Button Grid.Column="1" Style="{StaticResource DropItemButton}" Click="ClosePopup"
                             Command="{Binding DataContext.BranchesVM.CheckoutNamedCommand, ElementName=Root}"
                             CommandParameter="{Binding FullName}" ToolTip="{Binding FullName}">
-                        <TextBlock Text="{Binding Name}" FontFamily="{StaticResource FontFamilyMono}" FontSize="12"
+                        <TextBlock Text="{Binding Name}" Margin="{Binding LabelIndent}"
+                                   FontFamily="{StaticResource FontFamilyMono}" FontSize="12"
                                    Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center">
                             <TextBlock.Style>
@@ -362,8 +363,7 @@
                     </Button>
                 </Grid>
 
-                <!-- Children (folders only; leaves have none) -->
-                <ItemsControl Margin="14,0,0,0" ItemsSource="{Binding Children}"
+                <ItemsControl ItemsSource="{Binding Children}"
                               ItemTemplate="{DynamicResource BranchNodeTemplate}"
                               Visibility="{Binding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </StackPanel>
@@ -427,7 +427,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="&#x2713;" FontSize="13" FontWeight="Bold"
                                            Foreground="{DynamicResource AccentSuccess}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                           HorizontalAlignment="Left" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" Margin="8,7,8,7">
                                     <TextBlock Text="{Binding TitleBarVM.RepositoryName}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
