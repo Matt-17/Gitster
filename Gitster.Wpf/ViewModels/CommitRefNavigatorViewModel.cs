@@ -87,6 +87,9 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
     public ObservableCollection<CommitRefNode> RefTree { get; } = [];
 
     public Func<RefCatalogItem, Task>? SelectRefAsync { get; set; }
+
+    /// <summary>Checks out a local branch — used by the double-click in the refs pane.</summary>
+    public Func<string, Task>? CheckoutBranchAsync { get; set; }
     public Func<Task>? SelectCurrentBranchAsync { get; set; }
     public Func<Task>? SelectAllBranchesAsync { get; set; }
 
@@ -166,6 +169,20 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
             return;
 
         SelectedNode = node;
+    }
+
+    /// <summary>Double-click on a local branch: check it out. Folders, tags and remotes do nothing.</summary>
+    [RelayCommand]
+    private async Task CheckoutNode(CommitRefNode? node)
+    {
+        if (node?.Item is not { Kind: RefCatalogKind.LocalBranch, IsCurrent: false } item
+            || CheckoutBranchAsync is null)
+        {
+            return;
+        }
+
+        SelectedNode = node;
+        await CheckoutBranchAsync(item.DisplayName);
     }
 
     private void Rebuild()

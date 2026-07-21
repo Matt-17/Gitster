@@ -226,11 +226,13 @@
                 </StackPanel>
 
                 <TreeView Grid.Row="2"
+                          x:Name="RefTreeView"
                           ItemsSource="{Binding RefTree}"
                           ItemTemplate="{StaticResource CommitRefNodeTemplate}"
                           Background="Transparent"
                           BorderThickness="0"
                           Padding="4,0,6,8"
+                          PreviewMouseDoubleClick="RefTree_PreviewMouseDoubleClick"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <TreeView.ItemContainerStyle>
                         <Style TargetType="TreeViewItem">

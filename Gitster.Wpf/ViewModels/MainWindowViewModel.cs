@@ -211,6 +211,11 @@ public partial class MainWindowViewModel : BaseViewModel
         CommitRefNavigatorVM.SelectRefAsync = async item => await CommitListVM.ShowRefAsync(item.CanonicalName, item.DisplayName);
         CommitRefNavigatorVM.SelectCurrentBranchAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.CurrentBranch);
         CommitRefNavigatorVM.SelectAllBranchesAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.AllBranches);
+        CommitRefNavigatorVM.CheckoutBranchAsync = async name =>
+        {
+            if (BranchesVM is { } branches)
+                await branches.CheckoutNamedCommand.ExecuteAsync(name);
+        };
         TimestampEditVM = timestampEditViewModel;
         QuickActionsVM = quickActionsViewModel;
         QuickActionsVM.RefreshAfterActionAsync = async () => await UpdateElementsAsync();
@@ -230,6 +235,8 @@ public partial class MainWindowViewModel : BaseViewModel
         SidebarVM = sidebarViewModel;
         StashesVM = stashesViewModel;
         BranchesVM = branchesViewModel;
+        // Show the new branch immediately; the full refresh that follows only confirms it.
+        BranchesVM.BranchCheckedOut += name => TitleBarVM.CurrentBranch = name;
         WorktreesVM = worktreesViewModel;
         CommitPanelVM = commitPanelViewModel;
         SearchVM = searchViewModel;

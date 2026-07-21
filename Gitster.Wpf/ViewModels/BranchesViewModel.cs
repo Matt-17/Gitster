@@ -143,6 +143,12 @@ public partial class BranchesViewModel : BaseViewModel
 
     private List<BranchRow> _all = [];
 
+    /// <summary>
+    /// Raised right after a successful checkout, before the (slower) full repository refresh,
+    /// so the title bar can show the new branch without waiting for it.
+    /// </summary>
+    public event Action<string>? BranchCheckedOut;
+
     public ObservableCollection<BranchRow> Branches { get; } = [];
 
     /// <summary>Local branches only — backs the title-bar branch dropdown (plan A11).</summary>
@@ -504,6 +510,7 @@ public partial class BranchesViewModel : BaseViewModel
         try
         {
             await _feedback.RunAsync("Checkout", () => _git.CheckoutBranchAsync(row.Name));
+            BranchCheckedOut?.Invoke(row.Name);
             await AfterChangeAsync();
         }
         catch (CheckoutConflictException)
@@ -523,6 +530,7 @@ public partial class BranchesViewModel : BaseViewModel
                     await _git.CreateStashAsync($"Auto-stash before checkout of {row.Name}", includeUntracked: true);
                     await _git.CheckoutBranchAsync(row.Name);
                 });
+                BranchCheckedOut?.Invoke(row.Name);
                 await AfterChangeAsync();
                 _windowService.Info(
                     "Your changes were stashed before switching. Find them in the Stashes view.",
