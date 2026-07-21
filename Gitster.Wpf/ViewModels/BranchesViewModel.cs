@@ -97,6 +97,15 @@ public sealed class BranchPickerNode : ObservableObject
     public string? FullName => Row?.Name;
     public bool IsCurrent => Row?.IsCurrent ?? false;
 
+    /// <summary>Nesting level in the "/"-folder tree.</summary>
+    public int Depth { get; internal set; }
+
+    /// <summary>
+    /// Indent for the label only — the rows themselves stay flush left so the current-branch
+    /// check marker lines up for every branch, nested or not.
+    /// </summary>
+    public System.Windows.Thickness LabelIndent => new(Depth * 14, 0, 0, 0);
+
     public bool IsGlobalFavorite { get; }
     public bool IsPinned { get; }
     public bool IsFavorite => IsGlobalFavorite || IsPinned;
@@ -400,7 +409,7 @@ public partial class BranchesViewModel : BaseViewModel
     }
 
     /// <summary>Sorts a tree level (folders before branches, each alphabetical) and recurses.</summary>
-    private static void SortPickerLevel(IList<BranchPickerNode> level)
+    private static void SortPickerLevel(IList<BranchPickerNode> level, int depth = 0)
     {
         var sorted = level
             .OrderByDescending(n => n.IsFolder)
@@ -410,9 +419,10 @@ public partial class BranchesViewModel : BaseViewModel
         level.Clear();
         foreach (var node in sorted)
         {
+            node.Depth = depth;
             level.Add(node);
             if (node.IsFolder)
-                SortPickerLevel(node.Children);
+                SortPickerLevel(node.Children, depth + 1);
         }
     }
 
