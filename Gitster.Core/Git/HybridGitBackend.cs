@@ -42,7 +42,7 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
     public Task<BranchInfo> GetCurrentBranchAsync()             => _lib.GetCurrentBranchAsync();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(CommitFilter? filter = null) => _lib.GetCommitsAsync(filter);
     public IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(CommitFilter? filter = null, CancellationToken ct = default) => _lib.EnumerateCommitsAsync(filter, ct);
-    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default) => _lib.ComputeRemoteSetsAsync(ct);
+    public Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default) => _lib.ComputeRemoteSetsAsync(refName, ct);
     public Task<CommitDetails> GetCommitAsync(string sha)       => _lib.GetCommitAsync(sha);
     public Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default) => _lib.GetCommitDiffAsync(sha, ct);
     public Task<WorkingTreeStatus> GetWorkingTreeStatusAsync()  => _lib.GetWorkingTreeStatusAsync();
@@ -62,6 +62,9 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
 
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
         => RunServerOperationAsync("Push", () => _cli.PushAsync(remoteName, mode, ct));
+
+    public Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default)
+        => RunServerOperationAsync("Publish branch", () => _cli.PublishBranchAsync(branchName, remoteName, ct));
 
     public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
         => RunServerOperationAsync("Push through commit", () => _cli.PushThroughCommitAsync(commitSha, remoteName, ct));
@@ -115,6 +118,7 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
     // ── Phase 3: branch ops, commit-to-branch, snapshot (libgit2) ─────────
     public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync()            => _lib.GetBranchListAsync();
     public Task CheckoutBranchAsync(string branchName)                        => _lib.CheckoutBranchAsync(branchName);
+    public Task SetUpstreamAsync(string branchName, string remoteBranchName)  => _lib.SetUpstreamAsync(branchName, remoteBranchName);
     public Task<string> CreateBranchAsync(string name, string startPointSha)  => _lib.CreateBranchAsync(name, startPointSha);
     public Task DeleteBranchAsync(string name, bool force)                    => _lib.DeleteBranchAsync(name, force);
     public Task RenameBranchAsync(string oldName, string newName)             => _lib.RenameBranchAsync(oldName, newName);

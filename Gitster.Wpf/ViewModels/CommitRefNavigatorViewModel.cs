@@ -6,12 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 using Gitster.Services;
 using Gitster.Core;
 using Gitster.Core.Git;
+using Gitster.Core.History;
 
 namespace Gitster.ViewModels;
 
 public sealed class CommitRefNode : ObservableObject
 {
     private bool _isExpanded = true;
+    private bool _isViewed;
 
     public CommitRefNode(string name, RefCatalogItem? item, string folderPath = "")
     {
@@ -50,6 +52,13 @@ public sealed class CommitRefNode : ObservableObject
         get => _isExpanded;
         set => SetProperty(ref _isExpanded, value);
     }
+
+    /// <summary>True when this ref's history is the one currently shown in the commit list.</summary>
+    public bool IsViewed
+    {
+        get => _isViewed;
+        set => SetProperty(ref _isViewed, value);
+    }
 }
 
 public partial class CommitRefNavigatorViewModel : BaseViewModel
@@ -71,6 +80,11 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
 
     // A filtered tree is force-expanded, so its state must not be snapshotted back as user intent.
     private bool _treeFiltered;
+
+    // What the commit list currently shows, so the matching node stays highlighted
+    // across tree rebuilds (refresh, filter, favourites changes).
+    private HistoryScope _viewedScope = HistoryScope.CurrentBranch;
+    private string? _viewedCanonicalName;
 
     public CommitRefNavigatorViewModel(
         IGitBackend git,
@@ -142,12 +156,42 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
         HasRefs = false;
     }
 
+    /// <summary>Marks the ref whose history the commit list shows (the "viewed" branch).</summary>
+    public void SetViewedTarget(HistoryScope scope, string? canonicalName)
+    {
+        _viewedScope = scope;
+        _viewedCanonicalName = canonicalName;
+        ApplyViewedMarker();
+    }
+
+    private void ApplyViewedMarker()
+    {
+        foreach (var root in RefTree)
+            ApplyViewedMarker(root);
+    }
+
+    private void ApplyViewedMarker(CommitRefNode node)
+    {
+        node.IsViewed = node.Item is { } item && _viewedScope switch
+        {
+            HistoryScope.Ref => string.Equals(item.CanonicalName, _viewedCanonicalName, StringComparison.Ordinal),
+            HistoryScope.CurrentBranch => item.IsCurrent,
+            _ => false,
+        };
+
+        foreach (var child in node.Children)
+            ApplyViewedMarker(child);
+    }
+
     [RelayCommand]
     private void ToggleCollapsed() => IsCollapsed = !IsCollapsed;
 
     [RelayCommand]
     private async Task ShowCurrentBranch()
     {
+        // The commit list moves away from the tree selection, so drop it — otherwise
+        // re-clicking the same branch later would be a no-op property change.
+        SelectedNode = null;
         if (SelectCurrentBranchAsync is not null)
             await SelectCurrentBranchAsync();
     }
@@ -155,6 +199,7 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
     [RelayCommand]
     private async Task ShowAllBranches()
     {
+        SelectedNode = null;
         if (SelectAllBranchesAsync is not null)
             await SelectAllBranchesAsync();
     }
@@ -167,6 +212,15 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
     {
         if (node?.Item is null)
             return;
+
+        // Re-clicking the already-selected node must still re-target the history view:
+        // the commit list may have moved elsewhere in the meantime (scope buttons,
+        // "show local history" link, checkout) without touching the tree selection.
+        if (ReferenceEquals(SelectedNode, node))
+        {
+            _ = SelectRefAsync?.Invoke(node.Item);
+            return;
+        }
 
         SelectedNode = node;
     }
@@ -217,6 +271,7 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
 
         _treeFiltered = hasFilter;
         HasRefs = RefTree.Count > 0;
+        ApplyViewedMarker();
     }
 
     private void SnapshotExpansion()

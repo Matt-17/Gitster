@@ -36,6 +36,10 @@ public partial class CommitListViewModel : BaseViewModel
     private List<CommitItem> _incomingRows = [];
     private List<CommitItem> _selectedCommits = [];
     private RemoteSets? _remoteSets;
+    // Keeps the remote name/url on the header while a new branch's sets are still computing,
+    // so switching branches never blanks the header line.
+    private string? _lastRemoteName;
+    private string? _lastRemoteUrl;
     private RemoteHistoryState _remoteHistoryState = RemoteHistoryState.Loaded;
     private CommitQuery _query = CommitQuery.Parse(null);
 
@@ -97,6 +101,13 @@ public partial class CommitListViewModel : BaseViewModel
 
     public bool IsNamedRefSelected => _selectedTarget.Scope == HistoryScope.Ref;
 
+    /// <summary>Raised with (scope, canonical ref name) whenever the shown history target
+    /// changes, so the refs pane can highlight the viewed branch.</summary>
+    public Action<HistoryScope, string?>? ViewTargetChanged { get; set; }
+
+    private void NotifyViewTargetChanged() =>
+        ViewTargetChanged?.Invoke(_selectedTarget.Scope, _selectedTarget.RefName);
+
     [RelayCommand]
     private void FocusSearch() => FocusSearchRequested?.Invoke();
 
@@ -111,6 +122,7 @@ public partial class CommitListViewModel : BaseViewModel
         _selectedTarget = HistoryTarget.ForScope(value);
         SelectedRefDisplayName = string.Empty;
         OnPropertyChanged(nameof(IsNamedRefSelected));
+        NotifyViewTargetChanged();
 
         if (!string.IsNullOrWhiteSpace(_git.RepositoryPath))
             _ = LoadAsync();
@@ -124,6 +136,7 @@ public partial class CommitListViewModel : BaseViewModel
         if (normalized != HistoryScope.CurrentBranch)
             ShowOutgoingIncomingOnly = false;
         OnPropertyChanged(nameof(IsNamedRefSelected));
+        NotifyViewTargetChanged();
         _suppressScopeReload = true;
         try
         {
@@ -143,11 +156,21 @@ public partial class CommitListViewModel : BaseViewModel
         SelectedRefDisplayName = displayName;
         ShowOutgoingIncomingOnly = false;
         OnPropertyChanged(nameof(IsNamedRefSelected));
+        NotifyViewTargetChanged();
         return string.IsNullOrWhiteSpace(_git.RepositoryPath) ? Task.CompletedTask : LoadAsync();
     }
 
     public Func<DiffFileEntry?, Task>? RemoveChangeFromCommitAsync { get; set; }
     public Func<CommitItem, CommitItem, Task>? FixupDroppedCommitAsync { get; set; }
+
+    /// <summary>Checks out a branch by name (local, or remote like "origin/foo" which creates the local branch).</summary>
+    public Func<string, Task>? CheckoutBranchAsync { get; set; }
+
+    /// <summary>Publishes a local branch: (branchName, remoteName) → git push -u.</summary>
+    public Func<string, string, Task>? PublishBranchAsync { get; set; }
+
+    /// <summary>Assigns an existing remote branch as upstream: (branchName, remoteBranchName).</summary>
+    public Func<string, string, Task>? SetUpstreamAsync { get; set; }
 
     public static bool CanDropCommitForFixup(
         CommitItem? source,
@@ -317,7 +340,7 @@ public partial class CommitListViewModel : BaseViewModel
                 _allRows = newAllRows;
                 _incomingRows = [];
                 _remoteSets = null;
-                _remoteHistoryState = target.Scope == HistoryScope.CurrentBranch
+                _remoteHistoryState = ShowsSections(target)
                     ? RemoteHistoryState.Pending
                     : RemoteHistoryState.Loaded;
                 OnPropertyChanged(nameof(LoadedCommits));
@@ -354,11 +377,14 @@ public partial class CommitListViewModel : BaseViewModel
         _allRows = [];
         _incomingRows = [];
         _remoteSets = null;
+        _lastRemoteName = null;
+        _lastRemoteUrl = null;
         _remoteHistoryState = RemoteHistoryState.Loaded;
         _selectedTarget = HistoryTarget.CurrentBranch;
         SelectedScope = HistoryScope.CurrentBranch;
         SelectedRefDisplayName = string.Empty;
         OnPropertyChanged(nameof(IsNamedRefSelected));
+        NotifyViewTargetChanged();
         OnPropertyChanged(nameof(LoadedCommits));
         Items = [];
         GraphColumnWidth = GraphColumnMinWidth;
@@ -367,6 +393,10 @@ public partial class CommitListViewModel : BaseViewModel
         HistoryStatusText = string.Empty;
         UpdateFilterStatus();
     }
+
+    /// <summary>Rebuilds the visible rows from the cached data without reloading history.</summary>
+    public void RebuildRows() =>
+        ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha);
 
     public bool SelectCommitBySha(string? fullSha)
     {
@@ -534,8 +564,42 @@ public partial class CommitListViewModel : BaseViewModel
         }
     }
 
+    /// <summary>True for every target that must render the Incoming/Outgoing sections:
+    /// the current branch and any local or remote branch picked in the refs pane.</summary>
+    private static bool ShowsSections(HistoryTarget target) =>
+        target.Scope == HistoryScope.CurrentBranch || IsBranchRef(target);
+
+    private static bool IsBranchRef(HistoryTarget target) =>
+        target.Scope == HistoryScope.Ref
+        && target.RefName is { } refName
+        && (refName.StartsWith("refs/heads/", StringComparison.Ordinal)
+            || refName.StartsWith("refs/remotes/", StringComparison.Ordinal));
+
+    private static bool IsRemoteBranchRef(HistoryTarget target) =>
+        target.Scope == HistoryScope.Ref
+        && target.RefName?.StartsWith("refs/remotes/", StringComparison.Ordinal) == true;
+
     private void ApplyRemoteSets(RemoteSets sets, IEnumerable<CommitItem> rows)
     {
+        if (IsRemoteBranchRef(_selectedTarget))
+        {
+            // The listed history IS the remote branch; commits missing from the local
+            // counterpart (or all of them, without one) count as incoming.
+            var incomingShas = new HashSet<string>(
+                sets.Incoming.Select(c => c.FullSha),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in rows)
+            {
+                row.RemoteState = !sets.HasLocalBranch || incomingShas.Contains(row.FullSha)
+                    ? CommitRemoteState.Incoming
+                    : CommitRemoteState.OnRemote;
+                row.OrphanedPairSha = null;
+            }
+
+            return;
+        }
+
         var outgoing = sets.OutgoingFullShas;
         var orphans = sets.OrphanedPairs;
 
@@ -651,52 +715,163 @@ public partial class CommitListViewModel : BaseViewModel
 
     private BuiltCommitRows BuildRows(List<CommitItem> incoming, List<CommitItem> local)
     {
-        if (_selectedTarget.Scope is HistoryScope.AllBranches or HistoryScope.Ref)
+        // GRUNDREGEL: every branch view (current, local ref, remote ref) always renders
+        // BOTH the Remote History and Local History sections. Only the all-branches
+        // graph and non-branch refs (tags, stashes) fall back to a plain list.
+        if (!ShowsSections(_selectedTarget))
         {
             ApplyGraphRows(local);
             return new BuiltCommitRows(local.Cast<object>().ToList(), local.Count, 0);
         }
 
+        if (IsRemoteBranchRef(_selectedTarget))
+            return BuildRemoteBranchRows(local);
+
         int outgoingCount = 0;
         for (int i = 0; i < local.Count; i++)
             if (IsOutgoing(local[i])) outgoingCount++;
 
-        var showRemoteSection = _selectedTarget.Scope == HistoryScope.CurrentBranch;
         var remotePending = _remoteHistoryState == RemoteHistoryState.Pending;
         var remoteUnavailable = _remoteHistoryState == RemoteHistoryState.Unavailable;
         var hasRemote = _remoteSets?.HasRemote ?? false;
         var hasTrackingBranch = _remoteSets?.HasTrackingBranch ?? false;
 
-        var result = new List<object>(incoming.Count + local.Count + 2);
+        var result = new List<object>(incoming.Count + local.Count + 4);
 
-        if (showRemoteSection)
+        result.Add(new CommitSectionHeader(CommitSectionKind.RemoteIncoming, incoming.Count,
+            RemoteNameForHeader(), RemoteUrlForHeader(), remotePending));
+
+        if (remotePending)
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "checking remote branch history..."));
+        else if (remoteUnavailable)
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "remote history unavailable"));
+        else if (!hasRemote)
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no remote configured"));
+        else if (!hasTrackingBranch)
+            result.Add(BuildNoRemoteBranchRow());
+        else if (incoming.Count == 0)
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no incoming commits"));
+        else
         {
-            result.Add(new CommitSectionHeader(CommitSectionKind.RemoteIncoming, incoming.Count,
-                _remoteSets?.RemoteName, _remoteSets?.RemoteUrl, remotePending));
-
-            if (remotePending)
-                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "checking tracking remote history..."));
-            else if (remoteUnavailable)
-                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "remote history unavailable"));
-            else if (!hasRemote)
-                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no remote configured"));
-            else if (!hasTrackingBranch)
-                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no tracking branch"));
-            else if (incoming.Count == 0)
-                result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no incoming commits"));
-            else
-            {
-                ApplyGraphRows(incoming);
-                result.AddRange(incoming);
-            }
+            ApplyGraphRows(incoming);
+            result.AddRange(incoming);
         }
 
-        if (local.Count > 0 || showRemoteSection)
-            result.Add(new CommitSectionHeader(CommitSectionKind.LocalOutgoing, outgoingCount));
+        result.Add(new CommitSectionHeader(CommitSectionKind.LocalOutgoing, outgoingCount));
+        if (local.Count == 0)
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.LocalOutgoing, "no local commits"));
 
         ApplyGraphRows(local);
         result.AddRange(local);
         return new BuiltCommitRows(result, local.Count, incoming.Count);
+    }
+
+    /// <summary>A refs/remotes/* selection: the commits live in the Remote History section;
+    /// the Local History section explains whether a local counterpart exists.</summary>
+    private BuiltCommitRows BuildRemoteBranchRows(List<CommitItem> remoteRows)
+    {
+        var remotePending = _remoteHistoryState == RemoteHistoryState.Pending;
+        var incomingCount = 0;
+        for (int i = 0; i < remoteRows.Count; i++)
+            if (remoteRows[i].RemoteState == CommitRemoteState.Incoming) incomingCount++;
+
+        var result = new List<object>(remoteRows.Count + 4);
+
+        // The one-line local section goes first so it stays visible above the full
+        // remote history — mirroring the current-branch layout, where the compact
+        // status section sits on top of the long one.
+        result.Add(new CommitSectionHeader(CommitSectionKind.LocalOutgoing, 0));
+
+        if (remotePending)
+        {
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.LocalOutgoing, "checking for a local branch..."));
+        }
+        else if (_remoteSets is { HasLocalBranch: true, LocalBranchName: { } localName })
+        {
+            result.Add(new CommitSectionEmptyRow(
+                CommitSectionKind.LocalOutgoing,
+                $"local branch '{localName}'",
+                [
+                    new CommitSectionLink("show local history",
+                        () => ShowRefAsync($"refs/heads/{localName}", localName)),
+                    new CommitSectionLink("checkout", () => CheckoutThenShowCurrentAsync(localName)),
+                ]));
+        }
+        else
+        {
+            var remoteBranch = _remoteSets?.RemoteBranchName ?? _selectedTarget.DisplayName;
+            var links = string.IsNullOrWhiteSpace(remoteBranch)
+                ? Array.Empty<CommitSectionLink>()
+                : [new CommitSectionLink("checkout as local branch", () => CheckoutThenShowCurrentAsync(remoteBranch))];
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.LocalOutgoing, "no local branch", links));
+        }
+
+        result.Add(new CommitSectionHeader(CommitSectionKind.RemoteIncoming, remoteRows.Count,
+            RemoteNameForHeader(), RemoteUrlForHeader(), remotePending, plainCount: true));
+
+        if (remoteRows.Count == 0)
+        {
+            result.Add(new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no commits on this remote branch"));
+        }
+        else
+        {
+            ApplyGraphRows(remoteRows);
+            result.AddRange(remoteRows);
+        }
+
+        return new BuiltCommitRows(result, remoteRows.Count, incomingCount);
+    }
+
+    /// <summary>The "no remote branch" placeholder with assign/create+push actions.</summary>
+    private CommitSectionEmptyRow BuildNoRemoteBranchRow()
+    {
+        var sets = _remoteSets;
+        var links = new List<CommitSectionLink>();
+
+        if (sets?.LocalBranchName is { } branchName)
+        {
+            if (sets is { HasSameNameRemoteBranch: true, RemoteBranchName: { } remoteBranch })
+                links.Add(new CommitSectionLink(
+                    "connect to remote branch",
+                    () => AssignUpstreamAsync(branchName, remoteBranch)));
+
+            var remoteName = sets.RemoteName ?? "origin";
+            links.Add(new CommitSectionLink(
+                "push",
+                () => PublishAsync(branchName, remoteName)));
+        }
+
+        return new CommitSectionEmptyRow(CommitSectionKind.RemoteIncoming, "no remote branch", links);
+    }
+
+    private string? RemoteNameForHeader() => _remoteSets?.RemoteName ?? _lastRemoteName;
+    private string? RemoteUrlForHeader() => _remoteSets?.RemoteUrl ?? _lastRemoteUrl;
+
+    private async Task CheckoutThenShowCurrentAsync(string branchName)
+    {
+        if (CheckoutBranchAsync is null)
+            return;
+
+        await CheckoutBranchAsync(branchName);
+        await ShowScopeAsync(HistoryScope.CurrentBranch);
+    }
+
+    private async Task AssignUpstreamAsync(string branchName, string remoteBranchName)
+    {
+        if (SetUpstreamAsync is null)
+            return;
+
+        await SetUpstreamAsync(branchName, remoteBranchName);
+        await LoadAsync();
+    }
+
+    private async Task PublishAsync(string branchName, string remoteName)
+    {
+        if (PublishBranchAsync is null)
+            return;
+
+        await PublishBranchAsync(branchName, remoteName);
+        await LoadAsync();
     }
 
     private void ApplyGraphRows(IReadOnlyList<CommitItem> commits)
@@ -839,15 +1014,23 @@ public partial class CommitListViewModel : BaseViewModel
 
             RemoteSets? sets = null;
             var incomingRows = new List<CommitItem>();
-            if (target.Scope == HistoryScope.CurrentBranch)
+            if (ShowsSections(target))
             {
-                sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(ct), ct).ConfigureAwait(true);
+                sets = await Task.Run(() => _git.ComputeRemoteSetsAsync(target.RefName, ct), ct).ConfigureAwait(true);
                 if (ct.IsCancellationRequested || _loadCts != ownerCts)
                     return;
 
-                await _history.ApplyRemoteSetsAsync(sets, ct);
-                incomingRows = sets.Incoming.Select(ToItem).ToList();
-                await ApplySigningStatusesAsync(incomingRows, ct);
+                // The SQLite cache only tracks the current branch's remote states.
+                if (target.Scope == HistoryScope.CurrentBranch)
+                    await _history.ApplyRemoteSetsAsync(sets, ct);
+
+                // For a remote-branch view the incoming markers live on the listed rows
+                // themselves (via ApplyRemoteSets); there is no separate incoming block.
+                if (!IsRemoteBranchRef(target))
+                {
+                    incomingRows = sets.Incoming.Select(ToItem).ToList();
+                    await ApplySigningStatusesAsync(incomingRows, ct);
+                }
             }
 
             if (ct.IsCancellationRequested || _loadCts != ownerCts)
@@ -858,6 +1041,8 @@ public partial class CommitListViewModel : BaseViewModel
                 if (sets is not null)
                 {
                     _remoteSets = sets;
+                    _lastRemoteName = sets.RemoteName ?? _lastRemoteName;
+                    _lastRemoteUrl = sets.RemoteUrl ?? _lastRemoteUrl;
                     _remoteHistoryState = RemoteHistoryState.Loaded;
                     _incomingRows = incomingRows;
                     ApplyRemoteSets(sets, _allRows);
@@ -875,7 +1060,7 @@ public partial class CommitListViewModel : BaseViewModel
         }
         catch
         {
-            if (_loadCts == ownerCts && target.Scope == HistoryScope.CurrentBranch)
+            if (_loadCts == ownerCts && ShowsSections(target))
                 await InvokeOnUiAsync(() =>
                 {
                     _remoteHistoryState = RemoteHistoryState.Unavailable;

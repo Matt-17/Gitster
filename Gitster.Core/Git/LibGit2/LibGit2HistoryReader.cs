@@ -222,15 +222,32 @@ internal sealed class LibGit2HistoryReader
         }
     }
 
-    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default)
+    public Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default)
     {
         using var repo = _context.OpenRepository();
-        var headTip = repo.Head?.Tip;
-        var tracking = repo.Head?.TrackedBranch;
         var hasRemote = repo.Network.Remotes.Any();
-        var hasTracking = tracking?.Tip != null && headTip != null;
 
-        var remoteName = tracking?.RemoteName;
+        if (refName?.StartsWith("refs/remotes/", StringComparison.Ordinal) == true)
+            return Task.FromResult(ComputeSetsForRemoteBranch(repo, refName, hasRemote, ct));
+
+        var branch = refName is null
+            ? repo.Head
+            : repo.Branches.FirstOrDefault(b =>
+                string.Equals(b.CanonicalName, refName, StringComparison.Ordinal))
+              ?? repo.Branches[refName];
+        var localTip = branch?.Tip;
+        var tracking = branch?.TrackedBranch;
+        var hasTracking = tracking?.Tip != null && localTip != null;
+
+        // Without a configured upstream, a same-name remote branch is still worth surfacing
+        // so the UI can offer "set upstream" instead of a fresh publish.
+        Branch? sameNameRemote = null;
+        if (!hasTracking && branch != null && localTip != null)
+            sameNameRemote = repo.Network.Remotes
+                .Select(r => repo.Branches[$"refs/remotes/{r.Name}/{branch.FriendlyName}"])
+                .FirstOrDefault(b => b?.Tip != null);
+
+        var remoteName = tracking?.RemoteName ?? sameNameRemote?.RemoteName;
         if (string.IsNullOrEmpty(remoteName) && hasRemote)
             remoteName = repo.Network.Remotes.First().Name;
         string? remoteUrl = null;
@@ -245,7 +262,7 @@ internal sealed class LibGit2HistoryReader
         {
             foreach (var c in repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
             {
-                IncludeReachableFrom = headTip,
+                IncludeReachableFrom = localTip,
                 ExcludeReachableFrom = tracking!.Tip,
             }))
             {
@@ -257,7 +274,7 @@ internal sealed class LibGit2HistoryReader
             {
                 SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
                 IncludeReachableFrom = tracking.Tip,
-                ExcludeReachableFrom = headTip,
+                ExcludeReachableFrom = localTip,
             }).ToList();
 
             foreach (var c in incomingCommits)
@@ -287,7 +304,71 @@ internal sealed class LibGit2HistoryReader
         }
 
         return Task.FromResult(new RemoteSets(
-            incoming, outgoing, orphaned, hasTracking, hasRemote, remoteName, remoteUrl));
+            incoming, outgoing, orphaned, hasTracking, hasRemote, remoteName, remoteUrl,
+            HasLocalBranch: localTip != null,
+            LocalBranchName: branch?.FriendlyName,
+            RemoteBranchName: tracking?.FriendlyName ?? sameNameRemote?.FriendlyName,
+            HasSameNameRemoteBranch: sameNameRemote != null));
+    }
+
+    /// <summary>
+    /// Sets for a refs/remotes/* selection: the shown history IS the remote side, so
+    /// Incoming holds the commits the local counterpart does not have. No local
+    /// counterpart means every commit counts as incoming.
+    /// </summary>
+    private static RemoteSets ComputeSetsForRemoteBranch(
+        Repository repo, string refName, bool hasRemote, CancellationToken ct)
+    {
+        var branch = repo.Branches.FirstOrDefault(b =>
+            string.Equals(b.CanonicalName, refName, StringComparison.Ordinal));
+        if (branch?.Tip is null)
+            return RemoteSets.Empty with { HasRemote = hasRemote, HasLocalBranch = false };
+
+        var remoteName = branch.RemoteName;
+        string? remoteUrl = null;
+        if (!string.IsNullOrEmpty(remoteName))
+            remoteUrl = repo.Network.Remotes[remoteName]?.Url;
+
+        var shortName = branch.FriendlyName.Contains('/')
+            ? branch.FriendlyName[(branch.FriendlyName.IndexOf('/') + 1)..]
+            : branch.FriendlyName;
+        var local = repo.Branches.FirstOrDefault(b =>
+                !b.IsRemote
+                && string.Equals(b.TrackedBranch?.CanonicalName, branch.CanonicalName, StringComparison.Ordinal))
+            ?? repo.Branches.FirstOrDefault(b =>
+                !b.IsRemote && string.Equals(b.FriendlyName, shortName, StringComparison.Ordinal));
+
+        var incoming = new List<CommitInfo>();
+        if (local?.Tip != null)
+        {
+            foreach (var c in repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+                IncludeReachableFrom = branch.Tip,
+                ExcludeReachableFrom = local.Tip,
+            }))
+            {
+                ct.ThrowIfCancellationRequested();
+                incoming.Add(new CommitInfo(
+                    c.Id.Sha[..7], c.MessageShort, c.Author.When.DateTime,
+                    c.Author.Name ?? string.Empty, c.Author.Email ?? string.Empty,
+                    CommitRemoteState.Incoming, c.Id.Sha,
+                    ParentShas: c.Parents.Select(p => p.Id.Sha).ToList(),
+                    CommitterDate: c.Committer.When.DateTime));
+            }
+        }
+
+        return new RemoteSets(
+            incoming,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            HasTrackingBranch: local?.Tip != null,
+            HasRemote: hasRemote,
+            RemoteName: remoteName,
+            RemoteUrl: remoteUrl,
+            HasLocalBranch: local?.Tip != null,
+            LocalBranchName: local?.FriendlyName,
+            RemoteBranchName: branch.FriendlyName);
     }
 
     public Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default)

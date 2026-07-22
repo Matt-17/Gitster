@@ -48,6 +48,17 @@
                                   DataType="{x:Type vm:CommitRefNode}"
                                   ItemsSource="{Binding Children}">
             <Grid MinHeight="22">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Style.Triggers>
+                            <!-- The ref whose history the commit list currently shows. -->
+                            <DataTrigger Binding="{Binding IsViewed}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AccentBlueBackground}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <!-- Fixed gutter so the current-branch dot sits to the left and every
                          branch name in a level stays left-aligned, dot or not. -->
@@ -237,6 +248,10 @@
                     <TreeView.ItemContainerStyle>
                         <Style TargetType="TreeViewItem">
                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                            <!-- Explicit values so the theme's FindAncestor bindings never run
+                                 (silences the "System.Windows.Data Error: 4" debug noise). -->
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
                         </Style>
                     </TreeView.ItemContainerStyle>
                 </TreeView>

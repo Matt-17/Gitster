@@ -1,3 +1,5 @@
+using CommunityToolkit.Mvvm.Input;
+
 namespace Gitster.ViewModels;
 
 public enum CommitSectionKind { RemoteIncoming, LocalOutgoing }
@@ -12,13 +14,15 @@ public sealed class CommitSectionHeader
         int count,
         string? remoteName = null,
         string? remoteUrl = null,
-        bool isLoading = false)
+        bool isLoading = false,
+        bool plainCount = false)
     {
         Kind = kind;
         Count = count;
         RemoteName = remoteName;
         RemoteUrl = remoteUrl;
         IsLoading = isLoading;
+        PlainCount = plainCount;
     }
 
     public CommitSectionKind Kind { get; }
@@ -26,6 +30,10 @@ public sealed class CommitSectionHeader
     public string? RemoteName { get; }
     public string? RemoteUrl { get; }
     public bool IsLoading { get; }
+
+    /// <summary>True when the section lists a branch's full history (remote-branch view),
+    /// so the count is a plain commit count rather than an incoming/outgoing delta.</summary>
+    public bool PlainCount { get; }
 
     public bool IsIncoming => Kind == CommitSectionKind.RemoteIncoming;
     public bool IsOutgoing => Kind == CommitSectionKind.LocalOutgoing;
@@ -46,6 +54,9 @@ public sealed class CommitSectionHeader
         if (IsLoading)
             return "Remote History (checking...)";
 
+        if (PlainCount)
+            return $"Remote History ({formattedCount})";
+
         return Count == 0
             ? "Remote History (0)"
             : $"Remote History ({formattedCount} incoming)";
@@ -57,16 +68,35 @@ public sealed class CommitSectionHeader
     public string RemoteUrlDisplay => RemoteUrl ?? string.Empty;
 }
 
+/// <summary>An inline action ("checkout", "create &amp; push", ...) on a placeholder row.</summary>
+public sealed class CommitSectionLink
+{
+    public CommitSectionLink(string text, Func<Task> action)
+    {
+        Text = text;
+        Command = new AsyncRelayCommand(action);
+    }
+
+    public string Text { get; }
+    public IAsyncRelayCommand Command { get; }
+}
+
 public sealed class CommitSectionEmptyRow
 {
-    public CommitSectionEmptyRow(CommitSectionKind kind, string message)
+    public CommitSectionEmptyRow(
+        CommitSectionKind kind,
+        string message,
+        IReadOnlyList<CommitSectionLink>? links = null)
     {
         Kind = kind;
         Message = message;
+        Links = links ?? [];
     }
 
     public CommitSectionKind Kind { get; }
     public string Message { get; }
+    public IReadOnlyList<CommitSectionLink> Links { get; }
+    public bool HasLinks => Links.Count > 0;
 
     public bool IsOutgoing => Kind == CommitSectionKind.LocalOutgoing;
 }

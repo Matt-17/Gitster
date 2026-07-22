@@ -210,6 +210,41 @@
             </Setter>
         </Style>
 
+        <!-- Placeholder rows stay hit-testable so their action links work, but a
+             PreviewMouseLeftButtonDown handler keeps them from stealing the selection. -->
+        <Style x:Key="SectionEmptyItemStyle" TargetType="ListViewItem"
+               BasedOn="{StaticResource SectionHeaderItemStyle}">
+            <Setter Property="IsHitTestVisible" Value="True"/>
+            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="SectionEmptyRow_PreviewMouseLeftButtonDown"/>
+        </Style>
+
+        <Style x:Key="SectionLinkButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock x:Name="LinkText"
+                                   Text="{TemplateBinding Content}"
+                                   FontSize="11"
+                                   Foreground="{TemplateBinding Foreground}"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="LinkText" Property="TextDecorations" Value="Underline"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="LinkText" Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate x:Key="SectionHeaderTemplate">
             <Border Padding="0"
                     BorderBrush="{DynamicResource BorderTertiary}"
@@ -313,15 +348,34 @@
                     <Border Grid.Column="0"
                             Width="{Binding DataContext.GraphColumnWidth, RelativeSource={RelativeSource AncestorType=ListView}}"/>
 
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Message}"
-                               HorizontalAlignment="Left"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis"
-                               Margin="2,0,8,0"
-                               FontSize="11"
-                               FontStyle="Italic"
-                               Foreground="{DynamicResource TextTertiary}"/>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="2,0,8,0">
+                        <TextBlock Text="{Binding Message}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontSize="11"
+                                   FontStyle="Italic"
+                                   Foreground="{DynamicResource TextTertiary}"/>
+                        <ItemsControl ItemsSource="{Binding Links}"
+                                      VerticalAlignment="Center"
+                                      Visibility="{Binding HasLinks, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource SectionLinkButtonStyle}"
+                                            Content="{Binding Text}"
+                                            Command="{Binding Command}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -637,7 +691,8 @@
             <ListView.ItemContainerStyleSelector>
                 <local:CommitContainerStyleSelector
                     CommitStyle="{StaticResource CommitItemStyle}"
-                    HeaderStyle="{StaticResource SectionHeaderItemStyle}"/>
+                    HeaderStyle="{StaticResource SectionHeaderItemStyle}"
+                    EmptyRowStyle="{StaticResource SectionEmptyItemStyle}"/>
             </ListView.ItemContainerStyleSelector>
 
             <ListView.ItemTemplateSelector>

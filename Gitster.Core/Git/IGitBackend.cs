@@ -16,7 +16,11 @@ public interface IHistoryReader : IRepositoryContext
     IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(
         CommitFilter? filter = null,
         CancellationToken ct = default);
-    Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Computes the local/remote relationship for <paramref name="refName"/> (canonical name,
+    /// refs/heads/* or refs/remotes/*), or for HEAD when null.
+    /// </summary>
+    Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default);
     Task<CommitDetails> GetCommitAsync(string sha);
     Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default);
     Task<string> GetReflogSelectorForHeadAsync();
@@ -74,6 +78,8 @@ public interface IRemoteOps : IRepositoryContext
     Task FetchAsync(string remoteName = "origin", CancellationToken ct = default);
     Task PullAsync(string remoteName = "origin", CancellationToken ct = default);
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default);
+    /// <summary>Creates the remote branch, pushes and sets it as upstream (git push -u).</summary>
+    Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default);
     Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default);
     Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default);
     Task PushTagAsync(string tagName, string remoteName = "origin", CancellationToken ct = default);
@@ -102,6 +108,8 @@ public interface IBranchOps : IRepositoryContext
     Task<IReadOnlyList<BranchSummary>> GetBranchesAsync();
     Task<IReadOnlyList<BranchListItem>> GetBranchListAsync();
     Task CheckoutBranchAsync(string branchName);
+    /// <summary>Sets an existing remote branch as the upstream of a local branch (no network).</summary>
+    Task SetUpstreamAsync(string branchName, string remoteBranchName);
     Task<string> CreateBranchAsync(string name, string startPointSha);
     Task DeleteBranchAsync(string name, bool force);
     Task RenameBranchAsync(string oldName, string newName);

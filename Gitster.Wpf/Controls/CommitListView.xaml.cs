@@ -64,6 +64,31 @@ public partial class CommitListView : UserControl
         }), DispatcherPriority.Loaded);
     }
 
+    private void SectionEmptyRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Let clicks on the action links through; anything else on a placeholder row
+        // must not steal the selection from the current commit.
+        if (e.OriginalSource is DependencyObject source && FindAncestorButton(source) is not null)
+            return;
+
+        e.Handled = true;
+    }
+
+    private static System.Windows.Controls.Primitives.ButtonBase? FindAncestorButton(DependencyObject? node)
+    {
+        while (node is not null and not ListViewItem)
+        {
+            if (node is System.Windows.Controls.Primitives.ButtonBase button)
+                return button;
+
+            node = node is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                : LogicalTreeHelper.GetParent(node);
+        }
+
+        return null;
+    }
+
     private void CommitItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not ListViewItem item || item.DataContext is not CommitItem commit)
@@ -175,9 +200,15 @@ public sealed class CommitContainerStyleSelector : StyleSelector
 {
     public Style? CommitStyle { get; set; }
     public Style? HeaderStyle { get; set; }
+    public Style? EmptyRowStyle { get; set; }
 
     public override Style? SelectStyle(object item, DependencyObject container)
-        => item is CommitSectionHeader or CommitSectionEmptyRow ? HeaderStyle : CommitStyle;
+        => item switch
+        {
+            CommitSectionHeader => HeaderStyle,
+            CommitSectionEmptyRow => EmptyRowStyle ?? HeaderStyle,
+            _ => CommitStyle,
+        };
 }
 
 /// <summary>Picks the header vs. commit row template for the heterogeneous commit list.</summary>
