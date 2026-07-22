@@ -449,7 +449,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task<BranchInfo> GetCurrentBranchAsync()             => NS<BranchInfo>();
     public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(CommitFilter? filter = null) => NS<IReadOnlyList<CommitInfo>>();
     public IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(CommitFilter? filter = null, CancellationToken ct = default) => throw new NotSupportedException("Route through HybridGitBackend.");
-    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default) => NS<RemoteSets>();
+    public Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default) => NS<RemoteSets>();
     public Task<CommitDetails> GetCommitAsync(string sha)       => NS<CommitDetails>();
     public Task<CommitDiff> GetCommitDiffAsync(string sha, CancellationToken ct = default) => NS<CommitDiff>();
     public Task<WorkingTreeStatus> GetWorkingTreeStatusAsync()  => NS<WorkingTreeStatus>();
@@ -528,6 +528,28 @@ public sealed class GitCliBackend : IGitBackend
         var head = await GitCli.RunAsync(RepositoryPath, ["rev-parse", "--verify", "HEAD"], ct: ct);
         if (head.Success)
             await UpdateTrackingRefAfterPushAsync(remote, head.Stdout.Trim(), ct);
+    }
+
+    /// <summary>Publishes a local branch: creates the remote branch and sets it as upstream.</summary>
+    public async Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default)
+    {
+        EnsurePath();
+        EnsureCli();
+
+        if (string.IsNullOrWhiteSpace(branchName))
+            throw new ArgumentException("Branch name is required.", nameof(branchName));
+
+        var remote = NormalizeRemoteName(remoteName);
+        await EnsureRemoteExistsAsync(remote, ct);
+
+        var r = await GitCli.RunAsync(
+            RepositoryPath,
+            ["push", "-u", remote, branchName.Trim()],
+            NoPromptEnvironment(),
+            ct,
+            timeout: RemoteOperationTimeout);
+        if (!r.Success)
+            throw new InvalidOperationException($"Publish failed:\n{r.Output}");
     }
 
     public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
@@ -760,6 +782,7 @@ public sealed class GitCliBackend : IGitBackend
     // Branch ops / commit-to-branch / snapshot are libgit2 — never routed here.
     public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync()            => NS<IReadOnlyList<BranchListItem>>();
     public Task CheckoutBranchAsync(string branchName)                        => NSVoid();
+    public Task SetUpstreamAsync(string branchName, string remoteBranchName)  => NSVoid();
     public Task<string> CreateBranchAsync(string name, string startPointSha)  => NS<string>();
     public Task DeleteBranchAsync(string name, bool force)                    => NSVoid();
     public Task RenameBranchAsync(string oldName, string newName)             => NSVoid();

@@ -57,8 +57,8 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
         CancellationToken ct = default)
         => _history.EnumerateCommitsAsync(filter, ct);
 
-    public Task<RemoteSets> ComputeRemoteSetsAsync(CancellationToken ct = default)
-        => _history.ComputeRemoteSetsAsync(ct);
+    public Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default)
+        => _history.ComputeRemoteSetsAsync(refName, ct);
 
     public Task<CommitDetails> GetCommitAsync(string sha) => _history.GetCommitAsync(sha);
 
@@ -96,6 +96,9 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
 
     public Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushAsync));
+
+    public Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default)
+        => ServerWorkNotSupportedAsync(nameof(PublishBranchAsync));
 
     public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushThroughCommitAsync));
@@ -210,6 +213,9 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
     public Task<IReadOnlyList<BranchListItem>> GetBranchListAsync() => _branches.GetBranchListAsync();
 
     public Task CheckoutBranchAsync(string branchName) => _branches.CheckoutBranchAsync(branchName);
+
+    public Task SetUpstreamAsync(string branchName, string remoteBranchName)
+        => _branches.SetUpstreamAsync(branchName, remoteBranchName);
 
     public Task<string> CreateBranchAsync(string name, string startPointSha)
         => _branches.CreateBranchAsync(name, startPointSha);

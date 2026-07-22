@@ -207,7 +207,11 @@ public partial class MainWindowViewModel : BaseViewModel
         CommitListVM.PropertyChanged += OnCommitListPropertyChanged;
         CommitListVM.RemoveChangeFromCommitAsync = RemoveChangeFromCommitAsync;
         CommitListVM.FixupDroppedCommitAsync = FixupDroppedCommitAsync;
+        CommitListVM.CheckoutBranchAsync = CheckoutBranchByNameAsync;
+        CommitListVM.PublishBranchAsync = PublishBranchByNameAsync;
+        CommitListVM.SetUpstreamAsync = SetUpstreamByNameAsync;
         CommitRefNavigatorVM = commitRefNavigatorViewModel;
+        CommitListVM.ViewTargetChanged = (scope, refName) => CommitRefNavigatorVM.SetViewedTarget(scope, refName);
         CommitRefNavigatorVM.SelectRefAsync = async item => await CommitListVM.ShowRefAsync(item.CanonicalName, item.DisplayName);
         CommitRefNavigatorVM.SelectCurrentBranchAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.CurrentBranch);
         CommitRefNavigatorVM.SelectAllBranchesAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.AllBranches);
@@ -1698,6 +1702,49 @@ public partial class MainWindowViewModel : BaseViewModel
             "other people rely on.\n\nPrefer \"Push (force-with-lease)\" unless you are certain.\n\nForce push anyway?",
             "Dangerous: force push");
         return confirm ? PushWithModeAsync(remoteName, PushMode.Force) : Task.CompletedTask;
+    }
+
+    /// <summary>Commit-list link: checkout by name ("foo" or "origin/foo", which creates the local branch).</summary>
+    private async Task CheckoutBranchByNameAsync(string name)
+    {
+        try
+        {
+            await _feedbackService.RunAsync("Checkout", () => _gitBackend.CheckoutBranchAsync(name));
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Checkout failed");
+        }
+    }
+
+    /// <summary>Commit-list link: publish a local branch (git push -u).</summary>
+    private async Task PublishBranchByNameAsync(string branchName, string remoteName)
+    {
+        try
+        {
+            await RunRemoteOperationAsync("Publish branch",
+                ct => _gitBackend.PublishBranchAsync(branchName, remoteName, ct));
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Error publishing branch: {ex.Message}", "Gitster");
+        }
+    }
+
+    /// <summary>Commit-list link: assign an existing remote branch as upstream.</summary>
+    private async Task SetUpstreamByNameAsync(string branchName, string remoteBranchName)
+    {
+        try
+        {
+            await _gitBackend.SetUpstreamAsync(branchName, remoteBranchName);
+            await UpdateElementsAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Set upstream failed");
+        }
     }
 
     private async Task PushWithModeAsync(string? remoteName, PushMode mode)

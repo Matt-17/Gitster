@@ -78,6 +78,21 @@ internal sealed class LibGit2BranchOperations
         return Task.CompletedTask;
     }
 
+    public Task SetUpstreamAsync(string branchName, string remoteBranchName)
+    {
+        using var repo = _context.OpenRepository();
+        var local = repo.Branches[branchName];
+        if (local is null || local.IsRemote)
+            throw new InvalidOperationException($"Local branch not found: {branchName}");
+
+        var remote = repo.Branches[remoteBranchName];
+        if (remote is not { IsRemote: true })
+            throw new InvalidOperationException($"Remote branch not found: {remoteBranchName}");
+
+        repo.Branches.Update(local, b => b.TrackedBranch = remote.CanonicalName);
+        return Task.CompletedTask;
+    }
+
     public Task<string> CreateBranchAsync(string name, string startPointSha)
     {
         using var repo = _context.OpenRepository();
