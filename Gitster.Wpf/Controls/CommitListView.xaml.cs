@@ -12,11 +12,16 @@ public partial class CommitListView : UserControl
     private const string CommitDragFormat = "Gitster.CommitItem";
     private CommitListViewModel? _vm;
     private Point _dragStart;
+    private ListViewItem? _dragSource;
 
     public CommitListView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        CommitListBox.AddHandler(
+            PreviewMouseLeftButtonUpEvent,
+            new MouseButtonEventHandler((_, _) => _dragSource = null),
+            handledEventsToo: true);
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -115,12 +120,21 @@ public partial class CommitListView : UserControl
     private void CommitItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart = e.GetPosition(null);
+        _dragSource = sender as ListViewItem;
     }
 
     private void CommitItem_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed
-            || sender is not ListViewItem item
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _dragSource = null;
+            return;
+        }
+
+        // WPF raises a move at the press position before the button-down event itself. Without a press
+        // that started on this row, _dragStart is stale and that move would start a drag that swallows the click.
+        if (sender is not ListViewItem item
+            || !ReferenceEquals(item, _dragSource)
             || item.DataContext is not CommitItem commit)
         {
             return;
@@ -135,6 +149,7 @@ public partial class CommitListView : UserControl
 
         var data = new DataObject();
         data.SetData(CommitDragFormat, commit);
+        _dragSource = null;
         DragDrop.DoDragDrop(item, data, DragDropEffects.Move);
     }
 
