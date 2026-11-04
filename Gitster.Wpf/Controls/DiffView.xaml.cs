@@ -114,14 +114,18 @@ public partial class DiffView : UserControl
         }
     }
 
-    private void FileTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ViewModel.SelectFromTreeItem(e.NewValue as DiffTreeNode);
+        // Recycled rows can echo stale selection while the list is being refilled; only react to a real pick.
+        if (e.AddedItems.Count == 0)
+            return;
+
+        ViewModel.SelectFromTreeItem(FileTreeView.SelectedItem as DiffTreeNode);
     }
 
-    private void TreeViewItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    private void FileRow_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is TreeViewItem item)
+        if (sender is ListBoxItem item)
         {
             item.Focus();
             item.IsSelected = true;

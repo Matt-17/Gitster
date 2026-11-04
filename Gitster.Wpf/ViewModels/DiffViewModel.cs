@@ -34,12 +34,15 @@ public sealed partial class DiffViewModel : ObservableObject
         OnSelectedFileDisplayChanged();
     }
 
+    /// <summary>The folder/file tree model; the view shows it through <see cref="VisibleRows"/>.</summary>
+    public IReadOnlyList<DiffTreeNode> FileTree { get; private set; } = [];
+
     /// <summary>
-    /// Replaced as a whole on every <see cref="SetFiles"/>: the tree view then regenerates once instead of
-    /// reacting to a Clear plus one Add per node.
+    /// The tree flattened to the rows currently shown (children of collapsed folders left out). The file
+    /// list renders this in a virtualized, recycling list. It is updated in place rather than replaced, so
+    /// switching commits reuses the row containers instead of rebuilding a nested tree view each time.
     /// </summary>
-    [ObservableProperty]
-    public partial ObservableCollection<DiffTreeNode> FileTree { get; private set; } = [];
+    public ObservableCollection<DiffTreeNode> VisibleRows { get; } = [];
 
     public string FileCountText => _fileCount == 1 ? "1 file" : $"{_fileCount} files";
 
@@ -94,13 +97,69 @@ public sealed partial class DiffViewModel : ObservableObject
         var selectedNode = previousPath is null ? null : FindFileNode(tree, previousPath);
         selectedNode ??= FindFirstFileNode(tree);
 
-        // Mark the selection before the tree is shown, so it is not applied node by node afterwards.
+        // Mark the selection before the rows are shown, so it is not applied row by row afterwards.
         ApplyTreeSelection(tree, selectedNode);
+
+        foreach (var folder in EnumerateNodes(FileTree).Where(n => n.IsFolder))
+            folder.PropertyChanged -= OnFolderPropertyChanged;
         FileTree = tree;
+        foreach (var folder in EnumerateNodes(FileTree).Where(n => n.IsFolder))
+            folder.PropertyChanged += OnFolderPropertyChanged;
+
+        RefreshVisibleRows();
         SelectNode(selectedNode);
 
         OnPropertyChanged(nameof(FileCountText));
         OnPropertyChanged(nameof(EmptyMessage));
+    }
+
+    private void OnFolderPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DiffTreeNode.IsExpanded))
+            RefreshVisibleRows();
+    }
+
+    private void RefreshVisibleRows()
+    {
+        var rows = new List<DiffTreeNode>();
+        AppendVisible(FileTree, rows);
+
+        // Overwrite slot by slot: an unchanged slot raises nothing, a changed one a single Replace.
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (i < VisibleRows.Count)
+            {
+                if (!ReferenceEquals(VisibleRows[i], rows[i]))
+                    VisibleRows[i] = rows[i];
+            }
+            else
+            {
+                VisibleRows.Add(rows[i]);
+            }
+        }
+
+        while (VisibleRows.Count > rows.Count)
+            VisibleRows.RemoveAt(VisibleRows.Count - 1);
+    }
+
+    private static void AppendVisible(IEnumerable<DiffTreeNode> nodes, List<DiffTreeNode> rows)
+    {
+        foreach (var node in nodes)
+        {
+            rows.Add(node);
+            if (node.IsFolder && node.IsExpanded)
+                AppendVisible(node.Children, rows);
+        }
+    }
+
+    private static IEnumerable<DiffTreeNode> EnumerateNodes(IEnumerable<DiffTreeNode> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            yield return node;
+            foreach (var child in EnumerateNodes(node.Children))
+                yield return child;
+        }
     }
 
     public void SelectNode(DiffTreeNode? selectedNode) => SelectNodeCore(selectedNode, forceApplyTreeSelection: false);
@@ -312,6 +371,9 @@ public sealed class DiffTreeNode : INotifyPropertyChanged
         : $"{FullPath}{Environment.NewLine}Status: {StatusText}{Environment.NewLine}Lines: {CountsText}";
 
     public int LeadingBadgeOffset => -(16 + 14 * Depth);
+
+    /// <summary>Left indentation of the row in the flattened file list.</summary>
+    public double Indent => 14 * Depth;
 
     public int FileCount
     {

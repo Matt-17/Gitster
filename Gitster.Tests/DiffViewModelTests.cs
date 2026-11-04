@@ -104,6 +104,49 @@ public sealed class DiffViewModelTests
         Assert.IsFalse(vm.FileTree.Single(n => n.Name == "src").Children.Single().IsSelected);
     }
 
+    [TestMethod]
+    public void VisibleRows_WhenFolderCollapsedAndExpanded_HidesAndRestoresItsChildren()
+    {
+        var vm = new DiffViewModel();
+        vm.SetFiles(new[]
+        {
+            File("src/App.xaml.cs"),
+            File("src/Main.cs"),
+            File("readme.md"),
+        });
+
+        CollectionAssert.AreEqual(
+            new[] { "src", "App.xaml.cs", "Main.cs", "readme.md" },
+            vm.VisibleRows.Select(r => r.Name).ToList());
+
+        var folder = vm.FileTree.Single(n => n.Name == "src");
+        folder.IsExpanded = false;
+        CollectionAssert.AreEqual(new[] { "src", "readme.md" }, vm.VisibleRows.Select(r => r.Name).ToList());
+
+        folder.IsExpanded = true;
+        Assert.AreEqual(4, vm.VisibleRows.Count);
+    }
+
+    [TestMethod]
+    public void SetFiles_ForNextCommit_ReusesTheVisibleRowsCollection()
+    {
+        var vm = new DiffViewModel();
+        vm.SetFiles(new[] { File("a.txt"), File("b.txt"), File("c.txt") });
+        var rows = vm.VisibleRows;
+        var resets = 0;
+        rows.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+                resets++;
+        };
+
+        vm.SetFiles(new[] { File("d.txt") });
+
+        Assert.AreSame(rows, vm.VisibleRows);
+        Assert.AreEqual(0, resets);
+        CollectionAssert.AreEqual(new[] { "d.txt" }, vm.VisibleRows.Select(r => r.Name).ToList());
+    }
+
     private static DiffFileEntry File(
         string path,
         int added = 1,
