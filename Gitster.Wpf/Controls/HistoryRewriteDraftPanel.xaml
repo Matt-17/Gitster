@@ -187,7 +187,6 @@
                             Padding="0"
                             AutomationProperties.Name="Sync committer timestamp with author timestamp"
                             ToolTip="Take over the author timestamp"
-                            IsEnabled="{Binding IsCommitterTimestampEditable}"
                             Command="{Binding SyncCommitterDateCommand}"
                             Style="{StaticResource GhostButton}">
                         <Path Width="13"
