@@ -179,7 +179,7 @@ public partial class DateControlViewModel : BaseViewModel, IDataErrorInfo
             var newDate = value;
 
             // In DateTime mode, if new date is at midnight and we have an existing time, preserve the time
-            if (EditMode == EditMode.DateTime && newDate.HasValue && _selectedDate.HasValue)
+            if (EditMode == EditMode.DateTime && !_isSteppingTime && newDate.HasValue && _selectedDate.HasValue)
             {
                 var newDateOnly = newDate.Value;
                 var oldTime = _selectedDate.Value;
@@ -368,6 +368,23 @@ public partial class DateControlViewModel : BaseViewModel, IDataErrorInfo
             Hour = newHour;
         }
     }
+
+    /// <summary>
+    /// Shifts the whole timestamp by the given minutes, carrying over into the hour (and day) like the
+    /// date field carries over into the month.
+    /// </summary>
+    public void StepMinutes(int minutes)
+    {
+        if (!SelectedDate.HasValue)
+            return;
+
+        // A step can land exactly on midnight, which the setter would otherwise treat as "date only".
+        _isSteppingTime = true;
+        try { SelectedDate = SelectedDate.Value.AddMinutes(minutes); }
+        finally { _isSteppingTime = false; }
+    }
+
+    private bool _isSteppingTime;
 
     public void ChangeMinute(int minutes)
     {

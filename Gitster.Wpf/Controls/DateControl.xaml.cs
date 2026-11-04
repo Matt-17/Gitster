@@ -183,13 +183,13 @@ public partial class DateControl : UserControl
                 }
                 break;
             case Key.Up:
-                ViewModel.ChangeMinute(-1);
+                ViewModel.StepMinutes(1);
                 ViewModel.RefreshTextDisplay();
                 TbTime.SelectAll();
                 e.Handled = true;
                 break;
             case Key.Down:
-                ViewModel.ChangeMinute(1);
+                ViewModel.StepMinutes(-1);
                 ViewModel.RefreshTextDisplay();
                 TbTime.SelectAll();
                 e.Handled = true;
@@ -220,7 +220,7 @@ public partial class DateControl : UserControl
 
     private void TbTime_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        ViewModel.ChangeMinute(-Math.Sign(e.Delta));
+        ViewModel.StepMinutes(Math.Sign(e.Delta));
         ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }

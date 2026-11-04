@@ -8,6 +8,37 @@ namespace Gitster.Tests;
 public sealed class DateControlViewModelTests
 {
     [TestMethod]
+    public void StepMinutes_AcrossHourBoundary_CarriesIntoHour()
+    {
+        var vm = new DateControlViewModel
+        {
+            EditMode = EditMode.DateTime,
+            SelectedDate = new DateTime(2026, 6, 30, 14, 59, 0)
+        };
+
+        vm.StepMinutes(1);
+        Assert.AreEqual(new DateTime(2026, 6, 30, 15, 0, 0), vm.SelectedDate);
+
+        vm.StepMinutes(-1);
+        Assert.AreEqual(new DateTime(2026, 6, 30, 14, 59, 0), vm.SelectedDate);
+    }
+
+    [TestMethod]
+    public void StepMinutes_OntoMidnight_KeepsMidnightAndAdvancesDay()
+    {
+        var vm = new DateControlViewModel
+        {
+            EditMode = EditMode.DateTime,
+            SelectedDate = new DateTime(2026, 6, 30, 23, 59, 0)
+        };
+
+        vm.StepMinutes(1);
+
+        Assert.AreEqual(new DateTime(2026, 7, 1, 0, 0, 0), vm.SelectedDate);
+        Assert.AreEqual("00:00", vm.TimeText);
+    }
+
+    [TestMethod]
     public void DateText_WhileFocusedWithValidPartial_KeepsTypedTextAndUpdatesSelectedDate()
     {
         var vm = new DateControlViewModel
