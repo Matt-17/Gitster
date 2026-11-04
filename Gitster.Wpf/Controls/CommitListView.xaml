@@ -381,6 +381,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="CommitRowTemplate">
+            <local:AutomationLeaf>
             <Grid Height="24">
                 <Grid.Style>
                     <Style TargetType="Grid">
@@ -571,6 +572,7 @@
                 <TextBlock Grid.Column="4" Text="{Binding CommitId}" VerticalAlignment="Center"
                            Style="{StaticResource CommitMonoTextStyle}"/>
             </Grid>
+            </local:AutomationLeaf>
         </DataTemplate>
     </UserControl.Resources>
 

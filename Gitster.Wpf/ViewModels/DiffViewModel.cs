@@ -34,7 +34,12 @@ public sealed partial class DiffViewModel : ObservableObject
         OnSelectedFileDisplayChanged();
     }
 
-    public ObservableCollection<DiffTreeNode> FileTree { get; } = [];
+    /// <summary>
+    /// Replaced as a whole on every <see cref="SetFiles"/>: the tree view then regenerates once instead of
+    /// reacting to a Clear plus one Add per node.
+    /// </summary>
+    [ObservableProperty]
+    public partial ObservableCollection<DiffTreeNode> FileTree { get; private set; } = [];
 
     public string FileCountText => _fileCount == 1 ? "1 file" : $"{_fileCount} files";
 
@@ -79,15 +84,19 @@ public sealed partial class DiffViewModel : ObservableObject
         var entries = files?.OfType<DiffFileEntry>().ToList() ?? [];
 
         _selectedNode = null;
-        FileTree.Clear();
+        var tree = new ObservableCollection<DiffTreeNode>();
         foreach (var file in entries)
-            AddFileNode(file);
+            AddFileNode(tree, file);
 
-        UpdateFolderCounts(FileTree);
+        UpdateFolderCounts(tree);
         _fileCount = entries.Count;
 
-        var selectedNode = previousPath is null ? null : FindFileNode(FileTree, previousPath);
-        selectedNode ??= FindFirstFileNode(FileTree);
+        var selectedNode = previousPath is null ? null : FindFileNode(tree, previousPath);
+        selectedNode ??= FindFirstFileNode(tree);
+
+        // Mark the selection before the tree is shown, so it is not applied node by node afterwards.
+        ApplyTreeSelection(tree, selectedNode);
+        FileTree = tree;
         SelectNode(selectedNode);
 
         OnPropertyChanged(nameof(FileCountText));
@@ -133,10 +142,10 @@ public sealed partial class DiffViewModel : ObservableObject
         OnSelectedFileDisplayChanged();
     }
 
-    private void AddFileNode(DiffFileEntry file)
+    private static void AddFileNode(ObservableCollection<DiffTreeNode> root, DiffFileEntry file)
     {
         var parts = SplitPath(file.Path);
-        var nodes = FileTree;
+        var nodes = root;
         var folderPath = string.Empty;
 
         for (var i = 0; i < parts.Count - 1; i++)

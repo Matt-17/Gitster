@@ -222,6 +222,7 @@ public partial class CommitListViewModel : BaseViewModel
     private bool CanRemoveChangeFromCommit(DiffFileEntry? file) =>
         RemoveChangeFromCommitAsync is not null
         && !DiffLoading
+        && !DiffStale
         && file is not null
         && SelectedCommit is not null
         && SelectedCommit.RemoteState != CommitRemoteState.Incoming;
@@ -266,6 +267,17 @@ public partial class CommitListViewModel : BaseViewModel
 
     [ObservableProperty]
     public partial bool DiffLoading { get; set; }
+
+    /// <summary>
+    /// True while the diff panel still shows the previous commit's files because the new diff has not
+    /// arrived yet. Keeping them avoids tearing the panel down and rebuilding it for every selection.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RemoveChangeFromCommitCommand))]
+    public partial bool DiffStale { get; set; }
+
+    /// <summary>Only after this long without a diff does the panel switch to its loading state.</summary>
+    private static readonly TimeSpan DiffLoadingIndicatorDelay = TimeSpan.FromMilliseconds(150);
 
     [ObservableProperty]
     public partial List<DiffFileEntry> DiffFiles { get; set; } = [];
@@ -1116,6 +1128,7 @@ public partial class CommitListViewModel : BaseViewModel
         if (commit == null)
         {
             DiffLoading = false;
+            DiffStale = false;
             UpdateDiff(string.Empty, []);
             return;
         }
@@ -1124,18 +1137,29 @@ public partial class CommitListViewModel : BaseViewModel
         _diffCts = cts;
         var token = cts.Token;
 
-        DiffRemoteState = commit.RemoteState;
-        DiffFiles = [];
-        DiffHeader = string.Empty;
-        DiffLoading = true;
+        DiffStale = DiffFiles.Count > 0;
 
         try
         {
-            var diff = await Task.Run(() => _git.GetCommitDiffAsync(commit.FullSha, token), token);
+            var diffTask = Task.Run(() => _git.GetCommitDiffAsync(commit.FullSha, token), token);
+
+            // Fast diffs replace the old one in a single pass; only slow ones show the loading state.
+            if (await Task.WhenAny(diffTask, Task.Delay(DiffLoadingIndicatorDelay, token)) != diffTask)
+            {
+                if (token.IsCancellationRequested) return;
+                DiffRemoteState = commit.RemoteState;
+                DiffFiles = [];
+                DiffHeader = string.Empty;
+                DiffStale = false;
+                DiffLoading = true;
+            }
+
+            var diff = await diffTask;
             if (token.IsCancellationRequested) return;
             DiffFiles = diff.Files.ToList();
             DiffHeader = diff.Header;
             DiffRemoteState = commit.RemoteState;
+            DiffStale = false;
             DiffLoading = false;
         }
         catch (OperationCanceledException)
@@ -1144,6 +1168,8 @@ public partial class CommitListViewModel : BaseViewModel
         }
         catch
         {
+            if (token.IsCancellationRequested) return;
+            DiffStale = false;
             DiffLoading = false;
             UpdateDiff(string.Empty, []);
         }

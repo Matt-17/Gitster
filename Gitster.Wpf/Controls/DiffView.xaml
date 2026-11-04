@@ -11,6 +11,7 @@
              mc:Ignorable="d">
     <UserControl.Resources>
         <DataTemplate x:Key="DiffLineTemplate" DataType="{x:Type models:DiffLine}">
+            <local:AutomationLeaf>
             <Border>
                 <Border.Style>
                     <Style TargetType="Border">
@@ -45,11 +46,13 @@
                     </TextBlock.Style>
                 </TextBlock>
             </Border>
+            </local:AutomationLeaf>
         </DataTemplate>
 
         <HierarchicalDataTemplate x:Key="DiffTreeNodeTemplate"
                                   DataType="{x:Type vm:DiffTreeNode}"
                                   ItemsSource="{Binding Children}">
+            <local:AutomationLeaf>
             <Grid Height="20"
                   ToolTip="{Binding TooltipText}">
                 <Grid.ColumnDefinitions>
@@ -123,6 +126,7 @@
                            Margin="10,0,4,0"
                            Visibility="Collapsed"/>
             </Grid>
+            </local:AutomationLeaf>
             <HierarchicalDataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsFolder}" Value="True">
                     <Setter TargetName="FolderGlyph" Property="Visibility" Value="Visible"/>
