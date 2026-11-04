@@ -213,14 +213,14 @@ public partial class DateControl : UserControl
 
     private void TbDate_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        ViewModel.ChangeDate(Math.Sign(e.Delta));
+        ViewModel.ChangeDate(-Math.Sign(e.Delta));
         ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }
 
     private void TbTime_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        ViewModel.StepMinutes(Math.Sign(e.Delta));
+        ViewModel.StepMinutes(-Math.Sign(e.Delta));
         ViewModel.RefreshTextDisplay();
         e.Handled = true;
     }
