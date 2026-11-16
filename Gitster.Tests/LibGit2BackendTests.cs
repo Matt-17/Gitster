@@ -119,6 +119,39 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task GetCommits_TwoIncomingCommitsShareTheTreeOfOneRewrittenCommit_DoesNotThrow()
+    {
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "a.txt", "1");
+        repo.Commit("change", "a.txt", "2");
+        string emptySha;
+        using (var r = new Repository(repo.Path))
+        {
+            // An empty commit keeps the tree of its parent: two remote commits, one tree.
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            emptySha = r.Commit("empty", sig, sig, new CommitOptions { AllowEmptyCommit = true }).Sha;
+
+            r.Network.Remotes.Add("origin", "https://example.invalid/repo.git");
+            r.Refs.Add("refs/remotes/origin/master", emptySha, allowOverwrite: true);
+            r.Branches.Update(r.Head, b => b.Remote = "origin", b => b.UpstreamBranch = "refs/heads/master");
+
+            // Rewrite locally: same content as "change", different commit.
+            r.Reset(ResetMode.Hard, r.Lookup<Commit>(baseSha)!);
+        }
+
+        var rewritten = repo.Commit("change rewritten", "a.txt", "2");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var commits = await backend.GetCommitsAsync();
+
+        var local = commits.Single(c => c.FullSha == rewritten);
+        Assert.IsNotNull(local.OrphanedPairSha, "the rewritten commit is still paired with a remote copy");
+        Assert.AreEqual(2, commits.Count(c => c.RemoteState == CommitRemoteState.Incoming));
+    }
+
+    [TestMethod]
     public async Task RewriteHistory_SameFileNonOverlappingEdits_ReordersWithMerge()
     {
         using var repo = new GitTestRepo();

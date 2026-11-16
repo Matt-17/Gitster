@@ -166,8 +166,12 @@ internal sealed class LibGit2HistoryReader
 
             if (incomingPairsBySha.Count > 0)
             {
-                var outgoingPairBySha = incomingPairsBySha
-                    .ToDictionary(kv => kv.Value, kv => kv.Key, StringComparer.OrdinalIgnoreCase);
+                // Several incoming commits can share one tree (an empty commit, a merge that
+                // changes no files), so one outgoing commit may match more than one of them;
+                // it pairs with the first, newest match.
+                var outgoingPairBySha = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (incomingSha, outgoingSha) in incomingPairsBySha)
+                    outgoingPairBySha.TryAdd(outgoingSha, incomingSha);
 
                 incomingCommits = incomingCommits.Select(c =>
                     incomingPairsBySha.TryGetValue(c.Sha, out var partner)
