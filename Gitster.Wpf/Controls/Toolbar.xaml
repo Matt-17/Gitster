@@ -549,9 +549,14 @@
                                 AutomationProperties.Name="Push to remote">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Push" VerticalAlignment="Center"/>
-                                <Border Background="{DynamicResource AccentWarning}" CornerRadius="8" Height="8" Width="8" Padding="0" Margin="6,2,0,0"
+                                <!-- Outgoing-commit count as a pill badge: grows with the number. -->
+                                <Border Background="{DynamicResource AccentWarning}" CornerRadius="8" Height="16" MinWidth="16"
+                                        Padding="5,0" Margin="6,0,0,0" VerticalAlignment="Center"
+                                        ToolTip="Commits not yet pushed"
                                         Visibility="{Binding TitleBarVM.HasOutgoing, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding TitleBarVM.OutgoingCount}" Foreground="{DynamicResource TextOnAccent}" FontSize="10" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding TitleBarVM.OutgoingCount}" Foreground="{DynamicResource TextOnAccent}"
+                                               FontSize="10" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </StackPanel>
                         </Button>
