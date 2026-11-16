@@ -78,6 +78,48 @@ public sealed class CommitRefNavigatorViewModelTests
         Assert.AreEqual(2, selectCount);
     }
 
+    [TestMethod]
+    public async Task CheckoutNode_RemoteBranch_InvokesRemoteCheckout()
+    {
+        var vm = await CreateLoadedViewModelAsync();
+        RefCatalogItem? requested = null;
+        string? localRequested = null;
+        vm.CheckoutRemoteBranchAsync = item => { requested = item; return Task.CompletedTask; };
+        vm.CheckoutBranchAsync = name => { localRequested = name; return Task.CompletedTask; };
+
+        await vm.CheckoutNodeCommand.ExecuteAsync(FindNode(vm, "refs/remotes/origin/feature/x"));
+
+        Assert.AreEqual("refs/remotes/origin/feature/x", requested?.CanonicalName);
+        Assert.IsNull(localRequested, "a remote branch must not go through the local checkout");
+    }
+
+    [TestMethod]
+    public async Task CheckoutNode_LocalBranch_InvokesLocalCheckout()
+    {
+        var vm = await CreateLoadedViewModelAsync();
+        string? localRequested = null;
+        var remoteCalled = false;
+        vm.CheckoutBranchAsync = name => { localRequested = name; return Task.CompletedTask; };
+        vm.CheckoutRemoteBranchAsync = _ => { remoteCalled = true; return Task.CompletedTask; };
+
+        await vm.CheckoutNodeCommand.ExecuteAsync(FindNode(vm, "refs/heads/feature/x"));
+
+        Assert.AreEqual("feature/x", localRequested);
+        Assert.IsFalse(remoteCalled);
+    }
+
+    [TestMethod]
+    [DataRow("origin/feature/x", "feature/x")]
+    [DataRow("upstream/main", "main")]
+    [DataRow("my/remote/topic", "topic")]
+    [DataRow("unknown/topic", "topic")]
+    public void SuggestLocalBranchName_StripsLongestMatchingRemote(string remoteBranch, string expected)
+    {
+        var name = MainWindowViewModel.SuggestLocalBranchName(remoteBranch, ["origin", "upstream", "my", "my/remote"]);
+
+        Assert.AreEqual(expected, name);
+    }
+
     private static async Task<CommitRefNavigatorViewModel> CreateLoadedViewModelAsync()
     {
         var git = Substitute.For<IGitBackend>();

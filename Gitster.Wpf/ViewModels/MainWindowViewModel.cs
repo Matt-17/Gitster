@@ -220,6 +220,7 @@ public partial class MainWindowViewModel : BaseViewModel
             if (BranchesVM is { } branches)
                 await branches.CheckoutNamedCommand.ExecuteAsync(name);
         };
+        CommitRefNavigatorVM.CheckoutRemoteBranchAsync = CheckoutRemoteBranchAsync;
         TimestampEditVM = timestampEditViewModel;
         QuickActionsVM = quickActionsViewModel;
         QuickActionsVM.RefreshAfterActionAsync = async () => await UpdateElementsAsync();
@@ -1741,6 +1742,86 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             _windowService.Warning(ex.Message, "Checkout failed");
         }
+    }
+
+    /// <summary>
+    /// Refs-pane double-click on a remote branch. A local branch that already tracks it (or has
+    /// the same name) is checked out directly; otherwise the user names a new local branch.
+    /// </summary>
+    private async Task CheckoutRemoteBranchAsync(RefCatalogItem remoteBranch)
+    {
+        if (BranchesVM is not { } branches)
+            return;
+
+        IReadOnlyList<BranchListItem> branchList;
+        try
+        {
+            branchList = await _gitBackend.GetBranchListAsync();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Warning(ex.Message, "Checkout failed");
+            return;
+        }
+
+        var remoteName = remoteBranch.DisplayName;
+        var suggested = SuggestLocalBranchName(remoteName, Remotes);
+        var locals = branchList.Where(b => !b.IsRemote).ToList();
+
+        var existing = locals.FirstOrDefault(b => string.Equals(b.UpstreamName, remoteName, StringComparison.Ordinal))
+            ?? locals.FirstOrDefault(b => string.Equals(b.Name, suggested, StringComparison.Ordinal)
+                                          && b.UpstreamName is null);
+        if (existing is not null)
+        {
+            if (!existing.IsCurrent)
+                await branches.CheckoutNamedCommand.ExecuteAsync(existing.Name);
+            return;
+        }
+
+        var dialog = new CheckoutRemoteBranchDialog(
+            remoteName,
+            suggested,
+            locals.Select(b => b.Name).ToHashSet(StringComparer.Ordinal));
+        if (_windowService.ShowDialog(dialog) != true)
+            return;
+
+        var localName = dialog.LocalName;
+        try
+        {
+            await _snapshotService.CaptureAsync(_gitBackend, $"Create branch {localName}");
+            await _feedbackService.RunAsync("Create branch", async () =>
+            {
+                await _gitBackend.CreateBranchAsync(localName, remoteBranch.TipSha);
+                if (dialog.SetUpstream)
+                    await _gitBackend.SetUpstreamAsync(localName, remoteName);
+            });
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Create branch failed:\n{ex.Message}", "Gitster");
+            return;
+        }
+
+        await branches.LoadAsync();
+        SidebarVM.BranchCount = branches.LocalCount;
+        if (dialog.Checkout)
+            await branches.CheckoutNamedCommand.ExecuteAsync(localName);
+        else
+            await UpdateElementsAsync();
+    }
+
+    /// <summary>"origin/feature/x" → "feature/x", using the longest matching remote name.</summary>
+    public static string SuggestLocalBranchName(string remoteBranchName, IEnumerable<string> remotes)
+    {
+        var remote = remotes
+            .Where(r => remoteBranchName.StartsWith(r + "/", StringComparison.Ordinal))
+            .OrderByDescending(r => r.Length)
+            .FirstOrDefault();
+        if (remote is not null)
+            return remoteBranchName[(remote.Length + 1)..];
+
+        var slash = remoteBranchName.IndexOf('/');
+        return slash >= 0 ? remoteBranchName[(slash + 1)..] : remoteBranchName;
     }
 
     /// <summary>Commit-list link: publish a local branch (git push -u).</summary>

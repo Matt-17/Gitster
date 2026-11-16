@@ -104,6 +104,9 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
 
     /// <summary>Checks out a local branch — used by the double-click in the refs pane.</summary>
     public Func<string, Task>? CheckoutBranchAsync { get; set; }
+
+    /// <summary>Checks out a remote branch: its local counterpart, or a new local branch created from it.</summary>
+    public Func<RefCatalogItem, Task>? CheckoutRemoteBranchAsync { get; set; }
     public Func<Task>? SelectCurrentBranchAsync { get; set; }
     public Func<Task>? SelectAllBranchesAsync { get; set; }
 
@@ -225,18 +228,22 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
         SelectedNode = node;
     }
 
-    /// <summary>Double-click on a local branch: check it out. Folders, tags and remotes do nothing.</summary>
+    /// <summary>Double-click on a local or remote branch: check it out. Folders and tags do nothing.</summary>
     [RelayCommand]
     private async Task CheckoutNode(CommitRefNode? node)
     {
-        if (node?.Item is not { Kind: RefCatalogKind.LocalBranch, IsCurrent: false } item
-            || CheckoutBranchAsync is null)
+        switch (node?.Item)
         {
-            return;
-        }
+            case { Kind: RefCatalogKind.LocalBranch, IsCurrent: false } local when CheckoutBranchAsync is not null:
+                SelectedNode = node;
+                await CheckoutBranchAsync(local.DisplayName);
+                break;
 
-        SelectedNode = node;
-        await CheckoutBranchAsync(item.DisplayName);
+            case { Kind: RefCatalogKind.RemoteBranch } remote when CheckoutRemoteBranchAsync is not null:
+                SelectedNode = node;
+                await CheckoutRemoteBranchAsync(remote);
+                break;
+        }
     }
 
     private void Rebuild()
