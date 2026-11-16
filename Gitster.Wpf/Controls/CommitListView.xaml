@@ -48,9 +48,17 @@
                                   Command="{Binding Tag.OpenCommitInBrowserCommand}"
                                   CommandParameter="{Binding DataContext}"/>
                         <Separator/>
-                        <MenuItem Header="Push through this commit"
-                                  Command="{Binding Tag.PushThroughCommitCommand}"
-                                  CommandParameter="{Binding DataContext}"/>
+                        <MenuItem Header="Push through this commit">
+                            <MenuItem Header="Push"
+                                      Command="{Binding Tag.PushThroughCommitCommand}"
+                                      CommandParameter="{Binding DataContext}"/>
+                            <MenuItem Header="Push (force-with-lease)"
+                                      Command="{Binding Tag.PushThroughCommitForceWithLeaseCommand}"
+                                      CommandParameter="{Binding DataContext}"/>
+                            <MenuItem Header="Push (force)..."
+                                      Command="{Binding Tag.PushThroughCommitForceCommand}"
+                                      CommandParameter="{Binding DataContext}"/>
+                        </MenuItem>
                         <MenuItem Header="Rewind remote to this commit"
                                   Command="{Binding Tag.ForceRemoteToCommitCommand}"
                                   CommandParameter="{Binding DataContext}"/>

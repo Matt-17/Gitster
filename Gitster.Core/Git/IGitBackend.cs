@@ -80,7 +80,7 @@ public interface IRemoteOps : IRepositoryContext
     Task PushAsync(string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default);
     /// <summary>Creates the remote branch, pushes and sets it as upstream (git push -u).</summary>
     Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default);
-    Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default);
+    Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default);
     Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default);
     Task PushTagAsync(string tagName, string remoteName = "origin", CancellationToken ct = default);
 }

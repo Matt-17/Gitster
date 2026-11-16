@@ -66,8 +66,8 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
     public Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default)
         => RunServerOperationAsync("Publish branch", () => _cli.PublishBranchAsync(branchName, remoteName, ct));
 
-    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
-        => RunServerOperationAsync("Push through commit", () => _cli.PushThroughCommitAsync(commitSha, remoteName, ct));
+    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
+        => RunServerOperationAsync("Push through commit", () => _cli.PushThroughCommitAsync(commitSha, remoteName, mode, ct));
 
     public Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
         => RunServerOperationAsync("Force remote to commit", () => _cli.ForceRemoteToCommitAsync(commitSha, remoteName, ct));

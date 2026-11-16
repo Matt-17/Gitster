@@ -100,7 +100,7 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
     public Task PublishBranchAsync(string branchName, string remoteName = "origin", CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PublishBranchAsync));
 
-    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
+    public Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
         => ServerWorkNotSupportedAsync(nameof(PushThroughCommitAsync));
 
     public Task ForceRemoteToCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)

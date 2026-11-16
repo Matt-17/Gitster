@@ -452,6 +452,50 @@ public sealed class GitCliBackendTests
     }
 
     [TestMethod]
+    public async Task PushThroughCommit_RewrittenCommitWithLease_ReplacesRemoteCopy()
+    {
+        await EnsureGitAsync();
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var remotePath = TempDirectoryPath("gitster-remote-");
+
+        try
+        {
+            repo.Commit("pushed", "pushed.txt", "pushed");
+            var branch = await AddBareOriginAndPushAsync(repo, remotePath);
+
+            string rewritten;
+            using (var setup = new Repository(repo.Path))
+            {
+                setup.Reset(ResetMode.Soft, setup.Head.Tip!.Parents.First());
+                File.WriteAllText(Path.Combine(repo.Path, "rewritten.txt"), "rewritten");
+                Commands.Stage(setup, "*");
+                var sig = new Signature("Test", "test@example.com", DateTimeOffset.Now);
+                rewritten = setup.Commit("rewritten", sig, sig).Sha;
+            }
+            var newer = repo.Commit("newer", "newer.txt", "newer");
+
+            var backend = new GitCliBackend();
+            await backend.OpenAsync(repo.Path);
+
+            await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+                () => backend.PushThroughCommitAsync(rewritten), "a normal push must be rejected as non-fast-forward");
+
+            await backend.PushThroughCommitAsync(rewritten, mode: PushMode.ForceWithLease);
+
+            using var local = new Repository(repo.Path);
+            using var remote = new Repository(remotePath);
+            Assert.AreEqual(newer, local.Head.Tip!.Sha, "partial push must not move local HEAD");
+            Assert.AreEqual(rewritten, remote.Branches[branch]!.Tip!.Sha, "remote branch should be replaced by the rewritten commit");
+            Assert.AreEqual(rewritten, local.Head.TrackedBranch.Tip!.Sha, "tracking ref should reflect the forced push");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(remotePath);
+        }
+    }
+
+    [TestMethod]
     public async Task PushTag_PushesSelectedTagToRemote()
     {
         await EnsureGitAsync();

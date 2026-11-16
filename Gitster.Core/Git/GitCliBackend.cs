@@ -552,7 +552,7 @@ public sealed class GitCliBackend : IGitBackend
             throw new InvalidOperationException($"Publish failed:\n{r.Output}");
     }
 
-    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", CancellationToken ct = default)
+    public async Task PushThroughCommitAsync(string commitSha, string remoteName = "origin", PushMode mode = PushMode.Normal, CancellationToken ct = default)
     {
         EnsurePath();
         EnsureCli();
@@ -576,9 +576,16 @@ public sealed class GitCliBackend : IGitBackend
 
         var remote = NormalizeRemoteName(remoteName);
         await EnsureRemoteExistsAsync(remote, ct);
+
+        string[] args = mode switch
+        {
+            PushMode.ForceWithLease => ["push", "--force-with-lease", remote, $"{resolvedSha}:{targetRef}"],
+            PushMode.Force          => ["push", "--force", remote, $"{resolvedSha}:{targetRef}"],
+            _                       => ["push", remote, $"{resolvedSha}:{targetRef}"],
+        };
         var r = await GitCli.RunAsync(
             RepositoryPath,
-            ["push", remote, $"{resolvedSha}:{targetRef}"],
+            args,
             NoPromptEnvironment(),
             ct,
             timeout: RemoteOperationTimeout);

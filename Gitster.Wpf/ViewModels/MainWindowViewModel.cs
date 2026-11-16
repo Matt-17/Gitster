@@ -348,6 +348,8 @@ public partial class MainWindowViewModel : BaseViewModel
         OnPropertyChanged(nameof(CanAmendSelectedCommit));
         ArchiveHeadCommand.NotifyCanExecuteChanged();
         PushThroughCommitCommand.NotifyCanExecuteChanged();
+        PushThroughCommitForceWithLeaseCommand.NotifyCanExecuteChanged();
+        PushThroughCommitForceCommand.NotifyCanExecuteChanged();
         NotifyCommitContextCommands();
     }
 
@@ -379,6 +381,8 @@ public partial class MainWindowViewModel : BaseViewModel
         OnPropertyChanged(nameof(IsAmendUnsafe));
         OnPropertyChanged(nameof(CanAmendSelectedCommit));
         PushThroughCommitCommand.NotifyCanExecuteChanged();
+        PushThroughCommitForceWithLeaseCommand.NotifyCanExecuteChanged();
+        PushThroughCommitForceCommand.NotifyCanExecuteChanged();
         NotifyCommitContextCommands();
     }
 
@@ -531,6 +535,8 @@ public partial class MainWindowViewModel : BaseViewModel
         if (e.PropertyName == nameof(CapabilityService.IsGitCliAvailable))
         {
             PushThroughCommitCommand.NotifyCanExecuteChanged();
+            PushThroughCommitForceWithLeaseCommand.NotifyCanExecuteChanged();
+            PushThroughCommitForceCommand.NotifyCanExecuteChanged();
             ForceRemoteToCommitCommand.NotifyCanExecuteChanged();
         }
     }
@@ -1619,7 +1625,25 @@ public partial class MainWindowViewModel : BaseViewModel
     private Task Push(string? remoteName) => PushWithModeAsync(remoteName, PushMode.Normal);
 
     [RelayCommand(CanExecute = nameof(CanPushThroughCommit))]
-    private async Task PushThroughCommit(CommitItem? commit)
+    private Task PushThroughCommit(CommitItem? commit) => PushThroughCommitWithModeAsync(commit, PushMode.Normal);
+
+    [RelayCommand(CanExecute = nameof(CanPushThroughCommit))]
+    private Task PushThroughCommitForceWithLease(CommitItem? commit) => PushThroughCommitWithModeAsync(commit, PushMode.ForceWithLease);
+
+    [RelayCommand(CanExecute = nameof(CanPushThroughCommit))]
+    private Task PushThroughCommitForce(CommitItem? commit)
+    {
+        if (!CanPushThroughCommit(commit))
+            return PushThroughCommitWithModeAsync(commit, PushMode.Force);
+
+        var confirm = _windowService.Confirm(
+            $"Force push (--force) sets the remote branch to {ShortSha(commit!.FullSha)} and can destroy commits " +
+            "other people rely on.\n\nPrefer \"Push (force-with-lease)\" unless you are certain.\n\nForce push anyway?",
+            "Dangerous: force push");
+        return confirm ? PushThroughCommitWithModeAsync(commit, PushMode.Force) : Task.CompletedTask;
+    }
+
+    private async Task PushThroughCommitWithModeAsync(CommitItem? commit, PushMode mode)
     {
         if (!CanPushThroughCommit(commit))
         {
@@ -1634,9 +1658,10 @@ public partial class MainWindowViewModel : BaseViewModel
         {
             var remote = ActiveRemote(null);
             var shortSha = ShortSha(commit!.FullSha);
+            var verb = mode == PushMode.Normal ? "Push through" : mode == PushMode.ForceWithLease ? "Push (lease) through" : "Force push through";
             await RunRemoteOperationAsync(
-                $"Push through {shortSha}",
-                ct => _gitBackend.PushThroughCommitAsync(commit.FullSha, remote, ct));
+                $"{verb} {shortSha}",
+                ct => _gitBackend.PushThroughCommitAsync(commit.FullSha, remote, mode, ct));
             await UpdateElementsAsync();
         }
         catch (Exception ex)
