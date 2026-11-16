@@ -47,6 +47,10 @@ public partial class CommitListViewModel : BaseViewModel
     private CancellationTokenSource? _filterCts;
     private CancellationTokenSource? _diffCts;
     private Task? _warmHistoryTask;
+
+    // While a cold-cache load fills the list in stages, the graph column only widens; the
+    // final stage sets the exact width.
+    private bool _graphWidthGrowOnly;
     private HistoryTarget _selectedTarget = HistoryTarget.CurrentBranch;
     private bool _suppressScopeReload;
 
@@ -405,6 +409,19 @@ public partial class CommitListViewModel : BaseViewModel
             var target = _selectedTarget;
             await _history.OpenAsync(_git.RepositoryPath, target, ct, progress);
 
+            // Warm cache (the usual case after a commit, amend or refresh): load the full
+            // history and the remote state together and rebuild the list once, instead of
+            // showing a first page without remote info and rebuilding twice more.
+            if (await _history.IsCompleteAsync(target, ct))
+            {
+                await LoadCompleteAsync(target, cts, priorSha, progress);
+                return;
+            }
+
+            // Cold cache: show the first page quickly; later stages may only widen the graph
+            // column so the rows do not jump back and forth while history fills in.
+            _graphWidthGrowOnly = true;
+
             progress?.Report(new RepositoryLoadProgress(
                 "Loading history",
                 "Loading the first commit page."));
@@ -429,7 +446,7 @@ public partial class CommitListViewModel : BaseViewModel
                     : RemoteHistoryState.Loaded;
                 OnPropertyChanged(nameof(LoadedCommits));
 
-                ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), priorSha);
+                ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha ?? priorSha);
                 HistoryLoading = false;
             });
 
@@ -452,6 +469,99 @@ public partial class CommitListViewModel : BaseViewModel
             if (_loadCts == cts)
                 HistoryLoading = false;
         }
+    }
+
+    /// <summary>
+    /// Loads the complete cached history and the remote sets in parallel and applies both in
+    /// one rebuild. Signing badges are filled in afterwards on the existing rows.
+    /// </summary>
+    private async Task LoadCompleteAsync(
+        HistoryTarget target,
+        CancellationTokenSource ownerCts,
+        string? priorSha,
+        IProgress<RepositoryLoadProgress>? progress)
+    {
+        var ct = ownerCts.Token;
+        var rowsTask = _history.EnsureCompleteAsync(progress, ct, target);
+        var setsTask = ShowsSections(target)
+            ? Task.Run(() => _git.ComputeRemoteSetsAsync(target.RefName, ct), ct)
+            : Task.FromResult<RemoteSets>(RemoteSets.Empty);
+
+        var rows = await rowsTask;
+        RemoteSets? sets = null;
+        var remoteFailed = false;
+        try
+        {
+            sets = await setsTask;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            remoteFailed = true;
+        }
+
+        if (ct.IsCancellationRequested || _loadCts != ownerCts)
+            return;
+
+        var newAllRows = rows.Select(r => r.ToCommitItem()).ToList();
+        var incomingRows = sets is not null && ShowsSections(target) && !IsRemoteBranchRef(target)
+            ? sets.Incoming.Select(ToItem).ToList()
+            : new List<CommitItem>();
+
+        await InvokeOnUiAsync(() =>
+        {
+            _graphWidthGrowOnly = false;
+            _allRows = newAllRows;
+            _incomingRows = incomingRows;
+            if (!ShowsSections(target))
+            {
+                _remoteSets = null;
+                _remoteHistoryState = RemoteHistoryState.Loaded;
+            }
+            else if (sets is not null)
+            {
+                _remoteSets = sets;
+                _lastRemoteName = sets.RemoteName ?? _lastRemoteName;
+                _lastRemoteUrl = sets.RemoteUrl ?? _lastRemoteUrl;
+                _remoteHistoryState = RemoteHistoryState.Loaded;
+                ApplyRemoteSets(sets, _allRows);
+            }
+            else
+            {
+                _remoteSets = null;
+                _remoteHistoryState = remoteFailed ? RemoteHistoryState.Unavailable : RemoteHistoryState.Loaded;
+            }
+
+            OnPropertyChanged(nameof(LoadedCommits));
+            if (_query.IsEmpty)
+                ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha ?? priorSha);
+            else
+                DebounceFilter();
+            HistoryLoading = false;
+        });
+
+        // Background bookkeeping that does not change the row layout.
+        _warmHistoryTask = Task.Run(async () =>
+        {
+            try
+            {
+                if (sets is not null && target.Scope == HistoryScope.CurrentBranch)
+                    await _history.ApplyRemoteSetsAsync(sets, ct);
+                await ApplySigningStatusesAsync(newAllRows, ct);
+                await ApplySigningStatusesAsync(incomingRows, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Superseded by a newer load.
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"History enrichment failed: {ex}");
+            }
+        }, ct);
     }
 
     public void ClearList()
@@ -1025,7 +1135,8 @@ public partial class CommitListViewModel : BaseViewModel
             .DefaultIfEmpty(1)
             .Max();
 
-        GraphColumnWidth = GraphColumnWidthForLaneCount(maxLaneCount);
+        var width = GraphColumnWidthForLaneCount(maxLaneCount);
+        GraphColumnWidth = _graphWidthGrowOnly ? Math.Max(GraphColumnWidth, width) : width;
     }
 
     public static double GraphColumnWidthForLaneCount(int laneCount)
@@ -1132,8 +1243,6 @@ public partial class CommitListViewModel : BaseViewModel
         var ct = ownerCts.Token;
         try
         {
-            await ApplySigningStatusesAsync(_allRows, ct);
-
             RemoteSets? sets = null;
             var incomingRows = new List<CommitItem>();
             if (ShowsSections(target))
@@ -1149,17 +1258,16 @@ public partial class CommitListViewModel : BaseViewModel
                 // For a remote-branch view the incoming markers live on the listed rows
                 // themselves (via ApplyRemoteSets); there is no separate incoming block.
                 if (!IsRemoteBranchRef(target))
-                {
                     incomingRows = sets.Incoming.Select(ToItem).ToList();
-                    await ApplySigningStatusesAsync(incomingRows, ct);
-                }
             }
 
             if (ct.IsCancellationRequested || _loadCts != ownerCts)
                 return;
 
+            // Remote info first: signing checks can be slow and must not hold it back.
             await InvokeOnUiAsync(() =>
             {
+                _graphWidthGrowOnly = false;
                 if (sets is not null)
                 {
                     _remoteSets = sets;
@@ -1175,6 +1283,10 @@ public partial class CommitListViewModel : BaseViewModel
                 else
                     DebounceFilter();
             });
+
+            // Signing badges update the existing rows in place, no rebuild.
+            await ApplySigningStatusesAsync(_allRows, ct);
+            await ApplySigningStatusesAsync(incomingRows, ct);
         }
         catch (OperationCanceledException)
         {
@@ -1185,6 +1297,7 @@ public partial class CommitListViewModel : BaseViewModel
             if (_loadCts == ownerCts && ShowsSections(target))
                 await InvokeOnUiAsync(() =>
                 {
+                    _graphWidthGrowOnly = false;
                     _remoteHistoryState = RemoteHistoryState.Unavailable;
                     if (_query.IsEmpty)
                         ApplyRows(BuildRows(FilteredIncoming(), FilteredLocal()), SelectedCommit?.FullSha);
