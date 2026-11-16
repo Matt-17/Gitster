@@ -4,6 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Conflict guidance"
         WindowStyle="None"
+        AllowsTransparency="True"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
         MinWidth="520"
