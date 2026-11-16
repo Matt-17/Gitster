@@ -69,6 +69,19 @@ public interface IHistoryRewriteOps : IRepositoryContext
     Task FixupCommitIntoCommitAsync(string sourceSha, string targetSha);
     Task RewordCommitAsync(string sha, string newMessage);
     Task SquashCommitsAsync(IReadOnlyList<string> shas, string combinedMessage, DateTimeOffset? overrideDate);
+
+    /// <summary>
+    /// The commits a merge brought in: reachable from its second parent but not from its first
+    /// (newest first). Empty for a non-merge commit.
+    /// </summary>
+    Task<IReadOnlyList<MergedBranchCommit>> GetMergedBranchCommitsAsync(string mergeSha);
+
+    /// <summary>
+    /// Squash-merge after the fact: replaces a merge on the branch's first-parent line with one
+    /// commit that has the merge's tree and its first parent as only parent. The merged branch
+    /// commits drop out of the history; newer commits are re-parented with unchanged trees.
+    /// </summary>
+    Task SquashMergeAsync(string mergeSha, string message, DateTimeOffset? overrideDate, string? branchName = null);
     Task ReorderCommitsAsync(IReadOnlyList<string> shasNewestFirst, IReadOnlyList<string> reorderedShasNewestFirst, string? branchName = null);
     Task SplitCommitAsync(
         string sha,

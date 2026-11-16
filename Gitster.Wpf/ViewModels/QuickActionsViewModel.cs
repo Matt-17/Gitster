@@ -198,6 +198,15 @@ public partial class QuickActionsViewModel : BaseViewModel
     private async Task SquashSelected()
     {
         var commits = _getMultiSelected();
+
+        // A merge plus (some of) the commits it merged in: squash-merge after the fact.
+        var merges = commits.Where(c => c.ParentShas.Count > 1).ToList();
+        if (merges.Count == 1)
+        {
+            await SquashMergeAsync(merges[0], commits);
+            return;
+        }
+
         if (commits.Count < 2) return;
 
         // Non-contiguous squash is ill-defined (a gap would silently fold unselected
@@ -262,7 +271,85 @@ public partial class QuickActionsViewModel : BaseViewModel
         }
     }
 
-    private bool CanSquash() => _getMultiSelected().Count >= 2;
+    private bool CanSquash()
+    {
+        var selected = _getMultiSelected();
+        return selected.Count >= 2 || selected is [{ ParentShas.Count: > 1 }];
+    }
+
+    /// <summary>
+    /// Folds a merge and the branch it merged into one ordinary commit with the merge's content.
+    /// The selection may hold the merge alone or with any of its merged-in commits.
+    /// </summary>
+    private async Task SquashMergeAsync(CommitItem merge, IReadOnlyList<CommitItem> selection)
+    {
+        IReadOnlyList<MergedBranchCommit> branchCommits;
+        try
+        {
+            branchCommits = await _git.GetMergedBranchCommitsAsync(merge.FullSha);
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Squash failed:\n{ex.Message}", "Gitster");
+            return;
+        }
+
+        var allowed = branchCommits.Select(c => c.Sha)
+            .Append(merge.FullSha)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (selection.Any(c => !allowed.Contains(c.FullSha)))
+        {
+            _windowService.Warning(
+                $"To squash a merge, select the merge commit {merge.CommitId} and, optionally, commits of the branch it merged.\n\n" +
+                "Other commits cannot be folded into it.",
+                "Cannot squash");
+            return;
+        }
+
+        if (merge.RemoteState == CommitRemoteState.OnRemote)
+        {
+            var r = _windowService.Ask(
+                "This merge has already been pushed. Squashing it rewrites history and requires a force-push.\n\nContinue?",
+                "Force-push warning", MessageButtons.YesNo, MessageIcon.Warning);
+            if (r != MessageResult.Yes) return;
+        }
+
+        // Merge subject first, then the merged commits oldest-first as a list.
+        var message = string.Join("\n",
+            new[] { merge.Message, string.Empty }
+                .Concat(branchCommits.Reverse().Select(c => $"- {c.Subject}")));
+        var dlg = _dialogs.SquashCommits(message);
+        if (dlg is null) return;
+
+        try
+        {
+            var beforeSha = await _git.GetHeadShaAsync();
+            await _snapshots.CaptureAsync(_git, $"Squash merge {merge.CommitId}");
+
+            await _feedback.RunAsync("Squash merge",
+                () => _git.SquashMergeAsync(merge.FullSha, dlg.CombinedMessage, dlg.OverrideDate));
+
+            var afterSha = await _git.GetHeadShaAsync();
+            var branch = (await _git.GetCurrentBranchAsync()).Name;
+
+            await _opsLog.RecordAsync(new OperationRecord(
+                Id:             Guid.NewGuid().ToString(),
+                Timestamp:      DateTimeOffset.Now,
+                Kind:           OperationKind.Squash,
+                Description:    $"Squash merge {merge.CommitId} with {branchCommits.Count} merged commit{(branchCommits.Count == 1 ? "" : "s")}",
+                BranchName:     branch,
+                BeforeSha:      beforeSha,
+                AfterSha:       afterSha,
+                ReflogSelector: null,
+                Status:         OperationStatus.Active));
+
+            await _onRefresh();
+        }
+        catch (Exception ex)
+        {
+            _windowService.Error($"Squash failed:\n{ex.Message}", "Gitster");
+        }
+    }
 
     // ── Cherry-pick (Step H) ──────────────────────────────────────────────
 

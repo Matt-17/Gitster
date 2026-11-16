@@ -453,6 +453,76 @@ internal sealed class LibGit2HistoryRewriteOperations
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<MergedBranchCommit>> GetMergedBranchCommitsAsync(string mergeSha)
+    {
+        using var repo = _context.OpenRepository();
+        var merge = repo.Lookup<Commit>(mergeSha)
+            ?? throw new InvalidOperationException($"Commit not found: {mergeSha}");
+        var parents = merge.Parents.ToList();
+        if (parents.Count < 2)
+            return Task.FromResult<IReadOnlyList<MergedBranchCommit>>([]);
+
+        var commits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+            {
+                IncludeReachableFrom = parents.Skip(1).ToList(),
+                ExcludeReachableFrom = parents[0],
+                SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
+            })
+            .Select(c => new MergedBranchCommit(c.Sha, c.MessageShort))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<MergedBranchCommit>>(commits);
+    }
+
+    public Task SquashMergeAsync(string mergeSha, string message, DateTimeOffset? overrideDate, string? branchName = null)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            throw new InvalidOperationException("Enter a message for the squashed commit.");
+
+        using var repo = _context.OpenRepository();
+        var branch = AttachBranchForHistoryRewrite(repo, branchName, "squash a merge");
+        var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+
+        // The merge must sit on the branch's own first-parent line; everything above it is
+        // re-parented, everything it merged in drops out.
+        var chainNewestFirst = new List<Commit>();
+        Commit? current = branchTip;
+        while (current is not null && !ShaMatches(current, mergeSha))
+        {
+            chainNewestFirst.Add(current);
+            current = current.Parents.FirstOrDefault();
+        }
+
+        var merge = current
+            ?? throw new InvalidOperationException("The merge commit is not on the first-parent line of the branch.");
+        if (merge.Parents.Count() < 2)
+            throw new InvalidOperationException($"Commit {ShortSha(merge.Sha)} is not a merge commit.");
+
+        var author = overrideDate is { } authorDate
+            ? new Signature(merge.Author.Name, merge.Author.Email, authorDate)
+            : merge.Author;
+        var committer = overrideDate is { } committerDate
+            ? new Signature(merge.Committer.Name, merge.Committer.Email, committerDate)
+            : merge.Committer;
+
+        // Same tree as the merge: the result of the merge, now as one ordinary commit.
+        Commit newParent = repo.ObjectDatabase.CreateCommit(
+            author, committer, message.TrimEnd() + "\n", merge.Tree, [merge.Parents.First()], prettifyMessage: false);
+
+        // Newer commits keep their trees; only the first parent changes, so nothing can conflict.
+        chainNewestFirst.Reverse();
+        foreach (var old in chainNewestFirst)
+        {
+            var parents = old.Parents.ToList();
+            parents[0] = newParent;
+            newParent = repo.ObjectDatabase.CreateCommit(
+                old.Author, old.Committer, old.Message, old.Tree, parents, prettifyMessage: false);
+        }
+
+        repo.Refs.UpdateTarget(branch.Reference, newParent.Id, $"squash merge {ShortSha(merge.Sha)}");
+        _context.RaiseHeadChanged();
+        return Task.CompletedTask;
+    }
+
     public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)
     {
         if (shas.Count <= 1)

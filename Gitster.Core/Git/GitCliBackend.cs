@@ -783,6 +783,8 @@ public sealed class GitCliBackend : IGitBackend
     public Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200) => NS<IReadOnlyList<CommitInfo>>();
     public Task<bool> AreCommitsContiguousAsync(IReadOnlyList<string> shas)    => NS<bool>();
     public Task ReorderCommitsAsync(IReadOnlyList<string> shasNewestFirst, IReadOnlyList<string> reorderedShasNewestFirst, string? branchName = null) => NSVoid();
+    public Task<IReadOnlyList<MergedBranchCommit>> GetMergedBranchCommitsAsync(string mergeSha) => NS<IReadOnlyList<MergedBranchCommit>>();
+    public Task SquashMergeAsync(string mergeSha, string message, DateTimeOffset? overrideDate, string? branchName = null) => NSVoid();
     public Task SplitCommitAsync(string sha, IReadOnlyList<string> firstCommitPaths, string firstMessage, string secondMessage, string? branchName = null) => NSVoid();
     public Task<string> CreateOrphanBranchAsync(string branchName, bool commitCurrentTree) => NS<string>();
     public Task<string> RescueDetachedHeadAsync(string branchName) => NS<string>();

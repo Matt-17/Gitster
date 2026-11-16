@@ -208,6 +208,12 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
         DateTimeOffset? overrideDate)
         => throw new NotSupportedException("Route through HybridGitBackend.");
 
+    public Task<IReadOnlyList<MergedBranchCommit>> GetMergedBranchCommitsAsync(string mergeSha)
+        => _rewrite.GetMergedBranchCommitsAsync(mergeSha);
+
+    public Task SquashMergeAsync(string mergeSha, string message, DateTimeOffset? overrideDate, string? branchName = null)
+        => _rewrite.SquashMergeAsync(mergeSha, message, overrideDate, branchName);
+
     public Task<IReadOnlyList<BranchSummary>> GetBranchesAsync() => _history.GetBranchesAsync();
 
     public Task<IReadOnlyList<CommitInfo>> GetCommitsForRefAsync(string refName, int maxCount = 200)

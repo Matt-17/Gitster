@@ -119,6 +119,76 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task SquashMerge_MergeWithNewerCommit_ReplacesMergeAndBranchByOneCommit()
+    {
+        using var repo = new GitTestRepo();
+        var baseSha = repo.Commit("base", "base.txt", "base");
+        string mergeSha;
+        using (var r = new Repository(repo.Path))
+        {
+            Commands.Checkout(r, r.CreateBranch("feature"));
+        }
+
+        var feature1 = repo.Commit("feature one", "f1.txt", "1");
+        var feature2 = repo.Commit("feature two", "f2.txt", "2");
+        using (var r = new Repository(repo.Path))
+        {
+            Commands.Checkout(r, r.Branches["master"]);
+        }
+
+        repo.Commit("main work", "main.txt", "m");
+        using (var r = new Repository(repo.Path))
+        {
+            var sig = new Signature("Tester", "tester@gitster.test", DateTimeOffset.Now);
+            var result = r.Merge(r.Branches["feature"], sig, new MergeOptions { FastForwardStrategy = FastForwardStrategy.NoFastForward });
+            mergeSha = result.Commit!.Sha;
+        }
+
+        repo.Commit("after merge", "after.txt", "a");
+        string originalTipTree;
+        using (var r = new Repository(repo.Path))
+            originalTipTree = r.Head.Tip!.Tree.Sha;
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var merged = await backend.GetMergedBranchCommitsAsync(mergeSha);
+        CollectionAssert.AreEquivalent(new[] { feature1, feature2 }, merged.Select(c => c.Sha).ToArray());
+
+        await backend.SquashMergeAsync(mergeSha, "feature squashed", overrideDate: null);
+
+        using var check = new Repository(repo.Path);
+        var tip = check.Head.Tip!;
+        Assert.AreEqual(originalTipTree, tip.Tree.Sha, "the final content must not change");
+        CollectionAssert.AreEqual(
+            new[] { "after merge", "feature squashed", "main work", "base" },
+            FirstParentMessages(tip, 4).ToArray());
+
+        var squashed = tip.Parents.Single();
+        Assert.AreEqual(1, squashed.Parents.Count(), "the squashed commit is no merge any more");
+        Assert.AreEqual(check.Lookup<Commit>(mergeSha)!.Tree.Sha, squashed.Tree.Sha);
+        var reachable = check.Commits.QueryBy(new LibGit2Sharp.CommitFilter { IncludeReachableFrom = tip }).Select(c => c.Sha).ToHashSet();
+        Assert.IsFalse(reachable.Contains(feature1) || reachable.Contains(feature2), "merged branch commits drop out of master");
+        Assert.IsTrue(reachable.Contains(baseSha));
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    [TestMethod]
+    public async Task SquashMerge_NonMergeCommit_Throws()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var plain = repo.Commit("plain", "a.txt", "a");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.SquashMergeAsync(plain, "x", overrideDate: null));
+        Assert.AreEqual(plain, repo.Head());
+    }
+
+    [TestMethod]
     public async Task GetCommits_TwoIncomingCommitsShareTheTreeOfOneRewrittenCommit_DoesNotThrow()
     {
         using var repo = new GitTestRepo();

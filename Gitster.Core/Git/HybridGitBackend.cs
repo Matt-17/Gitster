@@ -200,4 +200,10 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
         else
             await _cli.SquashCommitsAsync(shas, combinedMessage, overrideDate);
     }
+
+    public Task<IReadOnlyList<MergedBranchCommit>> GetMergedBranchCommitsAsync(string mergeSha)
+        => _lib.GetMergedBranchCommitsAsync(mergeSha);
+
+    public Task SquashMergeAsync(string mergeSha, string message, DateTimeOffset? overrideDate, string? branchName = null)
+        => _lib.SquashMergeAsync(mergeSha, message, overrideDate, branchName);
 }
