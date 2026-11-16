@@ -83,6 +83,7 @@ public partial class CommitItem : ObservableObject
         || HasPendingAuthorChange
         || HasPendingTimeChange
         || HasPendingFileChange
+        || HasPendingMove
         || IsHistoryEditTransitive;
 
     [ObservableProperty]
@@ -148,6 +149,11 @@ public partial class CommitItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasAnyHistoryEditIcon))]
     public partial bool HasPendingFileChange { get; set; }
 
+    /// <summary>The commit gets a new position in the pending history edit.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAnyHistoryEditIcon))]
+    public partial bool HasPendingMove { get; set; }
+
     [ObservableProperty]
     public partial bool IsPendingRemoteRisk { get; set; }
 
@@ -198,6 +204,7 @@ public partial class CommitItem : ObservableObject
         HasPendingAuthorChange = false;
         HasPendingTimeChange = false;
         HasPendingFileChange = false;
+        HasPendingMove = false;
         IsPendingRemoteRisk = false;
         IsPendingLocalCleanup = false;
         HistoryEditTooltip = string.Empty;

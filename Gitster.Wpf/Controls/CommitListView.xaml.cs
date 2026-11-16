@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 using Gitster.ViewModels;
@@ -147,10 +149,32 @@ public partial class CommitListView : UserControl
             return;
         }
 
+        // Dragging a row of a multi-selection moves the whole selection (reorder); fixup
+        // always uses the dragged row alone.
+        var group = item.IsSelected && CommitListBox.SelectedItems.Count > 1
+            ? CommitListBox.SelectedItems.OfType<CommitItem>().ToList()
+            : [commit];
+
         var data = new DataObject();
         data.SetData(CommitDragFormat, commit);
+        data.SetData(CommitGroupDragFormat, group);
         _dragSource = null;
         DragDrop.DoDragDrop(item, data, DragDropEffects.Move);
+        ClearInsertionMarker();
+    }
+
+    private const string CommitGroupDragFormat = "Gitster.CommitItems";
+
+    /// <summary>The outer bands of a row insert above/below it; the middle means fixup.</summary>
+    private enum DropZone { Above, Fixup, Below }
+
+    private static DropZone GetDropZone(ListViewItem item, DragEventArgs e)
+    {
+        var y = e.GetPosition(item).Y;
+        var band = item.ActualHeight * 0.3;
+        return y < band ? DropZone.Above
+            : y > item.ActualHeight - band ? DropZone.Below
+            : DropZone.Fixup;
     }
 
     private void CommitItem_DragOver(object sender, DragEventArgs e)
@@ -161,31 +185,63 @@ public partial class CommitListView : UserControl
             || item.DataContext is not CommitItem target
             || e.Data.GetData(CommitDragFormat) is not CommitItem source)
         {
+            ClearInsertionMarker();
             e.Handled = true;
             return;
         }
 
-        if (CommitListViewModel.CanDropCommitForFixup(source, target, out var reason))
+        var zone = GetDropZone(item, e);
+        if (zone == DropZone.Fixup)
         {
-            e.Effects = DragDropEffects.Move;
-            item.ToolTip = $"Fixup {source.CommitId} into {target.CommitId}";
+            ClearInsertionMarker();
+            if (_vm.HasPendingReorder)
+            {
+                item.ToolTip = "Apply or discard the pending reorder before a fixup.";
+            }
+            else if (CommitListViewModel.CanDropCommitForFixup(source, target, out var reason))
+            {
+                e.Effects = DragDropEffects.Move;
+                item.ToolTip = $"Fixup {source.CommitId} into {target.CommitId}";
+            }
+            else
+            {
+                item.ToolTip = reason;
+            }
         }
         else
         {
-            item.ToolTip = reason;
+            var group = DraggedGroup(e, source);
+            var after = zone == DropZone.Below;
+            if (_vm.CanMoveCommitsTo(group, target, after) is { } reason)
+            {
+                ClearInsertionMarker();
+                item.ToolTip = reason;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.Move;
+                ShowInsertionMarker(item, after);
+                var what = group.Count == 1 ? source.CommitId : $"{group.Count} commits";
+                item.ToolTip = $"Move {what} {(after ? "below" : "above")} {target.CommitId}";
+            }
         }
 
         e.Handled = true;
     }
 
+    private static List<CommitItem> DraggedGroup(DragEventArgs e, CommitItem source)
+        => e.Data.GetData(CommitGroupDragFormat) as List<CommitItem> ?? [source];
+
     private void CommitItem_DragLeave(object sender, DragEventArgs e)
     {
         if (sender is ListViewItem item)
             item.ClearValue(ToolTipProperty);
+        ClearInsertionMarker();
     }
 
     private async void CommitItem_Drop(object sender, DragEventArgs e)
     {
+        ClearInsertionMarker();
         if (_vm is null
             || sender is not ListViewItem item
             || item.DataContext is not CommitItem target
@@ -194,10 +250,17 @@ public partial class CommitListView : UserControl
             return;
         }
 
-        if (!CommitListViewModel.CanDropCommitForFixup(source, target, out _))
+        item.ClearValue(ToolTipProperty);
+        var zone = GetDropZone(item, e);
+        if (zone != DropZone.Fixup)
+        {
+            _vm.MoveCommitsTo(DraggedGroup(e, source), target, after: zone == DropZone.Below);
+            return;
+        }
+
+        if (_vm.HasPendingReorder || !CommitListViewModel.CanDropCommitForFixup(source, target, out _))
             return;
 
-        item.ClearValue(ToolTipProperty);
         try
         {
             await _vm.DropCommitForFixupAsync(source, target);
@@ -206,6 +269,58 @@ public partial class CommitListView : UserControl
         {
             // async void drop handler — an escaping exception would hit the dispatcher.
             System.Diagnostics.Debug.WriteLine($"Fixup drop failed: {ex}");
+        }
+    }
+
+    // ── Insertion marker for reorder drops ───────────────────────────────
+
+    private InsertionAdorner? _insertionAdorner;
+
+    private void ShowInsertionMarker(ListViewItem item, bool below)
+    {
+        if (_insertionAdorner is { } existing && ReferenceEquals(existing.AdornedElement, item) && existing.Below == below)
+            return;
+
+        ClearInsertionMarker();
+        if (AdornerLayer.GetAdornerLayer(item) is not { } layer)
+            return;
+
+        _insertionAdorner = new InsertionAdorner(item, below, (Brush)FindResource("AccentBlue"));
+        layer.Add(_insertionAdorner);
+    }
+
+    private void ClearInsertionMarker()
+    {
+        if (_insertionAdorner is null)
+            return;
+
+        AdornerLayer.GetAdornerLayer(_insertionAdorner.AdornedElement)?.Remove(_insertionAdorner);
+        _insertionAdorner = null;
+    }
+
+    /// <summary>A line with end ticks across the top or bottom edge of a row.</summary>
+    private sealed class InsertionAdorner : Adorner
+    {
+        private readonly Pen _pen;
+
+        public InsertionAdorner(UIElement adornedElement, bool below, Brush brush)
+            : base(adornedElement)
+        {
+            Below = below;
+            _pen = new Pen(brush, 2);
+            _pen.Freeze();
+            IsHitTestVisible = false;
+        }
+
+        public bool Below { get; }
+
+        protected override void OnRender(DrawingContext drawingContext)
+        {
+            var size = AdornedElement.RenderSize;
+            var y = Below ? size.Height - 1 : 1;
+            drawingContext.DrawLine(_pen, new Point(2, y), new Point(size.Width - 2, y));
+            drawingContext.DrawLine(_pen, new Point(2, y - 3), new Point(2, y + 3));
+            drawingContext.DrawLine(_pen, new Point(size.Width - 2, y - 3), new Point(size.Width - 2, y + 3));
         }
     }
 }

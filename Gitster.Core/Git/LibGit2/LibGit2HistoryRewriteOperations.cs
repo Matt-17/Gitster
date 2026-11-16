@@ -37,6 +37,135 @@ internal sealed class LibGit2HistoryRewriteOperations
         var branch = AttachBranchForHistoryRewrite(repo, branchName, "rewrite commits");
         var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
 
+        var newTip = RewriteMetadata(repo, branchTip, rewrites, out _);
+        if (newTip.Id != branchTip.Id)
+            repo.Refs.UpdateTarget(branch.Reference, newTip.Id, "rewrite commits");
+
+        _context.RaiseHeadChanged();
+        return Task.CompletedTask;
+    }
+
+    public Task RewriteHistoryAsync(
+        IEnumerable<CommitRewrite> rewrites,
+        IReadOnlyList<string> newOrderNewestFirst,
+        string? branchName = null)
+    {
+        using var repo = _context.OpenRepository();
+        var branch = AttachBranchForHistoryRewrite(repo, branchName, "rewrite history");
+        var branchTip = branch.Tip ?? throw new InvalidOperationException("No HEAD commit.");
+
+        // No clean-tree check: the tip tree is verified to stay identical below, so the index
+        // and working tree remain valid on top of the rewritten branch, as with metadata edits.
+
+        // Validate the order against the original history before anything is written.
+        var originalTop = GetFirstParentChainNewestFirst(branchTip, newOrderNewestFirst.Count);
+        var wanted = ResolveCommitsInChain(originalTop, newOrderNewestFirst);
+        EnsureSameCommitSet(originalTop, wanted);
+        EnsureNoMergeCommits(originalTop, "reorder commits");
+
+        // 1. Metadata edits (message, author, dates) — rewrites every descendant as before.
+        var rewrittenTip = RewriteMetadata(repo, branchTip, rewrites, out var mapping);
+
+        // 2. Replay the newest N commits in the wanted order on top of the unchanged base.
+        var rewrittenTop = GetFirstParentChainNewestFirst(rewrittenTip, originalTop.Count);
+        var wantedRewritten = wanted
+            .Select(c => mapping.TryGetValue(c.Sha, out var mapped) ? mapped : c)
+            .ToList();
+        var newTip = ReplayInOrder(repo, rewrittenTop, wantedRewritten);
+
+        // Reordering only changes how the history gets to the final snapshot, never the
+        // snapshot itself; a different tip tree would also leave the working tree looking dirty.
+        if (newTip.Tree.Id != branchTip.Tree.Id)
+            throw new InvalidOperationException(
+                "The new order would change the final file contents, so it was not applied. The branch is unchanged.");
+
+        if (newTip.Id != branchTip.Id)
+            repo.Refs.UpdateTarget(branch.Reference, newTip.Id, "rewrite history (reorder)");
+
+        _context.RaiseHeadChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Replays <paramref name="wantedNewestFirst"/> (the same commits as
+    /// <paramref name="currentNewestFirst"/>) oldest-first in the new order. Each moved commit is
+    /// cherry-picked in memory onto its new parent; a conflict throws before any ref moves.
+    /// </summary>
+    private static Commit ReplayInOrder(
+        Repository repo,
+        IReadOnlyList<Commit> currentNewestFirst,
+        IReadOnlyList<Commit> wantedNewestFirst)
+    {
+        var currentOldestFirst = currentNewestFirst.Reverse().ToList();
+        var wantedOldestFirst = wantedNewestFirst.Reverse().ToList();
+        Commit? newParent = currentOldestFirst[0].Parents.FirstOrDefault();
+
+        for (var i = 0; i < wantedOldestFirst.Count; i++)
+        {
+            var commit = wantedOldestFirst[i];
+            var oldParent = commit.Parents.FirstOrDefault();
+            if (oldParent?.Id == newParent?.Id)
+            {
+                newParent = commit;
+                continue;
+            }
+
+            if (newParent is null)
+                throw new InvalidOperationException(
+                    $"Commit {ShortSha(commit.Sha)} cannot become the root commit.");
+
+            var result = repo.ObjectDatabase.CherryPickCommit(
+                commit,
+                newParent,
+                0,
+                new MergeTreeOptions { FailOnConflict = false, SkipReuc = true });
+
+            if (result.Status == MergeTreeStatus.Conflicts)
+            {
+                var paths = result.Conflicts
+                    .Select(c => (c.Ours ?? c.Theirs ?? c.Ancestor)?.Path)
+                    .Where(p => p is not null)
+                    .Distinct()
+                    .Take(5);
+                throw new InvalidOperationException(
+                    $"Moving {ShortSha(commit.Sha)} \"{commit.MessageShort}\" conflicts in: {string.Join(", ", paths)}.\n\n" +
+                    "The branch is unchanged. Choose a different order or resolve it with an interactive rebase.");
+            }
+
+            newParent = CreateReplayedCommit(repo, commit, result.Tree, [newParent]);
+        }
+
+        return newParent ?? throw new InvalidOperationException("Could not build reordered history.");
+    }
+
+    private static List<Commit> GetFirstParentChainNewestFirst(Commit tip, int count)
+    {
+        var commits = new List<Commit>(count);
+        Commit? current = tip;
+        while (current is not null && commits.Count < count)
+        {
+            commits.Add(current);
+            current = current.Parents.FirstOrDefault();
+        }
+
+        if (commits.Count != count)
+            throw new InvalidOperationException("The branch has fewer commits than the requested order.");
+        return commits;
+    }
+
+    /// <summary>
+    /// Creates rewritten commits for the given metadata edits and every descendant. Returns the
+    /// new tip (the old tip when nothing changed); <paramref name="mapping"/> maps old SHAs to
+    /// their rewritten commits.
+    /// </summary>
+    private static Commit RewriteMetadata(
+        Repository repo,
+        Commit branchTip,
+        IEnumerable<CommitRewrite> rewrites,
+        out Dictionary<string, Commit> mapping)
+    {
+        var map = new Dictionary<string, Commit>(StringComparer.OrdinalIgnoreCase);
+        mapping = map;
         var allCommits = repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
         {
             SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time,
@@ -55,12 +184,8 @@ internal sealed class LibGit2HistoryRewriteOperations
         }
 
         if (rewriteByFullSha.Count == 0)
-        {
-            _context.RaiseHeadChanged();
-            return Task.CompletedTask;
-        }
+            return branchTip;
 
-        var mapping = new Dictionary<string, Commit>(StringComparer.OrdinalIgnoreCase);
         var anyChanged = false;
 
         foreach (var oldCommit in allCommits)
@@ -69,14 +194,14 @@ internal sealed class LibGit2HistoryRewriteOperations
 
             var oldParents = oldCommit.Parents.ToList();
             var newParents = oldParents
-                .Select(p => mapping.TryGetValue(p.Id.Sha, out var mapped) ? mapped : p)
+                .Select(p => map.TryGetValue(p.Id.Sha, out var mapped) ? mapped : p)
                 .ToList();
 
             var parentsChanged = newParents.Zip(oldParents, (n, o) => n.Id != o.Id).Any(x => x);
 
             if (rewrite == null && !parentsChanged)
             {
-                mapping[oldCommit.Id.Sha] = oldCommit;
+                map[oldCommit.Id.Sha] = oldCommit;
                 continue;
             }
 
@@ -99,14 +224,12 @@ internal sealed class LibGit2HistoryRewriteOperations
                 newParents,
                 prettifyMessage: false);
 
-            mapping[oldCommit.Id.Sha] = newCommit;
+            map[oldCommit.Id.Sha] = newCommit;
         }
 
-        if (anyChanged && mapping.TryGetValue(branchTip.Id.Sha, out var newHead))
-            repo.Refs.UpdateTarget(branch.Reference, newHead.Id, "rewrite commits");
-
-        _context.RaiseHeadChanged();
-        return Task.CompletedTask;
+        return anyChanged && map.TryGetValue(branchTip.Id.Sha, out var newHead)
+            ? newHead
+            : branchTip;
     }
 
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null)

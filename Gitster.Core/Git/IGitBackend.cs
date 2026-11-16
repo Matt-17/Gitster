@@ -51,6 +51,14 @@ public interface IHistoryRewriteOps : IRepositoryContext
     Task<string> AmendAsync(AmendRequest request);
     Task AmendAuthorAsync(AmendAuthorRequest request);
     Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null);
+
+    /// <summary>
+    /// Applies metadata rewrites and a new order for the newest commits of the branch in one
+    /// pass. <paramref name="newOrderNewestFirst"/> lists the branch's newest N commits (by their
+    /// original SHAs) in the wanted order; moved commits are replayed with a three-way merge and
+    /// a conflict aborts the whole operation with the branch unchanged.
+    /// </summary>
+    Task RewriteHistoryAsync(IEnumerable<CommitRewrite> rewrites, IReadOnlyList<string> newOrderNewestFirst, string? branchName = null);
     Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null);
     Task ResetMixedAsync(string targetReference, string? branchName = null);
     Task ResetHardAsync(string targetReference, string? branchName = null);

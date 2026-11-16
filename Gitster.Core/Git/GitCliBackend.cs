@@ -460,6 +460,7 @@ public sealed class GitCliBackend : IGitBackend
     public Task<string> AmendAsync(AmendRequest request)        => NS<string>();
     public Task AmendAuthorAsync(AmendAuthorRequest request)    => NSVoid();
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null) => NSVoid();
+    public Task RewriteHistoryAsync(IEnumerable<CommitRewrite> rewrites, IReadOnlyList<string> newOrderNewestFirst, string? branchName = null) => NSVoid();
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null) => NSVoid();
 
     // Remote server operations. Keep these on the Git CLI path only.

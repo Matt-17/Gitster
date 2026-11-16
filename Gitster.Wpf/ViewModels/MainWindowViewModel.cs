@@ -225,6 +225,9 @@ public partial class MainWindowViewModel : BaseViewModel
         QuickActionsVM = quickActionsViewModel;
         QuickActionsVM.RefreshAfterActionAsync = async () => await UpdateElementsAsync();
         HistoryRewriteDraftVM = historyRewriteDraftViewModel;
+        CommitListVM.Reorderer = HistoryRewriteDraftVM;
+        CommitListVM.ShowReorderError = message => _windowService.Warning(message, "Move commit");
+        HistoryRewriteDraftVM.PendingOrderChanged += CommitListVM.SetPendingLocalOrder;
         UndoBarVM = undoBarViewModel;
         UndoBarVM.AfterUndoAsync = async progress =>
         {

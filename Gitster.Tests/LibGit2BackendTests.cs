@@ -119,6 +119,93 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task RewriteHistory_SameFileNonOverlappingEdits_ReordersWithMerge()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "a.txt", "1\n2\n3\n4\n5\n6\n7\n8\n");
+        var top = repo.Commit("top line", "a.txt", "1 top\n2\n3\n4\n5\n6\n7\n8\n");
+        var bottom = repo.Commit("bottom line", "a.txt", "1 top\n2\n3\n4\n5\n6\n7\n8 bottom\n");
+        string originalTree;
+        using (var r = new Repository(repo.Path))
+            originalTree = r.Head.Tip!.Tree.Sha;
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RewriteHistoryAsync([], [top, bottom]);
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(originalTree, check.Head.Tip!.Tree.Sha);
+        CollectionAssert.AreEqual(
+            new[] { "top line", "bottom line", "base" },
+            FirstParentMessages(check.Head.Tip!, 3).ToArray());
+        var middle = check.Head.Tip!.Parents.First();
+        Assert.AreEqual("1\n2\n3\n4\n5\n6\n7\n8 bottom\n", ((Blob)middle["a.txt"].Target).GetContentText());
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    [TestMethod]
+    public async Task RewriteHistory_ConflictingOrder_ThrowsAndLeavesBranchUnchanged()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "a.txt", "1");
+        var c2 = repo.Commit("c2", "a.txt", "2");
+        var c3 = repo.Commit("c3", "a.txt", "3");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var ex = await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            () => backend.RewriteHistoryAsync([], [c2, c3]));
+
+        StringAssert.Contains(ex.Message, "a.txt");
+        Assert.AreEqual(c3, repo.Head());
+    }
+
+    [TestMethod]
+    public async Task RewriteHistory_ReorderWithMessageEdit_AppliesBoth()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var c2 = repo.Commit("c2", "a.txt", "a");
+        var c3 = repo.Commit("c3", "b.txt", "b");
+        var c4 = repo.Commit("c4", "c.txt", "c");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RewriteHistoryAsync(
+            [new CommitRewrite(c2, NewMessage: "c2 renamed")],
+            [c2, c4, c3]);
+
+        using var check = new Repository(repo.Path);
+        CollectionAssert.AreEqual(
+            new[] { "c2 renamed", "c4", "c3", "base" },
+            FirstParentMessages(check.Head.Tip!, 4).ToArray());
+        Assert.IsFalse(check.RetrieveStatus().IsDirty);
+    }
+
+    [TestMethod]
+    public async Task RewriteHistory_WithUncommittedChanges_KeepsThemAndReorders()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("base", "base.txt", "base");
+        var c2 = repo.Commit("c2", "a.txt", "a");
+        var c3 = repo.Commit("c3", "b.txt", "b");
+        File.WriteAllText(Path.Combine(repo.Path, "base.txt"), "work in progress");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RewriteHistoryAsync([], [c2, c3]);
+
+        using var check = new Repository(repo.Path);
+        CollectionAssert.AreEqual(new[] { "c2", "c3", "base" }, FirstParentMessages(check.Head.Tip!, 3).ToArray());
+        Assert.AreEqual(FileStatus.ModifiedInWorkdir, check.RetrieveStatus("base.txt"));
+        Assert.AreEqual(1, check.RetrieveStatus().Count(), "only the uncommitted edit shows as changed");
+    }
+
+    [TestMethod]
     public async Task SplitCommit_FileLevelSplit_ReplaysDescendantsAndPreservesTipTree()
     {
         using var repo = new GitTestRepo();

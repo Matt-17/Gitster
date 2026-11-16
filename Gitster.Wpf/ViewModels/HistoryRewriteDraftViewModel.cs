@@ -7,7 +7,7 @@ using Gitster.Core.OperationsLog;
 
 namespace Gitster.ViewModels;
 
-public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
+public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommitReorderer
 {
     private readonly IGitBackend? _git;
     private readonly OperationFeedbackService? _feedback;
@@ -47,6 +47,12 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     private int _directEditCount;
     private int _transitiveRewriteCount;
     private int _affectedRewriteCount;
+    private int _movedCount;
+
+    // Pending reorder: the wanted order of all local commits, plus the original order it was
+    // made against, so a reload with different history drops a stale order.
+    private List<string>? _pendingOrder;
+    private List<string>? _pendingOrderBase;
     private string _summaryText = "No pending history edits.";
     private bool _syncingEditor;
     private bool _editorTouched;
@@ -373,6 +379,18 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         private set => SetProperty(ref _transitiveRewriteCount, value);
     }
 
+    public int MovedCount
+    {
+        get => _movedCount;
+        private set => SetProperty(ref _movedCount, value);
+    }
+
+    /// <summary>The wanted order of all local commits (newest first), or null without a reorder.</summary>
+    public IReadOnlyList<string>? PendingOrder => _pendingOrder;
+
+    /// <summary>Raised when the pending order changes, so the commit list can show it.</summary>
+    public event Action<IReadOnlyList<string>?>? PendingOrderChanged;
+
     public int AffectedRewriteCount
     {
         get => _affectedRewriteCount;
@@ -386,7 +404,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     }
 
     public bool CanApply => HasDrafts && !IsApplying;
-    public bool CanDiscardSelected => _selectedCommits.Any(c => _drafts.ContainsKey(c.FullSha));
+    public bool CanDiscardSelected => _selectedCommits.Any(c => _drafts.ContainsKey(c.FullSha) || c.HasPendingMove);
 
     public void SetCommits(IEnumerable<CommitItem> commits)
     {
@@ -395,7 +413,130 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
 
         _commits = commits.ToList();
         RemoveMissingDrafts();
+        if (_pendingOrderBase is not null && !_pendingOrderBase.SequenceEqual(LocalShas(), StringComparer.OrdinalIgnoreCase))
+            SetPendingOrder(null, notify: true);
         RefreshProjection();
+    }
+
+    // ── Reorder ──────────────────────────────────────────────────────────
+
+    /// <summary>Moves the given commits one position up (delta -1, newer) or down (+1, older).</summary>
+    public string? MoveCommitsBy(IReadOnlyList<CommitItem> commits, int delta)
+    {
+        if (delta == 0)
+            return null;
+
+        var order = CurrentOrder();
+        var selected = SelectedShasIn(order, commits);
+        if (selected.Count == 0)
+            return "Only commits of the local branch can be moved.";
+
+        if (delta < 0)
+        {
+            for (var i = 1; i < order.Count; i++)
+                if (selected.Contains(order[i]) && !selected.Contains(order[i - 1]))
+                    (order[i - 1], order[i]) = (order[i], order[i - 1]);
+        }
+        else
+        {
+            for (var i = order.Count - 2; i >= 0; i--)
+                if (selected.Contains(order[i]) && !selected.Contains(order[i + 1]))
+                    (order[i + 1], order[i]) = (order[i], order[i + 1]);
+        }
+
+        return TrySetOrder(order);
+    }
+
+    /// <summary>Checks a drag-and-drop move without changing anything; null means allowed.</summary>
+    public string? CanMoveCommitsTo(IReadOnlyList<CommitItem> commits, CommitItem target, bool after)
+        => BuildMovedOrder(commits, target, after, out var order) ?? ValidateOrder(order!);
+
+    /// <summary>Places the given commits directly above (newer) or below (after) the target.</summary>
+    public string? MoveCommitsTo(IReadOnlyList<CommitItem> commits, CommitItem target, bool after)
+        => BuildMovedOrder(commits, target, after, out var order) ?? TrySetOrder(order!);
+
+    private string? BuildMovedOrder(IReadOnlyList<CommitItem> commits, CommitItem target, bool after, out List<string>? order)
+    {
+        order = null;
+        if (IsApplying)
+            return "A history rewrite is being applied.";
+
+        var current = CurrentOrder();
+        var selected = SelectedShasIn(current, commits);
+        if (selected.Count == 0)
+            return "Only commits of the local branch can be moved.";
+        if (selected.Contains(target.FullSha))
+            return "Drop onto a commit outside the moved selection.";
+
+        var targetIndex = current.FindIndex(sha => string.Equals(sha, target.FullSha, StringComparison.OrdinalIgnoreCase));
+        if (targetIndex < 0)
+            return "Commits can only be moved within the local branch.";
+
+        var moving = current.Where(selected.Contains).ToList();
+        var rest = current.Where(sha => !selected.Contains(sha)).ToList();
+        var insertAt = rest.FindIndex(sha => string.Equals(sha, target.FullSha, StringComparison.OrdinalIgnoreCase)) + (after ? 1 : 0);
+        rest.InsertRange(insertAt, moving);
+        order = rest;
+        return null;
+    }
+
+    private string? TrySetOrder(List<string> order)
+    {
+        if (ValidateOrder(order) is { } error)
+            return error;
+
+        SetPendingOrder(order.SequenceEqual(LocalShas(), StringComparer.OrdinalIgnoreCase) ? null : order, notify: true);
+        RefreshProjection();
+        return null;
+    }
+
+    /// <summary>Null when the order can be applied; otherwise the reason it cannot.</summary>
+    private string? ValidateOrder(IReadOnlyList<string> order)
+    {
+        if (IsApplying)
+            return "A history rewrite is being applied.";
+
+        var localRows = _commits.Where(IsLocalBranchRow).ToList();
+        var oldestChanged = -1;
+        for (var i = localRows.Count - 1; i >= 0; i--)
+        {
+            if (!string.Equals(localRows[i].FullSha, order[i], StringComparison.OrdinalIgnoreCase))
+            {
+                oldestChanged = i;
+                break;
+            }
+        }
+
+        if (oldestChanged < 0)
+            return null;
+
+        var merge = localRows.Take(oldestChanged + 1).FirstOrDefault(c => c.ParentShas.Count > 1);
+        if (merge is not null)
+            return $"Commits cannot be moved across merge commit {merge.CommitId}.";
+
+        if (localRows[oldestChanged].ParentShas.Count == 0)
+            return "The root commit cannot be moved.";
+
+        return null;
+    }
+
+    private void SetPendingOrder(List<string>? order, bool notify)
+    {
+        _pendingOrder = order;
+        _pendingOrderBase = order is null ? null : LocalShas();
+        if (notify)
+            PendingOrderChanged?.Invoke(_pendingOrder);
+    }
+
+    private List<string> CurrentOrder() => (_pendingOrder ?? LocalShas()).ToList();
+
+    private static HashSet<string> SelectedShasIn(IReadOnlyList<string> order, IReadOnlyList<CommitItem> commits)
+    {
+        var inOrder = order.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return commits
+            .Select(c => c.FullSha)
+            .Where(inOrder.Contains)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     public void SetSelectedCommit(CommitItem? commit)
@@ -444,6 +585,11 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         foreach (var commit in _selectedCommits)
             _drafts.Remove(commit.FullSha);
 
+        // A move cannot be undone for one commit alone (the others shifted with it), so
+        // resetting a moved commit drops the whole pending order.
+        if (_selectedCommits.Any(c => c.HasPendingMove))
+            SetPendingOrder(null, notify: true);
+
         ProjectEditorFromSelection();
         RefreshProjection();
     }
@@ -452,6 +598,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     private void ClearAll()
     {
         _drafts.Clear();
+        if (_pendingOrder is not null)
+            SetPendingOrder(null, notify: true);
         ProjectEditorFromSelection();
         RefreshProjection();
     }
@@ -463,7 +611,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             return;
 
         var rewrites = BuildRewrites();
-        if (rewrites.Count == 0)
+        var orderPrefix = BuildRewritePlan().OrderPrefix;
+        if (rewrites.Count == 0 && orderPrefix is null)
             return;
 
         if (HasRemoteRewriteRisk && _windowService?.Confirm(
@@ -482,6 +631,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             var branchName = _getBranchName?.Invoke() ?? string.Empty;
             var directCount = DirectEditCount;
             var transitiveCount = TransitiveRewriteCount;
+            var movedCount = MovedCount;
             var remoteRisk = HasRemoteRewriteRisk;
 
             if (_snapshots is not null)
@@ -491,7 +641,10 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 "Rewrite history",
                 async () =>
                 {
-                    await Task.Run(() => _git.RewriteCommitsAsync(rewrites, branchName));
+                    if (orderPrefix is null)
+                        await Task.Run(() => _git.RewriteCommitsAsync(rewrites, branchName));
+                    else
+                        await Task.Run(() => _git.RewriteHistoryAsync(rewrites, orderPrefix, branchName));
                     return await _git.GetHeadShaAsync();
                 },
                 ShortSha);
@@ -516,8 +669,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 Timestamp: DateTimeOffset.Now,
                 Kind: OperationKind.HistoryEdit,
                 Description: remoteRisk
-                    ? $"Batch history edit ({directCount} edit{Plural(directCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)}, force-with-lease required)"
-                    : $"Batch history edit ({directCount} edit{Plural(directCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)})",
+                    ? $"Batch history edit ({directCount} edit{Plural(directCount)}{MovedSuffix(movedCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)}, force-with-lease required)"
+                    : $"Batch history edit ({directCount} edit{Plural(directCount)}{MovedSuffix(movedCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)})",
                 BranchName: branchName,
                 BeforeSha: beforeSha,
                 AfterSha: afterSha,
@@ -525,6 +678,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
                 Status: OperationStatus.Active));
 
             _drafts.Clear();
+            SetPendingOrder(null, notify: true);
             RefreshProjection();
 
             if (_refreshAfterApply is not null)
@@ -731,8 +885,9 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             row.ClearHistoryEditOverlay();
 
         var plan = BuildRewritePlan();
-        if (plan.Direct.Count == 0)
+        if (plan.Direct.Count == 0 && plan.Moved.Count == 0)
         {
+            MovedCount = 0;
             DirectEditCount = 0;
             TransitiveRewriteCount = 0;
             AffectedRewriteCount = 0;
@@ -744,6 +899,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         }
 
         var direct = plan.Direct.Select(d => d.FullSha).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var moved = plan.Moved.ToDictionary(m => m.FullSha, StringComparer.OrdinalIgnoreCase);
         var remoteRisk = plan.HasRemoteRisk;
 
         foreach (var affected in plan.Affected)
@@ -752,18 +908,25 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             row.IsPendingRemoteRisk = IsRemoteRewriteRisk(row);
             row.IsPendingLocalCleanup = !remoteRisk;
 
-            if (direct.Contains(row.FullSha) && _drafts.TryGetValue(row.FullSha, out var draft))
+            var draft = direct.Contains(row.FullSha) && _drafts.TryGetValue(row.FullSha, out var found) ? found : null;
+            var move = moved.GetValueOrDefault(row.FullSha);
+            if (draft is not null || move is not null)
             {
                 row.IsHistoryEditDirect = true;
-                row.HasPendingMessageChange = draft.HasMessageChange;
-                row.HasPendingAuthorChange = draft.HasAuthorChange;
-                row.HasPendingTimeChange = draft.HasTimeChange || draft.HasCommitterTimeChange;
-                row.PendingMessage = draft.HasMessageChange ? FirstLine(draft.NewMessage) : null;
-                row.PendingAuthorName = draft.HasAuthorChange ? draft.NewAuthorName : null;
-                row.PendingAuthorEmail = draft.HasAuthorChange ? draft.NewAuthorEmail : null;
-                row.PendingDate = draft.HasTimeChange ? draft.NewAuthorDate : null;
-                row.PendingCommitterDate = draft.HasCommitterTimeChange ? draft.NewCommitterDate : null;
-                row.HistoryEditTooltip = BuildDirectTooltip(draft, remoteRisk);
+                row.HasPendingMove = move is not null;
+                if (draft is not null)
+                {
+                    row.HasPendingMessageChange = draft.HasMessageChange;
+                    row.HasPendingAuthorChange = draft.HasAuthorChange;
+                    row.HasPendingTimeChange = draft.HasTimeChange || draft.HasCommitterTimeChange;
+                    row.PendingMessage = draft.HasMessageChange ? FirstLine(draft.NewMessage) : null;
+                    row.PendingAuthorName = draft.HasAuthorChange ? draft.NewAuthorName : null;
+                    row.PendingAuthorEmail = draft.HasAuthorChange ? draft.NewAuthorEmail : null;
+                    row.PendingDate = draft.HasTimeChange ? draft.NewAuthorDate : null;
+                    row.PendingCommitterDate = draft.HasCommitterTimeChange ? draft.NewCommitterDate : null;
+                }
+
+                row.HistoryEditTooltip = BuildDirectTooltip(draft, move, remoteRisk);
             }
             else
             {
@@ -774,8 +937,10 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             }
         }
 
-        DirectEditCount = plan.Direct.Count;
-        TransitiveRewriteCount = plan.Affected.Count - plan.Direct.Count;
+        var directOrMoved = direct.Union(moved.Keys, StringComparer.OrdinalIgnoreCase).Count();
+        MovedCount = plan.Moved.Count;
+        DirectEditCount = directOrMoved;
+        TransitiveRewriteCount = plan.Affected.Count - directOrMoved;
         AffectedRewriteCount = plan.Affected.Count;
         HasRemoteRewriteRisk = remoteRisk;
         HasLocalOnlyCleanup = !remoteRisk;
@@ -812,7 +977,9 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             return;
         }
 
-        var direct = $"{DirectEditCount} edit{Plural(DirectEditCount)}";
+        var direct = MovedCount > 0
+            ? $"{DirectEditCount} edit{Plural(DirectEditCount)} ({MovedCount} moved)"
+            : $"{DirectEditCount} edit{Plural(DirectEditCount)}";
         var transitive = TransitiveRewriteCount == 0
             ? "no local descendant rewrites"
             : $"{TransitiveRewriteCount} local descendant rewrite{Plural(TransitiveRewriteCount)}";
@@ -836,39 +1003,113 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             _drafts.Remove(sha);
     }
 
-    private static string BuildDirectTooltip(CommitDraft draft, bool remoteRisk)
+    private static string BuildDirectTooltip(CommitDraft? draft, AffectedCommit? move, bool remoteRisk)
     {
         var parts = new List<string>();
-        if (draft.HasMessageChange) parts.Add("message");
-        if (draft.HasAuthorChange) parts.Add("author");
-        if (draft.HasTimeChange) parts.Add("time");
-        if (draft.HasCommitterTimeChange) parts.Add("committer time");
+        if (move is not null) parts.Add($"position {move.LocalIndex + 1} → {move.NewIndex + 1}");
+        if (draft?.HasMessageChange == true) parts.Add("message");
+        if (draft?.HasAuthorChange == true) parts.Add("author");
+        if (draft?.HasTimeChange == true) parts.Add("time");
+        if (draft?.HasCommitterTimeChange == true) parts.Add("committer time");
         var suffix = remoteRisk ? " Remote contains old copies." : string.Empty;
         return $"Pending edit: {string.Join(", ", parts)}.{suffix}";
     }
 
     private RewritePlan BuildRewritePlan()
     {
-        var localRows = _commits
-            .Where(IsLocalBranchRow)
-            .Select((commit, index) => new AffectedCommit(commit, index))
+        var localCommits = _commits.Where(IsLocalBranchRow).ToList();
+        var newIndexBySha = (_pendingOrder ?? localCommits.Select(c => c.FullSha).ToList())
+            .Select((sha, index) => (sha, index))
+            .ToDictionary(x => x.sha, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        var localRows = localCommits
+            .Select((commit, index) => new AffectedCommit(
+                commit,
+                index,
+                newIndexBySha.TryGetValue(commit.FullSha, out var newIndex) ? newIndex : index))
             .ToList();
 
         var direct = localRows
             .Where(row => _drafts.TryGetValue(row.FullSha, out var draft) && draft.HasChanges)
             .ToList();
 
-        if (direct.Count == 0)
-            return new RewritePlan([], [], false);
+        var oldestMovedIndex = OldestChangedIndex();
+        var moved = oldestMovedIndex < 0 ? new List<AffectedCommit>() : FindMovedRows(localRows, oldestMovedIndex);
 
-        var oldestEditedLocalIndex = direct.Max(row => row.LocalIndex);
+        if (direct.Count == 0 && moved.Count == 0)
+            return new RewritePlan([], [], [], null, false);
+
+        var oldestAffectedIndex = Math.Max(
+            direct.Count == 0 ? -1 : direct.Max(row => row.LocalIndex),
+            oldestMovedIndex);
         var affected = localRows
-            .Where(row => row.LocalIndex <= oldestEditedLocalIndex)
+            .Where(row => row.LocalIndex <= oldestAffectedIndex)
+            .OrderBy(row => row.NewIndex)
             .ToList();
 
+        var orderPrefix = oldestMovedIndex < 0 ? null : _pendingOrder!.Take(oldestMovedIndex + 1).ToList();
         var hasRemoteRisk = affected.Any(row => IsRemoteRewriteRisk(row.Commit));
-        return new RewritePlan(affected, direct, hasRemoteRisk);
+        return new RewritePlan(affected, direct, moved, orderPrefix, hasRemoteRisk);
     }
+
+    /// <summary>
+    /// The commits the user actually moved: everything in the reordered window that is not part
+    /// of the longest run keeping its original relative order. Swapping two neighbours marks one,
+    /// dragging one commit far up marks only that one, not every commit it passed.
+    /// </summary>
+    private static List<AffectedCommit> FindMovedRows(IReadOnlyList<AffectedCommit> localRows, int oldestChangedIndex)
+    {
+        var window = localRows
+            .Where(row => row.LocalIndex <= oldestChangedIndex)
+            .OrderBy(row => row.NewIndex)
+            .ToList();
+
+        // Longest increasing subsequence of the original indices, in new order (patience sort).
+        var tails = new List<int>();
+        var tailIndex = new List<int>();
+        var previous = new int[window.Count];
+        for (var i = 0; i < window.Count; i++)
+        {
+            var value = window[i].LocalIndex;
+            var position = tails.BinarySearch(value);
+            if (position < 0) position = ~position;
+            previous[i] = position > 0 ? tailIndex[position - 1] : -1;
+            if (position == tails.Count)
+            {
+                tails.Add(value);
+                tailIndex.Add(i);
+            }
+            else
+            {
+                tails[position] = value;
+                tailIndex[position] = i;
+            }
+        }
+
+        var kept = new HashSet<int>();
+        for (var i = tailIndex.Count == 0 ? -1 : tailIndex[^1]; i >= 0; i = previous[i])
+            kept.Add(i);
+
+        return window.Where((_, i) => !kept.Contains(i)).ToList();
+    }
+
+    /// <summary>Original index of the oldest local commit whose position changes, or -1.</summary>
+    private int OldestChangedIndex()
+    {
+        if (_pendingOrder is null)
+            return -1;
+
+        var original = LocalShas();
+        for (var i = original.Count - 1; i >= 0; i--)
+        {
+            if (!string.Equals(original[i], _pendingOrder[i], StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+
+        return -1;
+    }
+
+    private List<string> LocalShas() => _commits.Where(IsLocalBranchRow).Select(c => c.FullSha).ToList();
 
     private async Task<ApplyVerificationResult> VerifyApplyAsync(
         RewritePlan beforePlan,
@@ -877,14 +1118,15 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         if (_git is null)
             return ApplyVerificationResult.Failed("Git backend is unavailable.");
 
+        // Positions after the rewrite: a reorder moves commits, so compare against NewIndex.
         var directTargets = beforePlan.Direct
             .Select(row => new VerificationTarget(
                 row.Commit.FullSha,
-                row.LocalIndex,
+                row.NewIndex,
                 _drafts[row.Commit.FullSha].ToRewrite()))
             .ToList();
 
-        if (directTargets.Count == 0)
+        if (directTargets.Count == 0 && beforePlan.Moved.Count == 0)
             return ApplyVerificationResult.Failed("No direct edits were available to verify.");
 
         var refreshed = await Task.Run(async () => await _git.GetCommitsAsync());
@@ -1034,17 +1276,17 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
             var selectedAffected = beforePlan.Affected.FirstOrDefault(row =>
                 string.Equals(row.FullSha, selectedOriginalSha, StringComparison.OrdinalIgnoreCase));
             if (selectedAffected is not null
-                && selectedAffected.LocalIndex >= 0
-                && selectedAffected.LocalIndex < refreshedLocalRows.Count)
+                && selectedAffected.NewIndex >= 0
+                && selectedAffected.NewIndex < refreshedLocalRows.Count)
             {
-                return refreshedLocalRows[selectedAffected.LocalIndex].FullSha;
+                return refreshedLocalRows[selectedAffected.NewIndex].FullSha;
             }
         }
 
         var nearestRewritten = beforePlan.Affected
-            .OrderBy(row => row.LocalIndex)
-            .FirstOrDefault(row => row.LocalIndex >= 0 && row.LocalIndex < refreshedLocalRows.Count);
-        return nearestRewritten is null ? refreshedLocalRows.FirstOrDefault()?.FullSha : refreshedLocalRows[nearestRewritten.LocalIndex].FullSha;
+            .OrderBy(row => row.NewIndex)
+            .FirstOrDefault(row => row.NewIndex >= 0 && row.NewIndex < refreshedLocalRows.Count);
+        return nearestRewritten is null ? refreshedLocalRows.FirstOrDefault()?.FullSha : refreshedLocalRows[nearestRewritten.NewIndex].FullSha;
     }
 
     private static bool IsLocalBranchRow(CommitItem row)
@@ -1104,6 +1346,9 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
     private static string Plural(int count)
         => count == 1 ? string.Empty : "s";
 
+    private static string MovedSuffix(int movedCount)
+        => movedCount > 0 ? $", {movedCount} moved" : string.Empty;
+
     private sealed record EffectiveValues(
         string Message,
         string AuthorName,
@@ -1118,12 +1363,20 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel
         DateTime Date,
         DateTime CommitterDate);
 
+    /// <summary>
+    /// <paramref name="Direct"/> holds metadata edits, <paramref name="Moved"/> the commits that
+    /// change position; <paramref name="OrderPrefix"/> is the wanted order of the newest commits
+    /// (original SHAs) down to the oldest one whose position changes, or null without a reorder.
+    /// </summary>
     private sealed record RewritePlan(
         IReadOnlyList<AffectedCommit> Affected,
         IReadOnlyList<AffectedCommit> Direct,
+        IReadOnlyList<AffectedCommit> Moved,
+        IReadOnlyList<string>? OrderPrefix,
         bool HasRemoteRisk);
 
-    private sealed record AffectedCommit(CommitItem Commit, int LocalIndex)
+    /// <summary>A local commit with its index before and after the pending reorder.</summary>
+    private sealed record AffectedCommit(CommitItem Commit, int LocalIndex, int NewIndex)
     {
         public string FullSha => Commit.FullSha;
     }

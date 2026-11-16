@@ -172,6 +172,78 @@ public partial class CommitListViewModel : BaseViewModel
     /// <summary>Assigns an existing remote branch as upstream: (branchName, remoteBranchName).</summary>
     public Func<string, string, Task>? SetUpstreamAsync { get; set; }
 
+    // ── Reorder (pending history edit) ───────────────────────────────────
+
+    /// <summary>Plans commit moves as a pending history edit (the history draft).</summary>
+    public ICommitReorderer? Reorderer { get; set; }
+
+    /// <summary>Shows a reorder error, e.g. as a warning dialog.</summary>
+    public Action<string>? ShowReorderError { get; set; }
+
+    private IReadOnlyList<string>? _pendingLocalOrder;
+
+    public bool HasPendingReorder => _pendingLocalOrder is not null;
+
+    /// <summary>Shows the pending order in the current-branch view; null restores the real order.</summary>
+    public void SetPendingLocalOrder(IReadOnlyList<string>? order)
+    {
+        _pendingLocalOrder = order;
+        OnPropertyChanged(nameof(HasPendingReorder));
+        RebuildRows();
+    }
+
+    /// <summary>Why commits cannot be moved in the current view, or null when they can.</summary>
+    public string? ReorderBlockedReason =>
+        Reorderer is null ? "Reordering is not available."
+        : _selectedTarget.Scope != HistoryScope.CurrentBranch ? "Switch to the current branch to reorder commits."
+        : !_query.IsEmpty || ShowOutgoingIncomingOnly ? "Clear the filter to reorder commits."
+        : null;
+
+    public string? CanMoveCommitsTo(IReadOnlyList<CommitItem> commits, CommitItem target, bool after)
+        => ReorderBlockedReason ?? Reorderer!.CanMoveCommitsTo(commits, target, after);
+
+    public void MoveCommitsTo(IReadOnlyList<CommitItem> commits, CommitItem target, bool after)
+        => ReportReorder(ReorderBlockedReason ?? Reorderer!.MoveCommitsTo(commits, target, after));
+
+    [RelayCommand]
+    private void MoveCommitUp() => MoveSelectedBy(-1);
+
+    [RelayCommand]
+    private void MoveCommitDown() => MoveSelectedBy(1);
+
+    private void MoveSelectedBy(int delta)
+    {
+        List<CommitItem> commits = SelectedCommits.Count > 0
+            ? SelectedCommits
+            : SelectedCommit is { } single ? [single] : [];
+        if (commits.Count == 0)
+            return;
+
+        ReportReorder(ReorderBlockedReason ?? Reorderer!.MoveCommitsBy(commits, delta));
+    }
+
+    private void ReportReorder(string? error)
+    {
+        if (error is not null)
+            ShowReorderError?.Invoke(error);
+    }
+
+    /// <summary>Puts the local rows into the pending order (current-branch view only).</summary>
+    private List<CommitItem> ApplyPendingOrder(List<CommitItem> local)
+    {
+        if (_pendingLocalOrder is null || _selectedTarget.Scope != HistoryScope.CurrentBranch)
+            return local;
+
+        var position = _pendingLocalOrder
+            .Select((sha, index) => (sha, index))
+            .ToDictionary(x => x.sha, x => x.index, StringComparer.OrdinalIgnoreCase);
+        return local
+            .Select((commit, index) => (commit, index))
+            .OrderBy(x => position.TryGetValue(x.commit.FullSha, out var p) ? p : x.index)
+            .Select(x => x.commit)
+            .ToList();
+    }
+
     public static bool CanDropCommitForFixup(
         CommitItem? source,
         CommitItem? target,
@@ -773,8 +845,9 @@ public partial class CommitListViewModel : BaseViewModel
         if (local.Count == 0)
             result.Add(new CommitSectionEmptyRow(CommitSectionKind.LocalOutgoing, "no local commits"));
 
-        ApplyGraphRows(local);
-        result.AddRange(local);
+        var ordered = ApplyPendingOrder(local);
+        ApplyGraphRows(ordered, PendingParents(local, ordered));
+        result.AddRange(ordered);
         return new BuiltCommitRows(result, local.Count, incoming.Count);
     }
 
@@ -886,10 +959,47 @@ public partial class CommitListViewModel : BaseViewModel
         await LoadAsync();
     }
 
-    private void ApplyGraphRows(IReadOnlyList<CommitItem> commits)
+    /// <summary>
+    /// For a pending reorder: the parents the reordered run will have after applying (each commit
+    /// on top of the one below it), so the graph draws the planned history. Null without a reorder.
+    /// </summary>
+    private static Dictionary<string, IReadOnlyList<string>>? PendingParents(
+        IReadOnlyList<CommitItem> original,
+        IReadOnlyList<CommitItem> ordered)
+    {
+        var oldestChanged = -1;
+        for (var i = ordered.Count - 1; i >= 0; i--)
+        {
+            if (!ReferenceEquals(original[i], ordered[i]))
+            {
+                oldestChanged = i;
+                break;
+            }
+        }
+
+        if (oldestChanged < 0)
+            return null;
+
+        var parents = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i <= oldestChanged; i++)
+        {
+            parents[ordered[i].FullSha] = i + 1 < ordered.Count
+                ? [ordered[i + 1].FullSha]
+                : original[oldestChanged].ParentShas;
+        }
+
+        return parents;
+    }
+
+    private void ApplyGraphRows(
+        IReadOnlyList<CommitItem> commits,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? parentOverrides = null)
     {
         var graphRows = _graphLayout.Layout(commits
-            .Select(c => new CommitGraphNode(c.FullSha, c.ParentShas, c.RefLabels))
+            .Select(c => new CommitGraphNode(
+                c.FullSha,
+                parentOverrides is not null && parentOverrides.TryGetValue(c.FullSha, out var parents) ? parents : c.ParentShas,
+                c.RefLabels))
             .ToList());
 
         foreach (var commit in commits)

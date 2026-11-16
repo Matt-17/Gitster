@@ -147,6 +147,8 @@
     <UserControl.InputBindings>
         <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding CommitListVM.SelectPreviousCommitCommand}"/>
         <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding CommitListVM.SelectNextCommitCommand}"/>
+        <KeyBinding Key="Up" Modifiers="Alt+Shift" Command="{Binding CommitListVM.MoveCommitUpCommand}"/>
+        <KeyBinding Key="Down" Modifiers="Alt+Shift" Command="{Binding CommitListVM.MoveCommitDownCommand}"/>
         <KeyBinding Key="Prior" Modifiers="Alt" Command="{Binding CommitListVM.SelectChildCommitCommand}"/>
         <KeyBinding Key="Next" Modifiers="Alt" Command="{Binding CommitListVM.SelectParentCommitCommand}"/>
         <KeyBinding Key="Home" Modifiers="Alt" Command="{Binding CommitListVM.SelectFirstCommitCommand}"/>

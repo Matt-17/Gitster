@@ -85,6 +85,9 @@ public sealed class LibGit2Backend : IGitBackend, IRepositoryReadProvider
     public Task RewriteCommitsAsync(IEnumerable<CommitRewrite> rewrites, string? branchName = null)
         => _rewrite.RewriteCommitsAsync(rewrites, branchName);
 
+    public Task RewriteHistoryAsync(IEnumerable<CommitRewrite> rewrites, IReadOnlyList<string> newOrderNewestFirst, string? branchName = null)
+        => _rewrite.RewriteHistoryAsync(rewrites, newOrderNewestFirst, branchName);
+
     public Task RemoveFileChangeFromCommitAsync(string sha, string path, string? branchName = null)
         => _rewrite.RemoveFileChangeFromCommitAsync(sha, path, branchName);
 

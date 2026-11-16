@@ -561,6 +561,138 @@ public sealed class HistoryRewriteDraftViewModelTests
         Assert.AreEqual("Tester", vm.AuthorName);
     }
 
+    [TestMethod]
+    public void MoveCommitsBy_SwapsNeighbours_MarksMovedRowAndRaisesPendingOrder()
+    {
+        var rows = Chain("c4", "c3", "c2", "c1");
+        var vm = new HistoryRewriteDraftViewModel();
+        IReadOnlyList<string>? raised = null;
+        vm.PendingOrderChanged += order => raised = order;
+        vm.SetCommits(rows);
+
+        var error = vm.MoveCommitsBy([rows[2]], -1);
+
+        Assert.IsNull(error);
+        CollectionAssert.AreEqual(new[] { rows[0].FullSha, rows[2].FullSha, rows[1].FullSha, rows[3].FullSha }, raised!.ToArray());
+        Assert.IsTrue(vm.HasDrafts);
+        Assert.AreEqual(1, vm.MovedCount);
+        Assert.AreEqual(1, rows.Count(r => r.HasPendingMove), "a swap marks one commit as moved");
+        Assert.IsTrue(rows[0].IsHistoryEditTransitive, "the newer commit above the swap is rewritten too");
+        Assert.IsFalse(rows[3].HasHistoryEditOverlay, "commits below the reordered range stay untouched");
+    }
+
+    [TestMethod]
+    public void MoveCommitsTo_DragFarUp_MarksOnlyTheDraggedCommit()
+    {
+        var rows = Chain("c5", "c4", "c3", "c2", "c1");
+        var vm = new HistoryRewriteDraftViewModel();
+        vm.SetCommits(rows);
+
+        Assert.IsNull(vm.MoveCommitsTo([rows[3]], rows[0], after: false));
+
+        CollectionAssert.AreEqual(
+            new[] { rows[3].FullSha, rows[0].FullSha, rows[1].FullSha, rows[2].FullSha, rows[4].FullSha },
+            vm.PendingOrder!.ToArray());
+        Assert.IsTrue(rows[3].HasPendingMove);
+        Assert.AreEqual(1, rows.Count(r => r.HasPendingMove));
+        StringAssert.Contains(rows[3].HistoryEditTooltip, "position 4 → 1");
+    }
+
+    [TestMethod]
+    public void MoveCommitsBy_MovingBack_ClearsPendingOrder()
+    {
+        var rows = Chain("c3", "c2", "c1");
+        var vm = new HistoryRewriteDraftViewModel();
+        vm.SetCommits(rows);
+
+        vm.MoveCommitsBy([rows[1]], -1);
+        vm.MoveCommitsBy([rows[1]], 1);
+
+        Assert.IsNull(vm.PendingOrder);
+        Assert.IsFalse(vm.HasDrafts);
+    }
+
+    [TestMethod]
+    public void MoveCommitsTo_AcrossMergeCommit_IsRejected()
+    {
+        var rows = Chain("c3", "merge", "c1");
+        rows[1] = new CommitItem("merge", new DateTime(2026, 1, 1), rows[1].CommitId, "Tester", fullSha: rows[1].FullSha,
+            parentShas: [rows[2].FullSha, "9999999999999999999999999999999999999999"]);
+        var vm = new HistoryRewriteDraftViewModel();
+        vm.SetCommits(rows);
+
+        var error = vm.MoveCommitsTo([rows[0]], rows[2], after: true);
+
+        StringAssert.Contains(error, "merge commit");
+        Assert.IsNull(vm.PendingOrder);
+    }
+
+    [TestMethod]
+    public void SetCommits_HistoryChanged_DropsStalePendingOrder()
+    {
+        var rows = Chain("c3", "c2", "c1");
+        var vm = new HistoryRewriteDraftViewModel();
+        IReadOnlyList<string>? raised = [];
+        vm.PendingOrderChanged += order => raised = order;
+        vm.SetCommits(rows);
+        vm.MoveCommitsBy([rows[1]], -1);
+
+        vm.SetCommits([Item("c4", "4444444444444444444444444444444444444444"), .. Chain("c3", "c2", "c1")]);
+
+        Assert.IsNull(vm.PendingOrder);
+        Assert.IsNull(raised);
+        Assert.IsFalse(vm.HasDrafts);
+    }
+
+    [TestMethod]
+    public async Task Apply_WithPendingOrder_PassesOrderPrefixToBackend()
+    {
+        var rows = Chain("c4", "c3", "c2", "c1");
+        var git = Substitute.For<IGitBackend>();
+        IReadOnlyList<string>? passedOrder = null;
+        git.GetHeadShaAsync().Returns(Task.FromResult(rows[0].FullSha));
+        git.GetCommitsAsync(Arg.Any<CommitFilter?>()).Returns(Task.FromResult<IReadOnlyList<CommitInfo>>(
+            [Info("c4", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Info("c2", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+             Info("c3", "cccccccccccccccccccccccccccccccccccccccc"), Info("c1", rows[3].FullSha)]));
+        git.RewriteHistoryAsync(Arg.Any<IEnumerable<CommitRewrite>>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<string?>())
+            .Returns(Task.CompletedTask)
+            .AndDoes(call => passedOrder = (IReadOnlyList<string>)call[1]!);
+        git.GetReflogSelectorForHeadAsync().Returns(Task.FromResult("HEAD@{1}"));
+
+        var vm = new HistoryRewriteDraftViewModel(
+            git, new OperationFeedbackService(), new OperationsLogService(), new SnapshotService(),
+            Substitute.For<IWindowService>(), () => "master", _ => Task.CompletedTask);
+        vm.SetCommits(rows);
+        vm.MoveCommitsBy([rows[2]], -1);
+
+        await vm.ApplyCommand.ExecuteAsync(null);
+
+        CollectionAssert.AreEqual(new[] { rows[0].FullSha, rows[2].FullSha, rows[1].FullSha }, passedOrder!.ToArray(),
+            "only the newest commits down to the oldest moved one are passed");
+        await git.DidNotReceive().RewriteCommitsAsync(Arg.Any<IEnumerable<CommitRewrite>>(), Arg.Any<string?>());
+        Assert.IsNull(vm.PendingOrder);
+        Assert.IsFalse(vm.HasDrafts);
+    }
+
+    /// <summary>A linear history, newest first, each commit's parent being the next one.</summary>
+    private static List<CommitItem> Chain(params string[] messagesNewestFirst)
+    {
+        var shas = messagesNewestFirst
+            .Select((_, i) => new string((char)('1' + (messagesNewestFirst.Length - 1 - i)), 40))
+            .ToList();
+        return messagesNewestFirst
+            .Select((message, i) => new CommitItem(
+                message,
+                new DateTime(2026, 1, 1, 12, 0, 0),
+                shas[i][..7],
+                "Tester",
+                "tester@gitster.test",
+                CommitRemoteState.LocalOnly,
+                shas[i],
+                parentShas: i + 1 < shas.Count ? [shas[i + 1]] : ["0000000000000000000000000000000000000000"]))
+            .ToList();
+    }
+
     private static CommitItem Item(
         string message,
         string sha,
