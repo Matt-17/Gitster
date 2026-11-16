@@ -348,7 +348,7 @@ public sealed class CommitHistoryService
                     SET remote_state = $state, orphaned_pair_sha = NULL
                     WHERE repo_key = $repo AND branch_name = $branch;
                     """;
-                reset.Parameters.AddWithValue("$state", (int)(sets.HasTrackingBranch
+                reset.Parameters.AddWithValue("$state", (int)(sets.HasTrackingBranch || sets.HasOutgoingBaseline
                     ? CommitRemoteState.OnRemote
                     : CommitRemoteState.NoTrackingBranch));
                 reset.Parameters.AddWithValue("$repo", context.RepoKey);

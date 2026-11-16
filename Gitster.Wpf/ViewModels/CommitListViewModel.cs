@@ -804,7 +804,7 @@ public partial class CommitListViewModel : BaseViewModel
         {
             row.RemoteState = outgoing.Contains(row.FullSha)
                 ? CommitRemoteState.LocalOnly
-                : sets.HasTrackingBranch ? CommitRemoteState.OnRemote : CommitRemoteState.NoTrackingBranch;
+                : sets.HasTrackingBranch || sets.HasOutgoingBaseline ? CommitRemoteState.OnRemote : CommitRemoteState.NoTrackingBranch;
             row.OrphanedPairSha = orphans.TryGetValue(row.FullSha, out var p) ? p : null;
         }
     }

@@ -47,6 +47,28 @@ public sealed class CommitListingTests
     }
 
     [TestMethod]
+    public async Task ComputeRemoteSets_NoUpstream_CountsOnlyCommitsMissingFromAllRemotes()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("c1", "a.txt", "1");
+        var pushed = repo.Commit("c2", "a.txt", "2");
+        using (var git = new Repository(repo.Path))
+        {
+            git.Network.Remotes.Add("origin", "https://example.invalid/repo.git");
+            git.Refs.Add("refs/remotes/origin/master", pushed);
+        }
+        var local = repo.Commit("c3", "a.txt", "3");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        var sets = await backend.ComputeRemoteSetsAsync();
+        Assert.IsFalse(sets.HasTrackingBranch);
+        Assert.IsTrue(sets.HasOutgoingBaseline);
+        CollectionAssert.AreEquivalent(new[] { local }, sets.OutgoingFullShas.ToArray());
+    }
+
+    [TestMethod]
     public async Task GetWorkingTreeStatus_SeparatesStagedAndUnstaged()
     {
         using var repo = new GitTestRepo();

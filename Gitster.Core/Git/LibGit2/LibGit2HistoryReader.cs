@@ -257,6 +257,7 @@ internal sealed class LibGit2HistoryReader
         var outgoing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var incoming = new List<CommitInfo>();
         var orphaned = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var hasBaseline = hasTracking;
 
         if (hasTracking)
         {
@@ -302,13 +303,38 @@ internal sealed class LibGit2HistoryReader
                 }
             }
         }
+        else if (localTip != null)
+        {
+            // No upstream: like `git log <branch> --not --remotes` (and Visual Studio),
+            // only commits no remote branch contains are outgoing. Otherwise an unpublished
+            // feature branch would report its entire history (thousands of commits).
+            var remoteTips = repo.Branches
+                .Where(b => b.IsRemote && b.Tip != null)
+                .Select(b => b.Tip)
+                .Distinct()
+                .ToList();
+            if (remoteTips.Count > 0)
+            {
+                hasBaseline = true;
+                foreach (var c in repo.Commits.QueryBy(new LibGit2Sharp.CommitFilter
+                {
+                    IncludeReachableFrom = localTip,
+                    ExcludeReachableFrom = remoteTips,
+                }))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    outgoing.Add(c.Id.Sha);
+                }
+            }
+        }
 
         return Task.FromResult(new RemoteSets(
             incoming, outgoing, orphaned, hasTracking, hasRemote, remoteName, remoteUrl,
             HasLocalBranch: localTip != null,
             LocalBranchName: branch?.FriendlyName,
             RemoteBranchName: tracking?.FriendlyName ?? sameNameRemote?.FriendlyName,
-            HasSameNameRemoteBranch: sameNameRemote != null));
+            HasSameNameRemoteBranch: sameNameRemote != null,
+            HasOutgoingBaseline: hasBaseline));
     }
 
     /// <summary>

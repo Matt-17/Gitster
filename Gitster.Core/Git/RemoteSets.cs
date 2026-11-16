@@ -7,6 +7,9 @@ namespace Gitster.Core.Git;
 /// Also computed for a branch selected in the refs pane (not just HEAD); for a
 /// refs/remotes/* selection the "local" side describes the local counterpart branch.
 /// </summary>
+/// <remarks><see cref="HasOutgoingBaseline"/> is true when <see cref="OutgoingFullShas"/> was
+/// measured against something (the upstream, or — without one — all remote branches), so
+/// commits outside the set are known to be on a remote.</remarks>
 public sealed record RemoteSets(
     IReadOnlyList<CommitInfo> Incoming,
     IReadOnlySet<string> OutgoingFullShas,
@@ -18,7 +21,8 @@ public sealed record RemoteSets(
     bool HasLocalBranch = true,
     string? LocalBranchName = null,
     string? RemoteBranchName = null,
-    bool HasSameNameRemoteBranch = false)
+    bool HasSameNameRemoteBranch = false,
+    bool HasOutgoingBaseline = false)
 {
     public static readonly RemoteSets Empty = new(
         Array.Empty<CommitInfo>(),
