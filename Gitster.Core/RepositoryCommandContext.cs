@@ -7,6 +7,7 @@ public sealed class RepositoryCommandContext
     public Func<Task>? RefreshAllAsync { get; set; }
     public Func<Task>? RefreshSidebarBadgesAsync { get; set; }
     public Func<string?>? GetCurrentBranch { get; set; }
+    public Func<string?>? GetViewedRef { get; set; }
     public Func<string>? GetCurrentPath { get; set; }
     public Func<string?>? GetSelectedRemote { get; set; }
     public Func<string?, Task>? RefreshAfterHistoryRewriteAsync { get; set; }
@@ -24,6 +25,9 @@ public sealed class RepositoryCommandContext
     public Task RefreshSidebarBadges() => RefreshSidebarBadgesAsync?.Invoke() ?? Task.CompletedTask;
 
     public string CurrentBranch => GetCurrentBranch?.Invoke() ?? string.Empty;
+
+    /// <summary>Canonical name of the ref shown in the history (e.g. refs/heads/x), or null for the current branch scope.</summary>
+    public string? ViewedRef => GetViewedRef?.Invoke();
 
     public string CurrentPath => GetCurrentPath?.Invoke() ?? string.Empty;
 

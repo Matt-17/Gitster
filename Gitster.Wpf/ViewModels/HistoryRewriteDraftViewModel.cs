@@ -15,6 +15,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
     private readonly SnapshotService? _snapshots;
     private readonly IWindowService? _windowService;
     private readonly Func<string?>? _getBranchName;
+    private readonly Func<string?>? _getViewedRef;
     private readonly Func<string?, Task>? _refreshAfterApply;
     private readonly UiPreferencesService? _uiPreferences;
     private bool _syncCommitterWithAuthor;
@@ -41,6 +42,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
     private bool _isLoadingDetails;
     private bool _isApplying;
     private bool _isSelectedCommitEditable;
+    private string? _editBlockedReason;
     private bool _hasDrafts;
     private bool _hasRemoteRewriteRisk;
     private bool _hasLocalOnlyCleanup;
@@ -78,7 +80,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
             windowService,
             () => commandContext.CurrentBranch,
             commandContext.RefreshAfterHistoryRewrite,
-            uiPreferences)
+            uiPreferences,
+            () => commandContext.ViewedRef)
     {
     }
 
@@ -90,7 +93,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         IWindowService windowService,
         Func<string?> getBranchName,
         Func<string?, Task> refreshAfterApply,
-        UiPreferencesService? uiPreferences = null)
+        UiPreferencesService? uiPreferences = null,
+        Func<string?>? getViewedRef = null)
     {
         _git = git;
         _feedback = feedback;
@@ -98,6 +102,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         _snapshots = snapshots;
         _windowService = windowService;
         _getBranchName = getBranchName;
+        _getViewedRef = getViewedRef;
         _refreshAfterApply = refreshAfterApply;
         _uiPreferences = uiPreferences;
     }
@@ -349,6 +354,19 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         private set => SetProperty(ref _isSelectedCommitEditable, value);
     }
 
+    /// <summary>Why the shown history can't be edited (remote branch or tag), or null when it can.</summary>
+    public string? EditBlockedReason
+    {
+        get => _editBlockedReason;
+        private set
+        {
+            if (SetProperty(ref _editBlockedReason, value))
+                OnPropertyChanged(nameof(IsEditBlocked));
+        }
+    }
+
+    public bool IsEditBlocked => EditBlockedReason is not null;
+
     public bool HasDrafts
     {
         get => _hasDrafts;
@@ -403,7 +421,7 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         private set => SetProperty(ref _summaryText, value);
     }
 
-    public bool CanApply => HasDrafts && !IsApplying;
+    public bool CanApply => HasDrafts && !IsApplying && !IsEditBlocked;
     public bool CanDiscardSelected => _selectedCommits.Any(c => _drafts.ContainsKey(c.FullSha) || c.HasPendingMove);
 
     public void SetCommits(IEnumerable<CommitItem> commits)
@@ -495,6 +513,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
     {
         if (IsApplying)
             return "A history rewrite is being applied.";
+        if (IsEditBlocked)
+            return EditBlockedReason;
 
         var localRows = _commits.Where(IsLocalBranchRow).ToList();
         var oldestChanged = -1;
@@ -555,13 +575,27 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
 
     public void SetSelectedCommits(IReadOnlyList<CommitItem> commits) => ApplySelection(commits);
 
+    /// <summary>Re-evaluates whether the shown history can be edited; call when the viewed branch changes.</summary>
+    public void RefreshEditTarget()
+    {
+        UpdateEditability();
+        OnPropertyChanged(nameof(CanApply));
+    }
+
+    private void UpdateEditability()
+    {
+        EditBlockedReason = ResolveRewriteTarget(_getViewedRef?.Invoke(), _getBranchName?.Invoke()).BlockReason;
+        IsSelectedCommitEditable = !IsEditBlocked
+            && _selectedCommits.Count > 0
+            && _selectedCommits.All(c => c.RemoteState != CommitRemoteState.Incoming);
+    }
+
     private void ApplySelection(IReadOnlyList<CommitItem> commits)
     {
         _selectionVersion++;
         _selectedCommits = commits.ToList();
         _editorTouched = false;
-        IsSelectedCommitEditable = _selectedCommits.Count > 0
-            && _selectedCommits.All(c => c.RemoteState != CommitRemoteState.Incoming);
+        UpdateEditability();
 
         OnPropertyChanged(nameof(SelectedCommitCount));
         OnPropertyChanged(nameof(IsMultiSelection));
@@ -615,6 +649,10 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         if (rewrites.Count == 0 && orderPrefix is null)
             return;
 
+        var target = ResolveRewriteTarget(_getViewedRef?.Invoke(), _getBranchName?.Invoke());
+        if (target.BlockReason is not null)
+            return;
+
         if (HasRemoteRewriteRisk && _windowService?.Confirm(
             "This rewrite touches commits that already exist on the tracking remote.\n\nAfter applying it, push with force-with-lease to replace the remote history.",
             "Rewrite pushed history") != true)
@@ -627,8 +665,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         {
             var rewritePlan = BuildRewritePlan();
             var selectedOriginalSha = SelectedCommit?.FullSha;
-            var beforeSha = await _git.GetHeadShaAsync();
-            var branchName = _getBranchName?.Invoke() ?? string.Empty;
+            var beforeSha = await GetTargetTipShaAsync(target);
+            var branchName = target.BranchName ?? string.Empty;
             var directCount = DirectEditCount;
             var transitiveCount = TransitiveRewriteCount;
             var movedCount = MovedCount;
@@ -645,11 +683,11 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
                         await Task.Run(() => _git.RewriteCommitsAsync(rewrites, branchName));
                     else
                         await Task.Run(() => _git.RewriteHistoryAsync(rewrites, orderPrefix, branchName));
-                    return await _git.GetHeadShaAsync();
+                    return await GetTargetTipShaAsync(target);
                 },
                 ShortSha);
 
-            var verification = await VerifyApplyAsync(rewritePlan, selectedOriginalSha);
+            var verification = await VerifyApplyAsync(rewritePlan, selectedOriginalSha, target);
             if (!verification.Success)
             {
                 _windowService?.Error(
@@ -660,22 +698,26 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
                 return;
             }
 
-            string? reflogSelector = null;
-            try { reflogSelector = await _git.GetReflogSelectorForHeadAsync(); }
-            catch { }
+            // Undo resets the checked-out branch, so only rewrites of that branch get an undoable record.
+            if (target.IsCheckedOut)
+            {
+                string? reflogSelector = null;
+                try { reflogSelector = await _git.GetReflogSelectorForHeadAsync(); }
+                catch { }
 
-            await _opsLog.RecordAsync(new OperationRecord(
-                Id: Guid.NewGuid().ToString(),
-                Timestamp: DateTimeOffset.Now,
-                Kind: OperationKind.HistoryEdit,
-                Description: remoteRisk
-                    ? $"Batch history edit ({directCount} edit{Plural(directCount)}{MovedSuffix(movedCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)}, force-with-lease required)"
-                    : $"Batch history edit ({directCount} edit{Plural(directCount)}{MovedSuffix(movedCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)})",
-                BranchName: branchName,
-                BeforeSha: beforeSha,
-                AfterSha: afterSha,
-                ReflogSelector: reflogSelector,
-                Status: OperationStatus.Active));
+                await _opsLog.RecordAsync(new OperationRecord(
+                    Id: Guid.NewGuid().ToString(),
+                    Timestamp: DateTimeOffset.Now,
+                    Kind: OperationKind.HistoryEdit,
+                    Description: remoteRisk
+                        ? $"Batch history edit ({directCount} edit{Plural(directCount)}{MovedSuffix(movedCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)}, force-with-lease required)"
+                        : $"Batch history edit ({directCount} edit{Plural(directCount)}{MovedSuffix(movedCount)}, {transitiveCount} local descendant rewrite{Plural(transitiveCount)})",
+                    BranchName: branchName,
+                    BeforeSha: beforeSha,
+                    AfterSha: afterSha,
+                    ReflogSelector: reflogSelector,
+                    Status: OperationStatus.Active));
+            }
 
             _drafts.Clear();
             SetPendingOrder(null, notify: true);
@@ -1053,6 +1095,43 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
     }
 
     /// <summary>
+    /// Determines which local branch a batch edit rewrites: the branch shown in the history, or the checked-out
+    /// branch when the current branch or all branches are shown. Remote branches and tags cannot be rewritten.
+    /// </summary>
+    internal static RewriteTarget ResolveRewriteTarget(string? viewedRef, string? currentBranch)
+    {
+        const string localPrefix = "refs/heads/";
+
+        if (string.IsNullOrWhiteSpace(viewedRef))
+            return new RewriteTarget(currentBranch, RefName: null, IsCheckedOut: true, BlockReason: null);
+
+        if (!viewedRef.StartsWith(localPrefix, StringComparison.Ordinal))
+        {
+            return new RewriteTarget(
+                BranchName: null,
+                RefName: null,
+                IsCheckedOut: false,
+                BlockReason: "Remote branches and tags can't be edited. Check out or create a local branch to edit its history.");
+        }
+
+        var branchName = viewedRef[localPrefix.Length..];
+        var isCheckedOut = string.Equals(branchName, currentBranch, StringComparison.Ordinal);
+        return new RewriteTarget(branchName, viewedRef, isCheckedOut, BlockReason: null);
+    }
+
+    private async Task<string> GetTargetTipShaAsync(RewriteTarget target)
+    {
+        if (_git is null)
+            return string.Empty;
+
+        if (target.IsCheckedOut || target.RefName is null)
+            return await _git.GetHeadShaAsync();
+
+        var tip = await Task.Run(async () => await _git.GetCommitsForRefAsync(target.RefName, 1));
+        return tip.FirstOrDefault()?.FullSha ?? string.Empty;
+    }
+
+    /// <summary>
     /// The commits the user actually moved: everything in the reordered window that is not part
     /// of the longest run keeping its original relative order. Swapping two neighbours marks one,
     /// dragging one commit far up marks only that one, not every commit it passed.
@@ -1113,7 +1192,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
 
     private async Task<ApplyVerificationResult> VerifyApplyAsync(
         RewritePlan beforePlan,
-        string? selectedOriginalSha)
+        string? selectedOriginalSha,
+        RewriteTarget rewriteTarget)
     {
         if (_git is null)
             return ApplyVerificationResult.Failed("Git backend is unavailable.");
@@ -1129,7 +1209,9 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
         if (directTargets.Count == 0 && beforePlan.Moved.Count == 0)
             return ApplyVerificationResult.Failed("No direct edits were available to verify.");
 
-        var refreshed = await Task.Run(async () => await _git.GetCommitsAsync());
+        var refreshed = rewriteTarget.IsCheckedOut || rewriteTarget.RefName is null
+            ? await Task.Run(async () => await _git.GetCommitsAsync())
+            : await Task.Run(async () => await _git.GetCommitsForRefAsync(rewriteTarget.RefName, int.MaxValue));
         var localRows = refreshed
             .Where(IsLocalBranchInfo)
             .Select((commit, index) => new VerificationCommit(commit, index, FullSha(commit)))
@@ -1382,6 +1464,8 @@ public sealed partial class HistoryRewriteDraftViewModel : BaseViewModel, ICommi
     }
 
     private sealed record VerificationTarget(string OriginalSha, int LocalIndex, CommitRewrite Rewrite);
+
+    internal sealed record RewriteTarget(string? BranchName, string? RefName, bool IsCheckedOut, string? BlockReason);
 
     private sealed record VerificationCommit(CommitInfo Commit, int LocalIndex, string FullSha);
 

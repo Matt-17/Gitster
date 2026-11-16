@@ -105,6 +105,9 @@ public partial class CommitListViewModel : BaseViewModel
 
     public bool IsNamedRefSelected => _selectedTarget.Scope == HistoryScope.Ref;
 
+    /// <summary>Canonical name of the shown ref, or null when the current branch or all branches are shown.</summary>
+    public string? ViewedRefName => _selectedTarget.Scope == HistoryScope.Ref ? _selectedTarget.RefName : null;
+
     /// <summary>Raised with (scope, canonical ref name) whenever the shown history target
     /// changes, so the refs pane can highlight the viewed branch.</summary>
     public Action<HistoryScope, string?>? ViewTargetChanged { get; set; }

@@ -45,6 +45,19 @@
                            Visibility="{Binding HasDrafts, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </Grid>
 
+            <Border Padding="8,6"
+                    Margin="0,0,0,8"
+                    CornerRadius="{StaticResource CornerRadiusMd}"
+                    Background="{DynamicResource AccentInfoBackground}"
+                    BorderBrush="{DynamicResource AccentBlue}"
+                    BorderThickness="0.5"
+                    Visibility="{Binding IsEditBlocked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding EditBlockedReason}"
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondary}"/>
+            </Border>
+
             <StackPanel IsEnabled="{Binding IsSelectedCommitEditable}">
                 <Grid Margin="0,0,0,3">
                     <TextBlock Text="Message"

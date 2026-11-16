@@ -179,8 +179,11 @@ internal sealed class LibGit2HistoryRewriteOperations
             var match = allCommits.FirstOrDefault(c =>
                 c.Id.Sha.Equals(r.Sha, StringComparison.OrdinalIgnoreCase) ||
                 c.Id.Sha.StartsWith(r.Sha, StringComparison.OrdinalIgnoreCase));
-            if (match != null)
-                rewriteByFullSha[match.Id.Sha] = r;
+            if (match == null)
+                throw new InvalidOperationException(
+                    $"Cannot rewrite commits because {ShortSha(r.Sha)} is not on the branch being rewritten. Nothing was changed.");
+
+            rewriteByFullSha[match.Id.Sha] = r;
         }
 
         if (rewriteByFullSha.Count == 0)
@@ -903,13 +906,27 @@ internal sealed class LibGit2HistoryRewriteOperations
         Commands.Checkout(repo, branch);
     }
 
+    /// <summary>
+    /// Resolves the branch a history rewrite targets. A local branch other than the checked-out one is rewritten
+    /// by moving its reference only, without a checkout; remote branches are rejected.
+    /// </summary>
     private static Branch AttachBranchForHistoryRewrite(
         Repository repo,
         string? branchName,
         string operation)
     {
         if (!repo.Info.IsHeadDetached)
-            return GetCurrentLocalBranch(repo, operation);
+        {
+            var current = GetCurrentLocalBranch(repo, operation);
+            if (string.IsNullOrWhiteSpace(branchName)
+                || IsDetachedBranchLabel(branchName)
+                || string.Equals(branchName, current.FriendlyName, StringComparison.Ordinal))
+            {
+                return current;
+            }
+
+            return GetLocalBranch(repo, branchName, operation);
+        }
 
         if (string.IsNullOrWhiteSpace(branchName) || IsDetachedBranchLabel(branchName))
             throw new InvalidOperationException(
@@ -930,6 +947,17 @@ internal sealed class LibGit2HistoryRewriteOperations
         Commands.Checkout(repo, branch);
         return repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch not found after checkout: {branchName}");
+    }
+
+    private static Branch GetLocalBranch(Repository repo, string branchName, string operation)
+    {
+        var branch = repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Cannot {operation} because branch '{branchName}' was not found.");
+        if (branch.IsRemote)
+            throw new InvalidOperationException(
+                $"Cannot {operation} on remote branch '{branchName}'. Check out or create a local branch first.");
+
+        return branch;
     }
 
     private static Branch GetCurrentLocalBranch(Repository repo, string operation)

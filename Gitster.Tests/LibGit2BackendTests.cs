@@ -764,6 +764,98 @@ public sealed class LibGit2BackendTests
     }
 
     [TestMethod]
+    public async Task RewriteCommits_OtherLocalBranch_RewritesThatBranchWithoutCheckout()
+    {
+        using var repo = new GitTestRepo();
+        var c1 = repo.Commit("c1", "a.txt", "1");
+        string currentBranch;
+
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            Commands.Checkout(r, r.CreateBranch("feature"));
+        }
+
+        var f1 = repo.Commit("f1", "b.txt", "1");
+        var f2 = repo.Commit("f2", "b.txt", "2");
+
+        using (var r = new Repository(repo.Path))
+            Commands.Checkout(r, r.Branches[currentBranch]);
+
+        var main = repo.Commit("main2", "a.txt", "2");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await backend.RewriteCommitsAsync([
+            new CommitRewrite(f1, NewMessage: "f1 rewritten")
+        ], "feature");
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(currentBranch, check.Head.FriendlyName, "the checked-out branch must stay checked out");
+        Assert.AreEqual(main, check.Head.Tip!.Sha, "the checked-out branch must not be rewritten");
+
+        var featureTip = check.Branches["feature"].Tip!;
+        Assert.AreNotEqual(f2, featureTip.Sha);
+        Assert.AreEqual("f2", featureTip.MessageShort);
+        Assert.AreEqual("f1 rewritten", featureTip.Parents.Single().MessageShort);
+        Assert.AreEqual(c1, featureTip.Parents.Single().Parents.Single().Sha);
+    }
+
+    [TestMethod]
+    public async Task RewriteCommits_RemoteBranch_ThrowsAndChangesNothing()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("c1", "a.txt", "1");
+        var c2 = repo.Commit("c2", "a.txt", "2");
+
+        using (var r = new Repository(repo.Path))
+            r.Refs.Add("refs/remotes/origin/main", c2);
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(() => backend.RewriteCommitsAsync([
+            new CommitRewrite(c2, NewMessage: "c2 rewritten")
+        ], "origin/main"));
+
+        using var check = new Repository(repo.Path);
+        Assert.AreEqual(c2, check.Head.Tip!.Sha);
+        Assert.AreEqual(c2, check.Refs["refs/remotes/origin/main"].ResolveToDirectReference().TargetIdentifier);
+    }
+
+    [TestMethod]
+    public async Task RewriteCommits_CommitNotOnBranch_ThrowsBeforeRewritingAnything()
+    {
+        using var repo = new GitTestRepo();
+        repo.Commit("c1", "a.txt", "1");
+        string currentBranch;
+
+        using (var r = new Repository(repo.Path))
+        {
+            currentBranch = r.Head.FriendlyName;
+            Commands.Checkout(r, r.CreateBranch("other"));
+        }
+
+        var other = repo.Commit("other", "b.txt", "1");
+
+        using (var r = new Repository(repo.Path))
+            Commands.Checkout(r, r.Branches[currentBranch]);
+
+        var head = repo.Commit("c2", "a.txt", "2");
+
+        var backend = new LibGit2Backend();
+        await backend.OpenAsync(repo.Path);
+
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(() => backend.RewriteCommitsAsync([
+            new CommitRewrite(head, NewMessage: "c2 rewritten"),
+            new CommitRewrite(other, NewMessage: "other rewritten")
+        ]));
+
+        Assert.AreEqual(head, repo.Head(), "a rewrite with a commit outside the branch must not apply the other edits");
+    }
+
+    [TestMethod]
     public async Task MergeBranch_FastForwardOnly_AdvancesCurrentBranchWithoutMergeCommit()
     {
         using var repo = new GitTestRepo();

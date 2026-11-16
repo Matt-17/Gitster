@@ -14,6 +14,118 @@ namespace Gitster.Tests;
 public sealed class HistoryRewriteDraftViewModelTests
 {
     [TestMethod]
+    public void ResolveRewriteTarget_NoViewedRef_UsesCheckedOutBranch()
+    {
+        var target = HistoryRewriteDraftViewModel.ResolveRewriteTarget(null, "main");
+
+        Assert.AreEqual("main", target.BranchName);
+        Assert.IsNull(target.RefName);
+        Assert.IsTrue(target.IsCheckedOut);
+        Assert.IsNull(target.BlockReason);
+    }
+
+    [TestMethod]
+    public void ResolveRewriteTarget_ViewedOtherLocalBranch_TargetsThatBranch()
+    {
+        var target = HistoryRewriteDraftViewModel.ResolveRewriteTarget("refs/heads/feature/x", "main");
+
+        Assert.AreEqual("feature/x", target.BranchName);
+        Assert.AreEqual("refs/heads/feature/x", target.RefName);
+        Assert.IsFalse(target.IsCheckedOut);
+        Assert.IsNull(target.BlockReason);
+    }
+
+    [TestMethod]
+    public void ResolveRewriteTarget_ViewedCheckedOutBranch_IsCheckedOut()
+    {
+        var target = HistoryRewriteDraftViewModel.ResolveRewriteTarget("refs/heads/main", "main");
+
+        Assert.AreEqual("main", target.BranchName);
+        Assert.IsTrue(target.IsCheckedOut);
+    }
+
+    [TestMethod]
+    [DataRow("refs/remotes/origin/main")]
+    [DataRow("refs/tags/v1.0")]
+    public void ResolveRewriteTarget_RemoteBranchOrTag_IsBlocked(string viewedRef)
+    {
+        var target = HistoryRewriteDraftViewModel.ResolveRewriteTarget(viewedRef, "main");
+
+        Assert.IsNull(target.BranchName);
+        Assert.IsNotNull(target.BlockReason);
+    }
+
+    [TestMethod]
+    public void SetSelectedCommit_RemoteBranchViewed_DisablesEditor()
+    {
+        var viewedRef = "refs/remotes/origin/main";
+        var vm = new HistoryRewriteDraftViewModel(
+            Substitute.For<IGitBackend>(),
+            new OperationFeedbackService(),
+            new OperationsLogService(),
+            new SnapshotService(),
+            Substitute.For<IWindowService>(),
+            () => "main",
+            _ => Task.CompletedTask,
+            getViewedRef: () => viewedRef);
+        var row = Item("c1", "1111111111111111111111111111111111111111");
+
+        vm.SetCommits([row]);
+        vm.SetSelectedCommit(row);
+
+        Assert.IsTrue(vm.IsEditBlocked);
+        Assert.IsFalse(vm.IsSelectedCommitEditable);
+        Assert.IsFalse(vm.CanApply);
+    }
+
+    [TestMethod]
+    public void MoveCommitsBy_RemoteBranchViewed_IsRejected()
+    {
+        var vm = new HistoryRewriteDraftViewModel(
+            Substitute.For<IGitBackend>(),
+            new OperationFeedbackService(),
+            new OperationsLogService(),
+            new SnapshotService(),
+            Substitute.For<IWindowService>(),
+            () => "main",
+            _ => Task.CompletedTask,
+            getViewedRef: () => "refs/remotes/origin/main");
+        var newest = Item("c2", "2222222222222222222222222222222222222222");
+        var oldest = Item("c1", "1111111111111111111111111111111111111111");
+        vm.SetCommits([newest, oldest]);
+        vm.SetSelectedCommit(newest);
+
+        var error = vm.MoveCommitsBy([newest], 1);
+
+        Assert.IsNotNull(error);
+        Assert.IsFalse(vm.HasDrafts);
+    }
+
+    [TestMethod]
+    public void RefreshEditTarget_SwitchToLocalBranch_EnablesEditor()
+    {
+        var viewedRef = "refs/remotes/origin/main";
+        var vm = new HistoryRewriteDraftViewModel(
+            Substitute.For<IGitBackend>(),
+            new OperationFeedbackService(),
+            new OperationsLogService(),
+            new SnapshotService(),
+            Substitute.For<IWindowService>(),
+            () => "main",
+            _ => Task.CompletedTask,
+            getViewedRef: () => viewedRef);
+        var row = Item("c1", "1111111111111111111111111111111111111111");
+        vm.SetCommits([row]);
+        vm.SetSelectedCommit(row);
+
+        viewedRef = "refs/heads/feature";
+        vm.RefreshEditTarget();
+
+        Assert.IsFalse(vm.IsEditBlocked);
+        Assert.IsTrue(vm.IsSelectedCommitEditable);
+    }
+
+    [TestMethod]
     public void EditOlderCommit_MarksDirectAndNewerCommitsTransitive()
     {
         var newest = Item("c3", "3333333333333333333333333333333333333333");

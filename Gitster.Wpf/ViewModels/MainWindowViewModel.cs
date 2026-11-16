@@ -211,7 +211,11 @@ public partial class MainWindowViewModel : BaseViewModel
         CommitListVM.PublishBranchAsync = PublishBranchByNameAsync;
         CommitListVM.SetUpstreamAsync = SetUpstreamByNameAsync;
         CommitRefNavigatorVM = commitRefNavigatorViewModel;
-        CommitListVM.ViewTargetChanged = (scope, refName) => CommitRefNavigatorVM.SetViewedTarget(scope, refName);
+        CommitListVM.ViewTargetChanged = (scope, refName) =>
+        {
+            CommitRefNavigatorVM.SetViewedTarget(scope, refName);
+            historyRewriteDraftViewModel.RefreshEditTarget();
+        };
         CommitRefNavigatorVM.SelectRefAsync = async item => await CommitListVM.ShowRefAsync(item.CanonicalName, item.DisplayName);
         CommitRefNavigatorVM.SelectCurrentBranchAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.CurrentBranch);
         CommitRefNavigatorVM.SelectAllBranchesAsync = async () => await CommitListVM.ShowScopeAsync(HistoryScope.AllBranches);
@@ -280,6 +284,7 @@ public partial class MainWindowViewModel : BaseViewModel
         _repoCommands.RefreshAllAsync = async () => await UpdateElementsAsync();
         _repoCommands.RefreshSidebarBadgesAsync = async () => await RefreshSidebarBadgesAsync();
         _repoCommands.GetCurrentBranch = () => TitleBarVM.CurrentBranch;
+        _repoCommands.GetViewedRef = () => CommitListVM.ViewedRefName;
         _repoCommands.GetCurrentPath = () => Path;
         _repoCommands.GetSelectedRemote = () => string.IsNullOrEmpty(SelectedRemote)
             ? Remotes.FirstOrDefault()
