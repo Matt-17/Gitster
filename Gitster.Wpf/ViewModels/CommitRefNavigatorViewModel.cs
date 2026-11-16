@@ -96,6 +96,11 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
         _favorites = favorites;
         IsCollapsed = _ui.CommitRefPaneCollapsed;
         _favorites.Changed += Rebuild;
+        _ui.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(UiPreferencesService.CompactFolders))
+                Rebuild();
+        };
     }
 
     public ObservableCollection<CommitRefNode> RefTree { get; } = [];
@@ -272,6 +277,9 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
             BuildGroup("Other refs", refs.Where(r => r.Kind is RefCatalogKind.Stash or RefCatalogKind.Note or RefCatalogKind.Replace), defaultExpanded: hasFilter),
         }.Where(n => n.Children.Count > 0).ToList();
 
+        if (_ui.CompactFolders)
+            roots = roots.Select(CompactFolder).ToList();
+
         RefTree.Clear();
         foreach (var root in roots)
             RefTree.Add(root);
@@ -279,6 +287,36 @@ public partial class CommitRefNavigatorViewModel : BaseViewModel
         _treeFiltered = hasFilter;
         HasRefs = RefTree.Count > 0;
         ApplyViewedMarker();
+    }
+
+    /// <summary>
+    /// Merges a folder whose only child is another folder into one row ("Remotes/origin"),
+    /// recursively. The merged row takes the deepest folder's path, so its expansion state
+    /// is remembered under that path.
+    /// </summary>
+    private static CommitRefNode CompactFolder(CommitRefNode node)
+    {
+        if (!node.IsFolder)
+            return node;
+
+        var name = node.Name;
+        var current = node;
+        while (current.Children is [{ IsFolder: true } onlyChild])
+        {
+            current = onlyChild;
+            name = $"{name}/{current.Name}";
+        }
+
+        var result = ReferenceEquals(current, node)
+            ? node
+            : new CommitRefNode(name, null, current.FolderPath) { IsExpanded = current.IsExpanded };
+
+        var children = current.Children.Select(CompactFolder).ToList();
+        result.Children.Clear();
+        foreach (var child in children)
+            result.Children.Add(child);
+
+        return result;
     }
 
     private void SnapshotExpansion()

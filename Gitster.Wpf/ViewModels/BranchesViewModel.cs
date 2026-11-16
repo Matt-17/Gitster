@@ -246,6 +246,11 @@ public partial class BranchesViewModel : BaseViewModel
             _favorites.Changed += RebuildPicker;
 
         ShowTree = ui.BranchTreeView;
+        ui.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(UiPreferencesService.CompactFolders) && ShowTree)
+                Rebuild();
+        };
 
         GroupedBranches = CollectionViewSource.GetDefaultView(Branches);
         GroupedBranches.GroupDescriptions.Add(new PropertyGroupDescription(nameof(BranchRow.GroupLabel)));
@@ -479,7 +484,27 @@ public partial class BranchesViewModel : BaseViewModel
 
         BranchTree.Clear();
         foreach (var node in roots)
-            BranchTree.Add(node);
+            BranchTree.Add(_ui.CompactFolders ? CompactFolder(node) : node);
+    }
+
+    /// <summary>Merges a folder whose only child is another folder into one row ("feature/ui"), recursively.</summary>
+    private static BranchTreeNode CompactFolder(BranchTreeNode node)
+    {
+        if (node.IsBranch)
+            return node;
+
+        var name = node.Name;
+        var current = node;
+        while (current.Children is [{ IsBranch: false } onlyChild])
+        {
+            current = onlyChild;
+            name = $"{name}/{current.Name}";
+        }
+
+        var result = new BranchTreeNode(name, null);
+        foreach (var child in current.Children)
+            result.Children.Add(CompactFolder(child));
+        return result;
     }
 
     [RelayCommand]

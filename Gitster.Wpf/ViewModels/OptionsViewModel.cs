@@ -52,6 +52,19 @@ public partial class OptionsViewModel : BaseViewModel
         }
     }
 
+    /// <summary>Branch trees: a folder whose only child is a folder is shown as one row.</summary>
+    public bool CompactFolders
+    {
+        get => _ui.CompactFolders;
+        set
+        {
+            if (_ui.CompactFolders == value)
+                return;
+            _ui.CompactFolders = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>A few sensible font suggestions; the field stays free-text/editable.</summary>
     public ObservableCollection<string> FontSuggestions { get; } =
     [

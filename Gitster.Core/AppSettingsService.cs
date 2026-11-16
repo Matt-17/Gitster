@@ -43,6 +43,7 @@ public sealed class AppSettingsService
         public bool GravatarEnabled { get; set; }
         public bool BranchTreeView { get; set; }
         public bool CommitRefPaneCollapsed { get; set; }
+        public bool CompactFolders { get; set; } = true;
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
         public bool SyncCommitterWithAuthorDate { get; set; }

@@ -120,7 +120,37 @@ public sealed class CommitRefNavigatorViewModelTests
         Assert.AreEqual(expected, name);
     }
 
-    private static async Task<CommitRefNavigatorViewModel> CreateLoadedViewModelAsync()
+    [TestMethod]
+    public async Task Rebuild_CompactFoldersOn_MergesSingleChildFolderChain()
+    {
+        var ui = new UiPreferencesService(TempPrefsPath()) { CompactFolders = true };
+        var vm = await CreateLoadedViewModelAsync(ui);
+
+        var remotes = vm.RefTree.Single(n => n.Name.StartsWith("Remotes", StringComparison.Ordinal));
+        Assert.AreEqual("Remotes/origin/feature", remotes.Name);
+        Assert.AreEqual("x", remotes.Children.Single().Name);
+
+        var branches = vm.RefTree.Single(n => n.Name == "Branches");
+        Assert.AreEqual(2, branches.Children.Count, "a folder with a branch and a sub-folder stays as it is");
+    }
+
+    [TestMethod]
+    public async Task Rebuild_CompactFoldersToggled_RebuildsNestedTree()
+    {
+        var ui = new UiPreferencesService(TempPrefsPath()) { CompactFolders = true };
+        var vm = await CreateLoadedViewModelAsync(ui);
+
+        ui.CompactFolders = false;
+
+        var remotes = vm.RefTree.Single(n => n.Name == "Remotes");
+        Assert.AreEqual("origin", remotes.Children.Single().Name);
+        Assert.IsNotNull(FindNode(vm, "refs/remotes/origin/feature/x"));
+    }
+
+    private static string TempPrefsPath() =>
+        Path.Combine(Path.GetTempPath(), "Gitster.Tests", Guid.NewGuid().ToString("N"), "ui.json");
+
+    private static async Task<CommitRefNavigatorViewModel> CreateLoadedViewModelAsync(UiPreferencesService? ui = null)
     {
         var git = Substitute.For<IGitBackend>();
         git.GetRefCatalogAsync().Returns(Task.FromResult<IReadOnlyList<RefCatalogItem>>(
@@ -131,7 +161,7 @@ public sealed class CommitRefNavigatorViewModelTests
         ]));
 
         var favoritesPath = Path.Combine(Path.GetTempPath(), "Gitster.Tests", Guid.NewGuid().ToString("N"), "favorites.json");
-        var vm = new CommitRefNavigatorViewModel(git, new UiPreferencesService(), new BranchFavoritesService(favoritesPath));
+        var vm = new CommitRefNavigatorViewModel(git, ui ?? new UiPreferencesService(), new BranchFavoritesService(favoritesPath));
         await vm.LoadAsync();
         return vm;
     }

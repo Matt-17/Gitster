@@ -100,6 +100,9 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -125,6 +128,18 @@
                            Foreground="{DynamicResource TextPrimary}"
                            FontFamily="{Binding BranchFontFamily}"/>
             </Border>
+
+            <TextBlock Grid.Row="4" Margin="0,24,0,0" Text="Branch trees"
+                       FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Grid.Row="5" Margin="0,4,0,12" TextWrapping="Wrap"
+                       Text="Show a folder whose only child is another folder as one row, e.g. &quot;Remotes/origin&quot; instead of &quot;Remotes&quot; ▸ &quot;origin&quot;."
+                       FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+            <CheckBox Grid.Row="6"
+                      Content="Compact single-child folders"
+                      IsChecked="{Binding CompactFolders}"
+                      FontSize="12"
+                      Foreground="{DynamicResource TextPrimary}"/>
         </Grid>
     </Grid>
 </Window>

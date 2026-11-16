@@ -46,6 +46,7 @@ public partial class UiPreferencesService : ObservableObject
         public bool GravatarEnabled { get; set; }
         public bool BranchTreeView { get; set; }
         public bool CommitRefPaneCollapsed { get; set; }
+        public bool CompactFolders { get; set; } = true;
         public bool UpdateChecksEnabled { get; set; }
         public bool PersistentLoggingEnabled { get; set; }
         public bool SyncCommitterWithAuthorDate { get; set; }
@@ -65,6 +66,10 @@ public partial class UiPreferencesService : ObservableObject
 
     [ObservableProperty]
     public partial bool CommitRefPaneCollapsed { get; set; }
+
+    /// <summary>Branch trees: show a folder whose only child is a folder as one row ("Remotes/origin").</summary>
+    [ObservableProperty]
+    public partial bool CompactFolders { get; set; } = true;
 
     [ObservableProperty]
     public partial bool UpdateChecksEnabled { get; set; }
@@ -90,6 +95,7 @@ public partial class UiPreferencesService : ObservableObject
     partial void OnGravatarEnabledChanged(bool value) => Save();
     partial void OnBranchTreeViewChanged(bool value) => Save();
     partial void OnCommitRefPaneCollapsedChanged(bool value) => Save();
+    partial void OnCompactFoldersChanged(bool value) => Save();
     partial void OnUpdateChecksEnabledChanged(bool value) => Save();
     partial void OnPersistentLoggingEnabledChanged(bool value) => Save();
     partial void OnSyncCommitterWithAuthorDateChanged(bool value) => Save();
@@ -156,6 +162,7 @@ public partial class UiPreferencesService : ObservableObject
                     GravatarEnabled = GravatarEnabled,
                     BranchTreeView = BranchTreeView,
                     CommitRefPaneCollapsed = CommitRefPaneCollapsed,
+                    CompactFolders = CompactFolders,
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
                     SyncCommitterWithAuthorDate = SyncCommitterWithAuthorDate,
@@ -177,6 +184,7 @@ public partial class UiPreferencesService : ObservableObject
                     GravatarEnabled = GravatarEnabled,
                     BranchTreeView = BranchTreeView,
                     CommitRefPaneCollapsed = CommitRefPaneCollapsed,
+                    CompactFolders = CompactFolders,
                     UpdateChecksEnabled = UpdateChecksEnabled,
                     PersistentLoggingEnabled = PersistentLoggingEnabled,
                     SyncCommitterWithAuthorDate = SyncCommitterWithAuthorDate,
@@ -202,6 +210,7 @@ public partial class UiPreferencesService : ObservableObject
         GravatarEnabled = settings.GravatarEnabled;
         BranchTreeView = settings.BranchTreeView;
         CommitRefPaneCollapsed = settings.CommitRefPaneCollapsed;
+        CompactFolders = settings.CompactFolders;
         UpdateChecksEnabled = settings.UpdateChecksEnabled;
         PersistentLoggingEnabled = settings.PersistentLoggingEnabled;
         SyncCommitterWithAuthorDate = settings.SyncCommitterWithAuthorDate;
@@ -218,6 +227,7 @@ public partial class UiPreferencesService : ObservableObject
         GravatarEnabled = p.GravatarEnabled;
         BranchTreeView = p.BranchTreeView;
         CommitRefPaneCollapsed = p.CommitRefPaneCollapsed;
+        CompactFolders = p.CompactFolders;
         UpdateChecksEnabled = p.UpdateChecksEnabled;
         PersistentLoggingEnabled = p.PersistentLoggingEnabled;
         SyncCommitterWithAuthorDate = p.SyncCommitterWithAuthorDate;
