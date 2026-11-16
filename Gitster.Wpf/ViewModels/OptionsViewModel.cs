@@ -45,9 +45,11 @@ public partial class OptionsViewModel : BaseViewModel
         {
             if (_ui.BranchFontFamily == value)
                 return;
-            _ui.BranchFontFamily = string.IsNullOrWhiteSpace(value)
-                ? UiPreferencesService.DefaultBranchFontFamily
-                : value;
+            // A broken installed font throws during layout and would take down the windows
+            // that use it, so only accept families WPF can really load.
+            _ui.BranchFontFamily = FontProbe.IsUsable(value)
+                ? value
+                : UiPreferencesService.DefaultBranchFontFamily;
             OnPropertyChanged();
         }
     }
@@ -65,15 +67,16 @@ public partial class OptionsViewModel : BaseViewModel
         }
     }
 
-    /// <summary>A few sensible font suggestions; the field stays free-text/editable.</summary>
-    public ObservableCollection<string> FontSuggestions { get; } =
-    [
-        UiPreferencesService.DefaultBranchFontFamily,
-        "Segoe UI",
-        "Cascadia Mono, Consolas",
-        "Consolas",
-        "Verdana",
-    ];
+    /// <summary>A few sensible font suggestions that load on this machine; the field stays free-text/editable.</summary>
+    public ObservableCollection<string> FontSuggestions { get; } = new(
+        new[]
+        {
+            UiPreferencesService.DefaultBranchFontFamily,
+            "Segoe UI",
+            "Cascadia Mono, Consolas",
+            "Consolas",
+            "Verdana",
+        }.Where(FontProbe.IsUsable));
 
     // ── Branches category ────────────────────────────────────────────────
 

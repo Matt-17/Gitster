@@ -120,6 +120,7 @@ public partial class App : Application
 			_host.Services.GetRequiredService<ThemeService>().Start();
 			if (_host.Services.GetRequiredService<UiPreferencesService>().PersistentLoggingEnabled)
 				_host.Services.GetRequiredService<GitCliTelemetryService>().Start();
+			ApplyUsableFonts(_host.Services.GetRequiredService<UiPreferencesService>());
 
 			var mainWindow = _host.Services.GetRequiredService<MainWindow>();
 			MainWindow = mainWindow;
@@ -156,6 +157,27 @@ public partial class App : Application
 		}
 
 		base.OnExit(e);
+	}
+
+	/// <summary>
+	/// WPF throws during layout (instead of falling back) when the first installed family of a
+	/// font list cannot be loaded, e.g. a broken Cascadia install. Replace the monospace theme
+	/// font with the first family that really loads, and reset an unusable branch font setting,
+	/// before any window is built. A top-level resource overrides the merged theme dictionary.
+	/// </summary>
+	private void ApplyUsableFonts(UiPreferencesService ui)
+	{
+		var mono = FontProbe.FirstUsable(
+			"Cascadia Mono, JetBrains Mono, Consolas",
+			"JetBrains Mono, Consolas",
+			"Consolas");
+		Resources["FontFamilyMono"] = new System.Windows.Media.FontFamily(mono);
+
+		if (!FontProbe.IsUsable(ui.BranchFontFamily))
+		{
+			_logger?.LogWarning("Branch font '{Font}' cannot be loaded; using the default", ui.BranchFontFamily);
+			ui.BranchFontFamily = UiPreferencesService.DefaultBranchFontFamily;
+		}
 	}
 
 	private void RegisterGlobalExceptionHandlers()
