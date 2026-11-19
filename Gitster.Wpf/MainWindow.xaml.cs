@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     public MainWindow(MainWindowViewModel viewModel, IWindowService windowService, AppSettingsService appSettings)
     {
         InitializeComponent();
+        Views.Helper.MaximizedWorkArea.Attach(this);
 
         _viewModel = viewModel;
         _windowService = windowService;
@@ -61,16 +62,13 @@ public partial class MainWindow : Window
         base.OnStateChanged(e);
         _viewModel.AutoFetch.OnWindowStateChanged(WindowState);
 
-        // Custom-chrome windows clip content under the screen edges when maximized;
-        // pad the root by the resize border so nothing is hidden (A6).
         UpdateRootChromeFrame();
     }
 
     private void UpdateRootChromeFrame()
     {
-        RootContainer.Padding = WindowState == WindowState.Maximized
-            ? new Thickness(SystemParameters.WindowResizeBorderThickness.Left + SystemParameters.FixedFrameVerticalBorderWidth)
-            : new Thickness(0);
+        // MaximizedWorkArea sizes the maximized window to the work area exactly,
+        // so there is no off-screen overhang to pad for.
         RootContainer.BorderThickness = WindowState == WindowState.Maximized
             ? new Thickness(0)
             : new Thickness(1);
