@@ -41,7 +41,7 @@ public partial class ConflictGuidanceDialog : Window
         var text = _guidance.Files.Count > 0
             ? string.Join(Environment.NewLine, _guidance.Files)
             : _guidance.RawMessage;
-        Clipboard.SetText(text);
+        Gitster.Services.WpfClipboard.TrySetText(text);
     }
 
     private void OnCloseClicked(object sender, RoutedEventArgs e)

@@ -3,17 +3,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         WindowStyle="None"
-        AllowsTransparency="True"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
         MinWidth="420"
         MaxWidth="620"
-        Background="Transparent"
+        Background="{DynamicResource BackgroundPrimary}"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         KeyboardNavigation.TabNavigation="Cycle">
+    <!-- A plain opaque window: the corners are whatever the OS draws, nothing is painted over them. -->
     <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="34"
+        <shell:WindowChrome CaptionHeight="32"
                             ResizeBorderThickness="0"
                             GlassFrameThickness="0"
                             CornerRadius="0"
@@ -22,11 +22,10 @@
 
     <Border Background="{DynamicResource BackgroundPrimary}"
             BorderBrush="{DynamicResource WindowBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="{DynamicResource CornerRadiusMd}">
+            BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="34"/>
+                <RowDefinition Height="32"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
@@ -43,52 +42,73 @@
                            FontWeight="SemiBold"
                            TextTrimming="CharacterEllipsis"/>
                 <Button Grid.Column="1"
-                        Width="42"
-                        BorderThickness="0"
-                        Background="Transparent"
-                        Foreground="{DynamicResource TextOnAccent}"
+                        Style="{DynamicResource CaptionCloseButton}"
                         Click="OnCloseClicked"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         ToolTip="Close"
-                        AutomationProperties.Name="Close dialog">
-                    <TextBlock Text="x"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"/>
-                </Button>
+                        AutomationProperties.Name="Close dialog"/>
             </Grid>
 
-            <Grid Grid.Row="1" Margin="18,18,18,12">
+            <Grid Grid.Row="1" Margin="20,20,20,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Border Width="32"
-                        Height="32"
-                        CornerRadius="16"
-                        Background="{DynamicResource AccentInfoBackground}"
-                        Margin="0,0,14,0"
-                        VerticalAlignment="Top">
-                    <TextBlock x:Name="IconText"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource AccentBlue}"/>
-                </Border>
-                <TextBlock x:Name="MessageText"
-                           Grid.Column="1"
-                           Foreground="{DynamicResource TextPrimary}"
-                           TextWrapping="Wrap"
-                           FontSize="13"
-                           LineHeight="19"
-                           MaxWidth="520"/>
+
+                <Grid x:Name="IconHost"
+                      Width="32"
+                      Height="32"
+                      Margin="0,0,16,0"
+                      VerticalAlignment="Top">
+                    <Path x:Name="IconShape"
+                          Stretch="None"
+                          StrokeThickness="2"
+                          StrokeLineJoin="Round"/>
+                    <Path x:Name="IconGlyph"
+                          Stretch="None"
+                          StrokeThickness="2.6"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          Stroke="{DynamicResource TextOnAccent}"/>
+                </Grid>
+
+                <!-- Read-only text box instead of a text block so the message can be selected
+                     and partially copied; without a selection Ctrl+C copies the whole dialog. -->
+                <TextBox x:Name="MessageText"
+                         Grid.Column="1"
+                         VerticalAlignment="Center"
+                         IsReadOnly="True"
+                         IsTabStop="False"
+                         TextWrapping="Wrap"
+                         MaxWidth="520"
+                         Padding="0"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Foreground="{DynamicResource TextPrimary}"
+                         SelectionBrush="{DynamicResource AccentBlue}"
+                         FontSize="13"
+                         TextBlock.LineHeight="19">
+                    <TextBox.Template>
+                        <ControlTemplate TargetType="TextBox">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Disabled"/>
+                        </ControlTemplate>
+                    </TextBox.Template>
+                </TextBox>
             </Grid>
 
-            <StackPanel x:Name="ButtonsHost"
-                        Grid.Row="2"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        Margin="18,0,18,18"/>
+            <Border Grid.Row="2"
+                    Background="{DynamicResource BackgroundSecondary}"
+                    BorderBrush="{DynamicResource BorderSecondary}"
+                    BorderThickness="0,1,0,0">
+                <StackPanel x:Name="ButtonsHost"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="20,12"/>
+            </Border>
         </Grid>
     </Border>
 </Window>

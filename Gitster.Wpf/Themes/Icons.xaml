@@ -12,6 +12,15 @@
     <Geometry x:Key="IconSyncGeometry">M3,10 a7,7 0 0,1 14,0 M17,10 L14,7 M17,10 L20,7 M17,10 a7,7 0 0,1 -14,0 M3,10 L6,13 M3,10 L0,13</Geometry>
     <Geometry x:Key="IconLightningGeometry">M13,2 L7,12 L11,12 L7,22 L17,10 L13,10 Z</Geometry>
 
+    <!-- Message dialog icons, drawn on a 32x32 canvas: a filled shape plus a stroked glyph. -->
+    <EllipseGeometry x:Key="MessageIconCircleGeometry" Center="16,16" RadiusX="15" RadiusY="15"/>
+    <Geometry x:Key="MessageIconTriangleGeometry">M16,2.5 L30.5,28.5 L1.5,28.5 Z</Geometry>
+    <Geometry x:Key="MessageIconErrorGlyph">M11,11 L21,21 M21,11 L11,21</Geometry>
+    <Geometry x:Key="MessageIconWarningGlyph">M16,11.5 L16,19 M16,23.4 L16,23.6</Geometry>
+    <Geometry x:Key="MessageIconInfoGlyph">M16,14.5 L16,23 M16,9.4 L16,9.6</Geometry>
+    <Geometry x:Key="MessageIconQuestionGlyph">M12.2,12.6 A3.9,3.9 0 1 1 18.4,15.8 C16.8,16.9 16,17.7 16,19.4 M16,23.4 L16,23.6</Geometry>
+    <Geometry x:Key="CaptionCloseGlyph">M0,0 L10,10 M10,0 L0,10</Geometry>
+
     <Style x:Key="StrokeIcon16" TargetType="Path">
         <Setter Property="Width" Value="16"/>
         <Setter Property="Height" Value="16"/>

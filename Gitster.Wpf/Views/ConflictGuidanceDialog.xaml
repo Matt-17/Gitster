@@ -4,12 +4,11 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Conflict guidance"
         WindowStyle="None"
-        AllowsTransparency="True"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
         MinWidth="520"
         MaxWidth="720"
-        Background="Transparent"
+        Background="{DynamicResource BackgroundPrimary}"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         KeyboardNavigation.TabNavigation="Cycle">
@@ -23,8 +22,7 @@
 
     <Border Background="{DynamicResource BackgroundPrimary}"
             BorderBrush="{DynamicResource WindowBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="{DynamicResource CornerRadiusMd}">
+            BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="34"/>
@@ -45,19 +43,11 @@
                            Text="Conflict guidance"
                            TextTrimming="CharacterEllipsis"/>
                 <Button Grid.Column="1"
-                        Width="42"
-                        BorderThickness="0"
-                        Background="Transparent"
-                        Foreground="{DynamicResource TextOnAccent}"
+                        Style="{DynamicResource CaptionCloseButton}"
                         Click="OnCloseClicked"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         ToolTip="Close"
-                        AutomationProperties.Name="Close conflict guidance">
-                    <TextBlock Text="x"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"/>
-                </Button>
+                        AutomationProperties.Name="Close conflict guidance"/>
             </Grid>
 
             <Grid Grid.Row="1" Margin="18">

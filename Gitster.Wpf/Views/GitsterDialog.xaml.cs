@@ -1,13 +1,20 @@
+using System.Media;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
+using Gitster.Services;
 
 namespace Gitster.Views;
 
+/// <summary>
+/// The app's message box: same contract as <see cref="MessageBox"/> (buttons, image, result,
+/// Esc, Enter, Ctrl+C, system sound), drawn in the Gitster theme.
+/// </summary>
 public partial class GitsterDialog : Window
 {
-    private MessageBoxResult _result = MessageBoxResult.Cancel;
+    private readonly MessageBoxButton _button;
+    private readonly MessageBoxImage _image;
+    private MessageBoxResult _result;
 
     public GitsterDialog(
         string text,
@@ -17,52 +24,21 @@ public partial class GitsterDialog : Window
     {
         InitializeComponent();
 
+        _button = button;
+        _image = image;
+        _result = CancelResult(button);
+
         Title = caption;
         CaptionText.Text = caption;
         MessageText.Text = text;
-        ApplyVariant(image);
+        ApplyIcon(image);
         BuildButtons(button);
+
+        // Bound on the window so Ctrl+C works wherever focus is inside the dialog.
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, OnCopy));
         PreviewKeyDown += OnPreviewKeyDown;
-
-        // Nothing has keyboard focus in a chromeless window by default, so neither the
-        // IsCancel access key (Esc) nor Enter reliably reach the buttons. Focus the default one.
-        Loaded += (_, _) =>
-        {
-            Activate();
-            ButtonsHost.Children.OfType<Button>().FirstOrDefault(b => b.IsDefault)?.Focus();
-        };
-    }
-
-    /// <summary>
-    /// Ctrl+C copies the dialog like the Windows message box does: caption, message and
-    /// buttons, so an error can be pasted into a bug report.
-    /// </summary>
-    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape)
-        {
-            // Esc always closes, like the close button (No/Cancel result), wherever focus is.
-            OnCloseClicked(this, e);
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key != Key.C || (Keyboard.Modifiers & ModifierKeys.Control) == 0)
-            return;
-
-        var buttons = string.Join("   ", ButtonsHost.Children.OfType<Button>().Select(b => b.Content));
-        const string rule = "---------------------------";
-        var text = $"{rule}\r\n{CaptionText.Text}\r\n{rule}\r\n{MessageText.Text}\r\n{rule}\r\n{buttons}\r\n{rule}\r\n";
-        try
-        {
-            Clipboard.SetText(text);
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            // Clipboard is busy (another app holds it); nothing sensible to do.
-        }
-
-        e.Handled = true;
+        Loaded += (_, _) => FocusDefaultButton();
+        ContentRendered += OnContentRendered;
     }
 
     public static MessageBoxResult Show(
@@ -73,10 +49,74 @@ public partial class GitsterDialog : Window
         MessageBoxImage image = MessageBoxImage.None)
     {
         var dialog = new GitsterDialog(text, caption, button, image);
-        if (owner is not null && !ReferenceEquals(owner, dialog))
+        if (owner is not null && !ReferenceEquals(owner, dialog) && owner.IsLoaded)
             dialog.Owner = owner;
+        else
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        return dialog.ShowDialog() == true ? dialog._result : CancelResult(button);
+        dialog.ShowDialog();
+        return dialog._result;
+    }
+
+    /// <summary>The text Ctrl+C copies when nothing is selected, laid out like the Windows message box.</summary>
+    internal string BuildClipboardText()
+    {
+        var buttons = string.Join("   ", ButtonsHost.Children.OfType<Button>().Select(b => b.Content));
+        const string rule = "---------------------------";
+        return $"{rule}\r\n{CaptionText.Text}\r\n{rule}\r\n{MessageText.Text}\r\n{rule}\r\n{buttons}\r\n{rule}\r\n";
+    }
+
+    private void OnContentRendered(object? sender, EventArgs e)
+    {
+        // A chromeless window shown from a background continuation does not always get
+        // activated; without activation no key (Esc, Enter, Ctrl+C) reaches it.
+        Activate();
+        FocusDefaultButton();
+        PlaySystemSound(_image);
+    }
+
+    private void FocusDefaultButton()
+    {
+        var button = ButtonsHost.Children.OfType<Button>().FirstOrDefault(b => b.IsDefault)
+            ?? ButtonsHost.Children.OfType<Button>().FirstOrDefault();
+        if (button is not null)
+            Keyboard.Focus(button);
+    }
+
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            // Esc closes like the close button, wherever focus is.
+            CloseAsCancelled();
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+C (also Ctrl+Insert) is handled here rather than left to the text box: the text
+        // box swallows the copy command when nothing is selected.
+        var isCopy = (Keyboard.Modifiers & ModifierKeys.Control) != 0
+            && (e.Key == Key.C || e.Key == Key.Insert);
+        if (isCopy)
+        {
+            Copy();
+            e.Handled = true;
+        }
+    }
+
+    private void OnCopy(object sender, ExecutedRoutedEventArgs e)
+    {
+        Copy();
+        e.Handled = true;
+    }
+
+    private void Copy()
+    {
+        var text = MessageText.SelectionLength > 0
+            ? MessageText.SelectedText
+            : BuildClipboardText();
+        if (!WpfClipboard.TrySetText(text))
+            SystemSounds.Beep.Play();
     }
 
     private void BuildButtons(MessageBoxButton button)
@@ -112,7 +152,7 @@ public partial class GitsterDialog : Window
         var button = new Button
         {
             Content = text,
-            Margin = new Thickness(6, 0, 0, 0),
+            Margin = new Thickness(8, 0, 0, 0),
             IsDefault = isDefault,
             IsCancel = isCancel,
         };
@@ -125,46 +165,54 @@ public partial class GitsterDialog : Window
         ButtonsHost.Children.Add(button);
     }
 
-    private void ApplyVariant(MessageBoxImage image)
+    private void ApplyIcon(MessageBoxImage image)
     {
-        var icon = image switch
+        // Several MessageBoxImage members share a value (Error = Hand = Stop,
+        // Warning = Exclamation, Information = Asterisk), so the switch covers them all.
+        var (shapeKey, glyphKey, colorKey) = image switch
         {
-            MessageBoxImage.Warning => "!",
-            MessageBoxImage.Error => "x",
-            MessageBoxImage.Question => "?",
-            _ => "i",
-        };
-        IconText.Text = icon;
-
-        var backgroundKey = image switch
-        {
-            MessageBoxImage.Warning => "AccentWarningBackground",
-            MessageBoxImage.Error => "AccentDangerBackground",
-            MessageBoxImage.Question => "AccentInfoBackground",
-            _ => "AccentInfoBackground",
-        };
-        var foregroundKey = image switch
-        {
-            MessageBoxImage.Warning => "AccentWarning",
-            MessageBoxImage.Error => "AccentDanger",
-            MessageBoxImage.Question => "AccentBlue",
-            _ => "AccentBlue",
+            MessageBoxImage.Error => ("MessageIconCircleGeometry", "MessageIconErrorGlyph", "AccentDanger"),
+            MessageBoxImage.Warning => ("MessageIconTriangleGeometry", "MessageIconWarningGlyph", "AccentWarning"),
+            MessageBoxImage.Question => ("MessageIconCircleGeometry", "MessageIconQuestionGlyph", "AccentBlue"),
+            MessageBoxImage.Information => ("MessageIconCircleGeometry", "MessageIconInfoGlyph", "AccentBlue"),
+            _ => (null, null, null),
         };
 
-        if (IconText.Parent is Border badge)
-            badge.SetResourceReference(Border.BackgroundProperty, backgroundKey);
-        IconText.SetResourceReference(ForegroundProperty, foregroundKey);
+        if (shapeKey is null)
+        {
+            // Like the Windows message box: no image, no icon.
+            IconHost.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        IconShape.SetResourceReference(System.Windows.Shapes.Path.DataProperty, shapeKey);
+        IconShape.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, colorKey);
+        IconShape.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, colorKey);
+        IconGlyph.SetResourceReference(System.Windows.Shapes.Path.DataProperty, glyphKey);
     }
 
-    private void OnCloseClicked(object sender, RoutedEventArgs e)
+    private static void PlaySystemSound(MessageBoxImage image)
     {
-        _result = CancelResult(ButtonsHost.Children.OfType<Button>().Any(b => Equals(b.Content, "No"))
-            ? MessageBoxButton.YesNo
-            : MessageBoxButton.OKCancel);
+        var sound = image switch
+        {
+            MessageBoxImage.Error => SystemSounds.Hand,
+            MessageBoxImage.Warning => SystemSounds.Exclamation,
+            MessageBoxImage.Question => SystemSounds.Question,
+            MessageBoxImage.Information => SystemSounds.Asterisk,
+            _ => null,
+        };
+        sound?.Play();
+    }
+
+    private void OnCloseClicked(object sender, RoutedEventArgs e) => CloseAsCancelled();
+
+    private void CloseAsCancelled()
+    {
+        _result = CancelResult(_button);
         DialogResult = false;
-        Close();
     }
 
+    /// <summary>What closing without a button means: OK for a plain OK box, otherwise No or Cancel.</summary>
     private static MessageBoxResult CancelResult(MessageBoxButton button) =>
         button switch
         {
