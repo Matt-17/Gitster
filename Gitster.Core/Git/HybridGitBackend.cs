@@ -40,7 +40,10 @@ public sealed class HybridGitBackend : IGitBackend, IRepositoryReadProvider
 
     public Task<WorkingTreeState> GetWorkingTreeStateAsync()     => _lib.GetWorkingTreeStateAsync();
     public Task<BranchInfo> GetCurrentBranchAsync()             => _lib.GetCurrentBranchAsync();
-    public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(CommitFilter? filter = null) => _lib.GetCommitsAsync(filter);
+    // Read through the Git CLI, which addresses every commit by its full SHA; libgit2 stays the
+    // fallback when no Git executable is installed.
+    public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(CommitFilter? filter = null)
+        => GitCli.IsAvailable ? _cli.GetCommitsAsync(filter) : _lib.GetCommitsAsync(filter);
     public IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(CommitFilter? filter = null, CancellationToken ct = default) => _lib.EnumerateCommitsAsync(filter, ct);
     public Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default) => _lib.ComputeRemoteSetsAsync(refName, ct);
     public Task<CommitDetails> GetCommitAsync(string sha)       => _lib.GetCommitAsync(sha);

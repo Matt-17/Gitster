@@ -150,17 +150,19 @@ internal sealed class LibGit2HistoryReader
             }))
             {
                 if (commit.Tree?.Sha != null)
-                    outgoingTreeMap.TryAdd(commit.Tree.Sha, commit.Id.Sha[..7]);
+                    outgoingTreeMap.TryAdd(commit.Tree.Sha, commit.Id.Sha);
             }
 
+            // Keyed and looked up by full SHA: the 7-char display form can be ambiguous in a
+            // large repository, and libgit2 then refuses the lookup.
             var incomingPairsBySha = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var inc in incomingCommits)
             {
-                var incCommit = repo.Lookup<Commit>(inc.Sha);
+                var incCommit = repo.Lookup<Commit>(new ObjectId(inc.FullSha));
                 if (incCommit?.Tree?.Sha != null &&
                     outgoingTreeMap.TryGetValue(incCommit.Tree.Sha, out var outSha))
                 {
-                    incomingPairsBySha[inc.Sha] = outSha;
+                    incomingPairsBySha[inc.FullSha] = outSha;
                 }
             }
 
@@ -174,13 +176,13 @@ internal sealed class LibGit2HistoryReader
                     outgoingPairBySha.TryAdd(outgoingSha, incomingSha);
 
                 incomingCommits = incomingCommits.Select(c =>
-                    incomingPairsBySha.TryGetValue(c.Sha, out var partner)
-                        ? c with { OrphanedPairSha = partner }
+                    incomingPairsBySha.TryGetValue(c.FullSha, out var partner)
+                        ? c with { OrphanedPairSha = GitSha.Short(partner) }
                         : c).ToList();
 
                 localResult = localResult.Select(c =>
-                    outgoingPairBySha.TryGetValue(c.Sha, out var partner)
-                        ? c with { OrphanedPairSha = partner }
+                    outgoingPairBySha.TryGetValue(c.FullSha, out var partner)
+                        ? c with { OrphanedPairSha = GitSha.Short(partner) }
                         : c).ToList();
             }
         }

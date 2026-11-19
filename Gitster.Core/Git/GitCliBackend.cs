@@ -357,6 +357,13 @@ public sealed class GitCliBackend : IGitBackend
         return r.Success ? r.Stdout.Trim() : null;
     }
 
+    /// <summary>The checked-out branch's history with remote state and rewritten-commit pairs.</summary>
+    public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(CommitFilter? filter = null)
+    {
+        EnsurePath(); EnsureCli();
+        return GitCliCommitLog.ReadAsync(RepositoryPath!, filter);
+    }
+
     public Task<CompareResult> CompareRefsAsync(string baseRef, string compareRef, bool threeDot, CancellationToken ct = default)
         => NS<CompareResult>();
 
@@ -447,7 +454,6 @@ public sealed class GitCliBackend : IGitBackend
 
     public Task<WorkingTreeState> GetWorkingTreeStateAsync()     => NS<WorkingTreeState>();
     public Task<BranchInfo> GetCurrentBranchAsync()             => NS<BranchInfo>();
-    public Task<IReadOnlyList<CommitInfo>> GetCommitsAsync(CommitFilter? filter = null) => NS<IReadOnlyList<CommitInfo>>();
     public IAsyncEnumerable<CommitInfo> EnumerateCommitsAsync(CommitFilter? filter = null, CancellationToken ct = default) => throw new NotSupportedException("Route through HybridGitBackend.");
     public Task<RemoteSets> ComputeRemoteSetsAsync(string? refName = null, CancellationToken ct = default) => NS<RemoteSets>();
     public Task<CommitDetails> GetCommitAsync(string sha)       => NS<CommitDetails>();
